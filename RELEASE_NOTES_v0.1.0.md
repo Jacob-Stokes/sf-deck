@@ -1,0 +1,121 @@
+**sf-deck is a terminal UI for working across your Salesforce orgs.**
+
+Schema, field-level security, SOQL, records, deploys, users, and metadata
+diffs — all on one screen, for every org you're authenticated to.
+Switch orgs with a keystroke, and reach most things in a few more.
+
+This is the first public release. sf-deck has been in private daily use
+for several months; this version wraps that up into something installable.
+
+## Install
+
+**macOS / Linux — Homebrew:**
+
+```sh
+brew install --cask Jacob-Stokes/tap/sf-deck
+```
+
+**Or download a binary** for your platform from the
+[assets list below](#assets).
+
+**Or build from source** (requires Go 1.26.5+):
+
+```sh
+git clone https://github.com/Jacob-Stokes/sf-deck
+cd sf-deck && go build -o sf-deck ./cmd/sf-deck
+```
+
+You'll also need the
+[Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
+(`sf`) with at least one authenticated org.
+
+## First run
+
+```sh
+sf-deck
+```
+
+Press a digit to open a tab. `?` lists every key the current screen
+understands. `Esc` backs out. That's most of it.
+
+To browse without a real org, every surface is wired up in demo mode:
+
+```sh
+sf-deck --demo
+```
+
+## What's in the box
+
+- **Multi-org TUI** — every authenticated org is a keystroke away.
+  Safety pill in the header shows what the active org's level is so you
+  know what you're working in.
+- **Schema, records, SOQL, FLS, flows, apex, deploys, users, perms,
+  metadata** — all numbered tabs, drill with Enter, back out with Esc.
+- **Chips** — saved filter views per surface, cyclable with `[` `]`,
+  cross-org, optionally session-only.
+- **Dev projects** — collect items from anywhere into a named working
+  set that spans orgs.
+- **Bundles** — materialise a dev project as an sfdx project directory
+  and retrieve / validate / deploy from inside sf-deck.
+- **Tags** — apply your own tags to any item across any org.
+- **SOQL editor** with autocomplete against your org's schema, a saved
+  library, and per-org history.
+- **Compare** — Apex, Flows, and metadata diffed org-to-org.
+- **Headless CLI** — core automation runs as
+  `sf-deck <noun> <verb> --json` with a stable envelope and exit codes.
+- **IPC socket** — a running sf-deck window exposes a Unix socket
+  agents can drive, including live navigation and editor state that only
+  make sense inside the TUI.
+- **Verb registry** — single source of truth for what sf-deck can do.
+  `sf-deck verbs list --json` returns the live list.
+- **Safety model** — four levels (read-only / records / metadata / full),
+  per-org, gates every write *before* the API call. Anonymous Apex requires
+  `full` because it can perform unrestricted mutations.
+- **Agent skill** — `skills/sf-deck/` packages the contract for AI
+  agents driving sf-deck.
+
+## Three things worth knowing up front
+
+**Every write is gated.** Each org has a safety level shown in the
+header. You can mark production read-only here even if your user has
+full perms in the org — sf-deck won't offer a write the level disallows.
+
+**Core operations are scriptable.** CLI and IPC share the same JSON
+envelope, backend, and safety gate; each also has intentional
+transport-specific verbs. `sf-deck verbs list --json` reports exact support.
+
+**No telemetry, no third-party calls.** sf-deck talks to Salesforce;
+that's it. State lives under `~/.sf-deck/`.
+
+## Known limitations
+
+- **Windows not supported** in this release. Uses POSIX file locking
+  and AF_UNIX sockets. WSL works fine via the Linux binary.
+- **No bulk record API.** `record.create / .update / .delete` are
+  per-record. Use the `sf` CLI for bulk operations.
+- **No async Apex test runner over IPC.** Long test runs fall through
+  to the `sf` CLI.
+
+Full limitations are documented in the
+[concepts](https://jacob-stokes.github.io/sf-deck/docs/concepts/bundles/)
+section of the docs.
+
+## Docs
+
+- **[Getting started](https://jacob-stokes.github.io/sf-deck/docs/getting-started/install/)**
+  — install, first launch, the dozen keys you'll use 90% of the time
+- **[Concepts](https://jacob-stokes.github.io/sf-deck/docs/concepts/panels/)**
+  — chips, dev projects, bundles, safety
+- **[Tasks](https://jacob-stokes.github.io/sf-deck/docs/tasks/find-a-record/)**
+  — cookbook recipes
+- **[Reference](https://jacob-stokes.github.io/sf-deck/docs/reference/cli/)**
+  — full CLI / IPC / keymap, auto-generated from the registry
+- **[Agent integration](https://jacob-stokes.github.io/sf-deck/docs/agent-integration/)**
+  — driving sf-deck from a script or AI agent
+
+## Feedback
+
+[Issues](https://github.com/Jacob-Stokes/sf-deck/issues) and
+[discussions](https://github.com/Jacob-Stokes/sf-deck/discussions)
+welcome. For security reports, see
+[SECURITY.md](https://github.com/Jacob-Stokes/sf-deck/blob/main/SECURITY.md).

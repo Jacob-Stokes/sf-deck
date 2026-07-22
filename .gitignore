@@ -1,0 +1,44 @@
+# Build and test output
+/bin/
+/dist/
+/salesforce-deck
+/sf-deck
+/sf-deck-docs
+/inventory
+/themegen
+/newsurface
+*.test
+*.out
+*.prof
+*.pprof
+*.trace
+/coverage/
+/coverage.*
+
+# Generated website and local Python environments
+/docs-site/site/
+/.venv/
+/docs-site/.venv/
+__pycache__/
+*.py[cod]
+
+# Local application state and scratch output
+/.sf-deck/
+/out/
+/tmp/
+.env
+.env.*
+!.env.example
+
+# Retired recording workspace and unsupported video output
+/vhs/
+*.webm
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~

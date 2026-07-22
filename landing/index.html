@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sf-deck — a terminal UI for your Salesforce orgs</title>
+<meta name="description" content="A fast, keyboard-driven terminal UI for working across your Salesforce orgs — schema, SOQL, records, deploys, users, and metadata diffs. Uses your existing sf CLI session; no org install or application telemetry.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#222436">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'none'">
+<link rel="canonical" href="https://jacob-stokes.github.io/sf-deck/">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jacob-stokes.github.io/sf-deck/">
+<meta property="og:title" content="sf-deck — every Salesforce org, one keystroke away">
+<meta property="og:description" content="A keyboard-first, safety-gated Salesforce workspace for your terminal. Uses your existing sf CLI session and keeps state local.">
+<meta property="og:image" content="https://jacob-stokes.github.io/sf-deck/assets/social-card.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="sf-deck — every Salesforce org, one keystroke away">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="sf-deck — every Salesforce org, one keystroke away">
+<meta name="twitter:description" content="A keyboard-first, safety-gated Salesforce workspace for your terminal.">
+<meta name="twitter:image" content="https://jacob-stokes.github.io/sf-deck/assets/social-card.png">
+
+<link rel="stylesheet" href="style.css?v=20260722">
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<!-- gradient mesh backdrop -->
+<div class="mesh" aria-hidden="true">
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="blob blob-c"></div>
+</div>
+
+<header class="nav">
+  <a class="brand" href="#main-content">
+    <span class="brand-mark">sf</span><span class="brand-rest">-deck</span>
+  </a>
+  <nav class="nav-links" aria-label="Primary navigation">
+    <a href="#features">Features</a>
+    <a href="#safety">Safety</a>
+    <a href="#headless">Headless</a>
+    <a href="#install">Install</a>
+    <a class="nav-gh" href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <span>GitHub</span>
+    </a>
+  </nav>
+</header>
+
+<main id="main-content">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy reveal">
+      <div class="pill">
+        <span class="dot"></span> v0.1 · macOS &amp; Linux · Apache-2.0
+      </div>
+      <h1>Every Salesforce org,<br><span class="grad">one keystroke away.</span></h1>
+      <p class="lede">
+        A keyboard-first terminal workspace for every org you authenticate — schema,
+        SOQL, records, deploys, and metadata diffs without leaving your terminal.
+      </p>
+
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#install">Install sf-deck</a>
+        <a class="btn btn-ghost" href="https://jacob-stokes.github.io/sf-deck/docs/">Read the docs →</a>
+      </div>
+    </div>
+
+    <div class="hero-media reveal">
+      <div class="term">
+        <div class="term-bar">
+          <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+          <span class="term-title">sf-deck — LSE-PROD · read-only</span>
+        </div>
+        <picture>
+          <source media="(prefers-reduced-motion: reduce)" srcset="assets/hero-poster.png">
+          <img src="assets/hero.gif" alt="sf-deck demo — tabs, chips, drill-downs, org switching, global search, and dev projects" loading="eager" width="1320" height="760">
+        </picture>
+      </div>
+    </div>
+
+    <div class="hero-below reveal">
+      <div class="hero-command-stack">
+        <div class="hero-install">
+          <code id="brew-cmd">brew install --cask Jacob-Stokes/tap/sf-deck</code>
+          <button type="button" class="copy" data-copy="brew install --cask Jacob-Stokes/tap/sf-deck" data-copy-label="Homebrew install command" aria-label="Copy Homebrew install command">Copy</button>
+        </div>
+        <div class="hero-install">
+          <code>sf-deck --demo</code>
+          <button type="button" class="copy" data-copy="sf-deck --demo" data-copy-label="demo command" aria-label="Copy demo command">Copy</button>
+        </div>
+      </div>
+
+      <ul class="hero-trust">
+        <li>Runs on your <code>sf</code> CLI session</li>
+        <li>Caches locally — gentle on your API limits</li>
+        <li>No org install</li>
+        <li>The sf-deck app sends no telemetry</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="section">
+    <div class="section-head reveal">
+      <span class="eyebrow">What you can do</span>
+      <h2>Explore an org without leaving the terminal</h2>
+      <p>Every authenticated org is a keystroke away. Local caches make repeat visits fast and reduce repeat API calls. Press <code>o</code> to jump into Lightning, or <code>?</code> for every key on the current screen.</p>
+    </div>
+
+    <div class="feat-grid">
+      <article class="feat reveal"><h3>Objects &amp; schema</h3><p>sObjects, fields, record types, validation rules, triggers, flows. FLS editable in place.</p></article>
+      <article class="feat reveal"><h3>Records</h3><p>Browse, search, drill, edit — export the current view.</p></article>
+      <article class="feat reveal"><h3>SOQL</h3><p>Editor with schema autocomplete, saved queries, history, xlsx/csv/json export.</p></article>
+      <article class="feat reveal"><h3>Apex &amp; Flows</h3><p>Class &amp; trigger bodies, anonymous Apex + logs, flow versions and activation.</p></article>
+      <article class="feat reveal"><h3>Users &amp; permissions</h3><p>Logins, live sessions, freeze/reset, permission sets, profiles, queues.</p></article>
+      <article class="feat reveal"><h3>Org at a glance</h3><p>Limits, licenses, notifications, and what you recently viewed.</p></article>
+      <article class="feat reveal"><h3>Deploys <span class="beta">beta</span></h3><p>History, component failures, test results, live status.</p></article>
+      <article class="feat reveal"><h3>Compare <span class="beta">beta</span></h3><p>Apex, flows, and metadata diffed org-to-org.</p></article>
+      <article class="feat reveal"><h3>Tags &amp; dev projects <span class="beta">beta</span></h3><p>Tag anything across orgs; collect, export, deploy.</p></article>
+    </div>
+  </section>
+
+  <!-- DEMO showcase -->
+  <section class="section demo">
+    <div class="demo-row reveal">
+      <div class="demo-copy">
+        <span class="eyebrow">See it move</span>
+        <h2>Field-level security, edited in place</h2>
+        <p>Toggle read/edit per profile and permission set, right in the terminal.</p>
+        <a class="btn btn-ghost" href="https://jacob-stokes.github.io/sf-deck/docs/getting-started/first-launch/">First-launch guide →</a>
+      </div>
+      <div class="demo-media term">
+        <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">FLS</span></div>
+        <picture>
+          <source media="(prefers-reduced-motion: reduce)" srcset="assets/fls-poster.png">
+          <img src="assets/fls.gif" alt="Editing field-level security per profile in sf-deck" loading="lazy" width="1320" height="760">
+        </picture>
+      </div>
+    </div>
+    <div class="demo-row reverse reveal">
+      <div class="demo-copy">
+        <span class="eyebrow">Multi-org workflow</span>
+        <h2>Switch orgs, keep your context</h2>
+        <p>Move from an org overview into schema details, then jump to another org without leaving the terminal.</p>
+        <a class="btn btn-ghost" href="https://jacob-stokes.github.io/sf-deck/docs/tasks/cross-org-workflow/">Cross-org walkthrough →</a>
+      </div>
+      <div class="demo-media term">
+        <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">multi-org navigation</span></div>
+        <picture>
+          <source media="(prefers-reduced-motion: reduce)" srcset="assets/demo-poster.png">
+          <img src="assets/demo.gif" alt="Switching orgs and drilling into schema details in sf-deck" loading="lazy" width="1920" height="1080">
+        </picture>
+      </div>
+    </div>
+  </section>
+
+  <!-- SAFETY -->
+  <section id="safety" class="section safety">
+    <div class="section-head reveal">
+      <span class="eyebrow">Safety levels</span>
+      <h2>Production is read-only until you say otherwise</h2>
+      <p>Every org has a safety level. On a read-only org, write actions don't even appear — set per org, changed deliberately.</p>
+    </div>
+    <div class="safety-scale reveal">
+      <div class="lvl"><span class="lvl-name">read-only</span><span class="lvl-desc">browse &amp; export only</span></div>
+      <div class="lvl"><span class="lvl-name">records</span><span class="lvl-desc">edit record fields</span></div>
+      <div class="lvl"><span class="lvl-name">metadata</span><span class="lvl-desc">deploys &amp; metadata writes</span></div>
+      <div class="lvl danger"><span class="lvl-name">full</span><span class="lvl-desc">destructive ops &amp; anonymous Apex</span></div>
+    </div>
+  </section>
+
+  <!-- HEADLESS -->
+  <section id="headless" class="section headless">
+    <div class="headless-grid">
+      <div class="section-head left reveal">
+        <span class="eyebrow">Headless &amp; agents</span>
+        <h2>The same tool, scriptable</h2>
+        <p>Core operations are scriptable with versioned JSON, predictable exit codes, and the same per-org safety gate. CLI and live-window IPC each expose the verbs that fit their context.</p>
+        <p class="fine">Agents can also drive a live window over a per-instance Unix socket.</p>
+      </div>
+      <div class="code-block reveal">
+        <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">shell</span></div>
+        <pre><code><span class="c-cmd">sf-deck</span> soql run <span class="c-flag">--org</span> my-sandbox <span class="c-flag">--query</span> <span class="c-str">"SELECT Id, Name FROM Account LIMIT 5"</span> <span class="c-flag">--json</span>
+<span class="c-cmd">sf-deck</span> record get <span class="c-flag">--org</span> my-sandbox <span class="c-flag">--id</span> 001... <span class="c-flag">--json</span>
+<span class="c-cmd">sf-deck</span> org safety get <span class="c-flag">--org</span> prod <span class="c-flag">--json</span>
+
+<span class="c-out">{ <span class="c-key">"ok"</span>: true, <span class="c-key">"command"</span>: <span class="c-str">"soql.run"</span>, <span class="c-key">"changed"</span>: false, <span class="c-key">"data"</span>: { … } }</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section id="install" class="section install">
+    <div class="section-head reveal">
+      <span class="eyebrow">Install</span>
+      <h2>Up and running in a minute</h2>
+      <p>You need the <a href="https://developer.salesforce.com/tools/salesforcecli" target="_blank" rel="noopener">Salesforce CLI</a> and at least one authenticated org. If <code>sf org list</code> returns your orgs, you're set up.</p>
+    </div>
+
+    <div class="install-cards">
+      <div class="icard reveal">
+        <h3>Homebrew</h3>
+        <p class="icard-sub">macOS &amp; Linux</p>
+        <div class="cmd"><code>brew install --cask Jacob-Stokes/tap/sf-deck</code><button type="button" class="copy" data-copy="brew install --cask Jacob-Stokes/tap/sf-deck" data-copy-label="Homebrew install command" aria-label="Copy Homebrew install command">Copy</button></div>
+        <div class="cmd"><code>sf-deck</code><button type="button" class="copy" data-copy="sf-deck" data-copy-label="launch command" aria-label="Copy launch command">Copy</button></div>
+      </div>
+      <div class="icard reveal">
+        <h3>From source</h3>
+        <p class="icard-sub">Go 1.26.5+</p>
+        <div class="cmd"><code>git clone https://github.com/Jacob-Stokes/sf-deck</code><button type="button" class="copy" data-copy="git clone https://github.com/Jacob-Stokes/sf-deck" data-copy-label="clone command" aria-label="Copy Git clone command">Copy</button></div>
+        <div class="cmd"><code>go build -o sf-deck ./cmd/sf-deck</code><button type="button" class="copy" data-copy="go build -o sf-deck ./cmd/sf-deck" data-copy-label="build command" aria-label="Copy Go build command">Copy</button></div>
+      </div>
+      <div class="icard icard-wide reveal">
+        <h3>Pre-built binary</h3>
+        <p class="icard-sub">macOS &amp; Linux</p>
+        <p class="icard-body">Grab the archive for your platform from the latest release, extract, and move <code>sf-deck</code> onto your <code>$PATH</code>.</p>
+        <a class="btn btn-ghost small" href="https://github.com/Jacob-Stokes/sf-deck/releases" target="_blank" rel="noopener">Releases →</a>
+      </div>
+    </div>
+
+    <p id="demo" class="demo-hint reveal">No org handy? Try <code>sf-deck --demo</code> to browse three fictional orgs with seeded data.</p>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="brand-mark">sf</span><span class="brand-rest">-deck</span>
+      <p>A terminal UI for working across your Salesforce orgs.</p>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://jacob-stokes.github.io/sf-deck/docs/">Docs</a>
+      <a href="https://github.com/Jacob-Stokes/sf-deck/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/Jacob-Stokes/sf-deck/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+      <a href="https://github.com/Jacob-Stokes/sf-deck#current-limitations" target="_blank" rel="noopener">Limitations</a>
+      <a href="https://github.com/Jacob-Stokes/sf-deck/blob/main/LICENSE" target="_blank" rel="noopener">Apache-2.0</a>
+    </div>
+  </div>
+  <p class="footer-legal">
+    "Salesforce" is a registered trademark of Salesforce, Inc. This project is not affiliated with, endorsed by, or sponsored by Salesforce, Inc.
+  </p>
+</footer>
+
+<p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+<script src="main.js?v=20260722"></script>
+</body>
+</html>

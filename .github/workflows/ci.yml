@@ -1,0 +1,92 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build + vet + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 2
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Tidy check
+        # Fail if go.mod / go.sum are out of sync. Catches "I added a
+        # dep but forgot to commit go.sum" before it hits main.
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Format check
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+            if ! base="$(git merge-base HEAD "origin/${{ github.base_ref }}")"; then
+              base="origin/${{ github.base_ref }}"
+            fi
+          else
+            if ! git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+              exit 0
+            fi
+            base="HEAD~1"
+          fi
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "$base" HEAD -- '*.go')
+          if [ "${#files[@]}" -eq 0 ]; then
+            exit 0
+          fi
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [ -n "$unformatted" ]; then
+            echo "Go files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Static analysis
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
+
+      - name: Generated documentation
+        run: |
+          go run ./cmd/sf-deck-docs -check
+          go run ./cmd/inventory -check
+          go run ./cmd/inventory -qa -check
+
+      - name: Test
+        # -race catches data races that single-threaded tests miss.
+        # -count=1 disables the test cache so PR runs are honest
+        # (cached results from main aren't reused).
+        run: go test -race -count=1 ./...
+
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+      - name: Secret scan
+        run: go run github.com/zricethezav/gitleaks/v8@v8.28.0 dir . --no-banner --redact
+
+      - name: Third-party license notices
+        run: ./scripts/check-third-party-licenses.sh
+
+      - name: Coverage ratchet
+        # Per-package coverage must never drop below the checked-in
+        # baseline (scripts/coverage-baseline.txt). Gains get locked
+        # in by re-running with --update; losses fail here.
+        run: ./scripts/coverage-ratchet.sh

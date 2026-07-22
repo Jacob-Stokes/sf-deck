@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/Jacob-Stokes/sf-deck/blob/main/SECURITY.md
+    about: Don't open a public issue for security reports — email hello@jacobstokes.com per SECURITY.md.
+  - name: Question / discussion
+    url: https://github.com/Jacob-Stokes/sf-deck/discussions
+    about: For "how do I …" / "should I …" questions, use Discussions instead of Issues.

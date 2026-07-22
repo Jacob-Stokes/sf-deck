@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest a new capability or behaviour change.
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: |
+        Describe the workflow / situation where sf-deck falls short. Real scenarios beat hypotheticals.
+      placeholder: |
+        When I'm shipping a feature across three orgs I currently have to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        What would the feature look like? A new verb? A new key binding? A new tab? Be specific about the gesture.
+      placeholder: |
+        A `bundle.diff` verb that shows what would be deployed before I commit.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        Other ways you've thought about solving this — including doing nothing or using a different tool.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface?
+      description: Where would this live?
+      multiple: true
+      options:
+        - TUI (interactive)
+        - CLI (headless)
+        - IPC (running-instance socket)
+        - Agent skill
+        - Docs only
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I've searched existing issues for this request.
+          required: true
+        - label: I've checked the docs site's Limitations sections to see if this is deliberately out of scope.

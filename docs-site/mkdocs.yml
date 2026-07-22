@@ -1,0 +1,92 @@
+site_name: sf-deck
+site_description: A terminal UI for working across your Salesforce orgs.
+site_url: https://jacob-stokes.github.io/sf-deck/docs/
+repo_url: https://github.com/Jacob-Stokes/sf-deck
+repo_name: Jacob-Stokes/sf-deck
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/install.md
+      - getting-started/first-launch.md
+      - getting-started/keyboard-basics.md
+  - Concepts:
+      - concepts/panels.md
+      - concepts/chips.md
+      - concepts/dev-projects.md
+      - concepts/bundles.md
+      - concepts/safety.md
+      - concepts/tags.md
+  - Tasks:
+      - tasks/find-a-record.md
+      - tasks/run-soql.md
+      - tasks/collect-into-project.md
+      - tasks/bundle-and-deploy.md
+      - tasks/cross-org-workflow.md
+  - Reference:
+      - reference/keymap.md
+      - reference/cli.md
+      - reference/ipc.md
+      - reference/error-codes.md
+      - reference/on-disk-layout.md
+  - Agent integration:
+      - agent-integration/index.md
+      - agent-integration/discovering-verbs.md
+      - agent-integration/cli-vs-ipc.md
+      - agent-integration/safety.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Jacob-Stokes/sf-deck

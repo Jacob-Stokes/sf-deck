@@ -1,0 +1,73 @@
+name: Bug report
+description: Something in sf-deck is broken or behaves unexpectedly.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you get instead?
+      placeholder: |
+        I pressed Ctrl+K on a flow and ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: Step-by-step. Use `--demo` if the bug shows up there too; it's easier to debug.
+      placeholder: |
+        1. sf-deck --demo
+        2. Press 3 (objects)
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: sf-deck version
+      description: Output of `sf-deck --version`
+      placeholder: "sf-deck 0.1.0  commit: ...  built: ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (arm64)
+        - WSL
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal
+      description: e.g. iTerm2, Alacritty, kitty, Ghostty, the default Terminal.app, …
+      placeholder: "Ghostty 1.0.1"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: |
+        Any error messages, stack traces, or terminal output. If sf-deck crashed, paste the panic.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I've searched existing issues for this bug.
+          required: true
+        - label: I've tried reproducing on `--demo` to rule out org-specific behaviour (where applicable).
+        - label: This is NOT a Salesforce-side issue (a write rejected by the org with a permission error is not an sf-deck bug).
