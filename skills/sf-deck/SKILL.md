@@ -1,15 +1,15 @@
 ---
 name: sf-deck
-description: Operate sf-deck (a Salesforce TUI + automation harness) over its CLI or its live-instance IPC socket. Use for anything involving Salesforce orgs the user has connected through sf-deck — read records, run SOQL, fire anonymous Apex, mutate Tooling metadata, build sfdx bundles linked to DevProjects, retrieve/validate/deploy across orgs, manage chips/tags/saved-queries, toggle org safety levels, navigate the live TUI. Two transports (CLI for cold subprocess calls, IPC for driving a running TUI window) share a Backend and safety gates but include intentional surface-specific verbs. ALWAYS discover available verbs via `sf-deck verbs list --json` rather than relying on prose lists in any reference.
+description: Operate sf-deck over its headless CLI or live-instance IPC socket. Use for Salesforce work through sf-deck, including records, SOQL, reports, anonymous Apex, Tooling metadata, sfdx bundles, retrieve/validate/deploy, DevProjects, chips, tags, saved queries, org safety, update checks, and navigation of a running TUI. CLI and IPC share a backend and safety gates but have intentional surface-specific verbs. Always discover the current contract with `sf-deck verbs list --json` instead of relying on prose verb lists.
 ---
 
 # sf-deck
 
-sf-deck is a Salesforce ops tool with three personalities:
+sf-deck has three interfaces:
 
 - A **TUI** the user runs interactively (records, flows, apex, deploys, etc.)
 - A **headless CLI** (`sf-deck <noun> <verb> --json`) for one-shot operations
-- A **control socket** at `~/.sf-deck/control-N.sock` for driving a running TUI window over IPC
+- A **control socket** at `~/.sf-deck/control-<N>.sock` for driving a running TUI window over IPC
 
 The transports share a Backend, safety gates, and JSON envelope (`{ok, command, data, error}`), but some operations exist on only one surface by design. Always use the registry to choose a supported transport.
 
@@ -75,12 +75,12 @@ Every verb that mutates Salesforce declares its required level in the registry's
 ### Safety workflow
 
 1. **Read current level**: `org.safety.get` — returns the effective level + whether it's an override or default.
-2. **Don't raise prod without confirmation**: ALWAYS ask the user before raising safety on a production org. For sandboxes the user has marked writable, raising is fine.
-3. **Raise**: `org.safety.set` with `level: <one of the 5>`.
+2. **Check authorization**: a writable safety level is a guardrail, not permission. Perform a write only when the user requested it. Always ask before raising safety on a production org unless the current request explicitly authorizes that exact production change.
+3. **Raise**: `org.safety.set` with one of the four levels.
 4. **Do the work**: the gated verb now goes through.
 5. **Drop back**: `org.safety.set` with `clear: true` to revert to the default.
 
-User-specific rules (which orgs are production, which sandboxes are pre-authorised for writes, who to confirm with) live in the user's memory — check it before any write. The skill describes the model; memory describes the policy.
+User-specific rules may live in the current request, project instructions, or saved agent context. Check them before any write. When no policy is available, treat the org as production and ask.
 
 ## Async + report pattern
 
@@ -93,7 +93,7 @@ Both verbs accept `async: true` (IPC) or `--async` (CLI). When async:
 3. The response has `data.status.done`, `data.status.success`, component/test error counts.
 4. Loop until `done=true`.
 
-**Always use async over IPC** — the socket can't hold a 15-min request open. CLI sync mode is fine for cold scripts up to ~5min.
+**Always use async over IPC** — the socket should not hold a long deploy request open. CLI sync mode is available when the caller can wait.
 
 For sandbox validates blocked by unrelated broken Apex tests, pass `tests: "NoTestRun"` (sandbox-only) or `tests: "RunSpecifiedTests"` + `test_classes: [...]` to scope the test run.
 
@@ -105,6 +105,8 @@ See `references/workflows.md` for task-shaped recipes:
 - Author a SOQL query, save to library, recall in another session
 - Collect items into a DevProject, materialise as bundle, deploy
 - Ingest an existing sfdx project as a DevProject
+- List, run, and export reports
+- Check for a newer sf-deck release without installing it
 
 The recipes reference verbs by name; for exact flags/args use the registry.
 
@@ -136,8 +138,9 @@ See `references/limitations.md` for the full list. Headline items:
 ## Output discipline
 
 - Always pass `--json` on the CLI. The text mode is for humans.
-- On error, branch on `error.code`: `invalid_argument`, `safety_blocked`, `not_found`, `auth_required`, `instance_busy`, `confirmation_required`, `method_not_implemented`, `internal_error`.
+- On error, branch on `error.code`: `invalid_argument`, `safety_blocked`, `not_found`, `auth_required`, `partial_success`, `instance_busy`, `confirmation_required`, `method_not_implemented`, `internal_error`.
 - Don't dump raw record payloads or Apex source back to the user unless they asked for the literal values.
+- Do not infer authorization from the org's current safety level.
 - For destructive operations (`bundle.delete`, `metadata.delete`, `record.delete`, `project.delete --force`), confirm with the user before firing.
 
 ## When to drop to the CLI from an IPC-driving agent

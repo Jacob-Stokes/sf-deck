@@ -136,3 +136,29 @@ level (there is no separate `anonymous` level).
 4. **Check the response** — `compiled`, `success`, `compile_problem`,
    `exception_message`, `line`, `column`, `took_ms`.
 5. **Drop safety back**.
+
+## 8. List, run, and export reports
+
+Report access is read-only through sf-deck.
+
+1. **Find the report** — `report.list` with optional `contains` or
+   `folder` filters.
+2. **Run it** — `report.run` with the report id. Pass `force_rerun`
+   over IPC or `--force-rerun` on the CLI when Salesforce must
+   recompute rather than return a cached run.
+3. **Export when needed** — `report.export` is CLI-only and writes
+   XLSX. Supply `--output`, choose `--view formatted|details`, and use
+   `--force` only when the user requested overwriting an existing file.
+
+Use the registry for the current result shape and exact flags.
+
+## 9. Check for sf-deck updates
+
+`update.check` is read-only and never downloads or installs anything:
+
+```bash
+sf-deck update check --json
+```
+
+It respects the 24-hour cache. Add `--force` only when the user asks
+for a fresh check.

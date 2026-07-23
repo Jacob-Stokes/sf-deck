@@ -134,22 +134,32 @@ sf-deck verbs list --surface ipc --json
 The bundled [`skills/sf-deck`](skills/sf-deck) package gives AI agents the same
 command discovery and safety model. See the [agent integration guide](https://sfdeck.dev/docs/agent-integration/).
 
+<details>
+<summary><strong>Install the Claude Code skill</strong></summary>
+
+From a clone, install it for every project:
+
+```sh
+mkdir -p ~/.claude/skills
+cp -R skills/sf-deck ~/.claude/skills/
+```
+
+Use `.claude/skills/` instead for one project. Run `/skills` to confirm the
+installation; restart Claude Code if the new directory is not detected. Repeat
+the copy after updating the repository.
+
+</details>
+
 ## Authentication and local data
 
-- Salesforce CLI owns authentication. Access tokens stay in memory and are not
-  written to the cache or logs.
-- Cached org data, settings, tags, saved queries, and dev projects live under
-  `~/.sf-deck/`. Exports and bundles go where you choose.
-- There is no telemetry, hosted backend, remote licence check, or sf-deck
-  account.
-- Update checks make at most one anonymous, version-free request to GitHub
-  Releases every 24 hours. sf-deck never downloads or installs updates.
-- IPC is local and user-only. Diagnostics are opt-in, authenticated, and
-  loopback-only.
+- Salesforce CLI owns authentication; access tokens are not cached or logged.
+- Local state lives under `~/.sf-deck/`. There is no telemetry, hosted backend,
+  sf-deck account, or remote licence check.
+- IPC is user-only and local. Update checks are anonymous, version-free,
+  limited to once daily, and never install anything.
 
-See the [on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/)
-and [security policy](.github/SECURITY.md). Disable update checks in
-**Settings → Updates** or with `SF_DECK_NO_UPDATE_CHECK=1`.
+See the [on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/) and
+[security policy](.github/SECURITY.md).
 
 ## Platform support and maturity
 
@@ -163,35 +173,6 @@ sf-deck v0.1 is young, solo-maintained, and used daily against real orgs.
 
 Release builds support macOS and Linux on arm64 and amd64. Windows users can
 run the Linux build and Salesforce CLI together inside WSL2.
-
-Current limitations:
-
-- No bulk record mutation API; use the Salesforce CLI for bulk imports and
-  updates.
-- No async Apex test runner over IPC; long-running test workflows fall
-  through to `sf`.
-- Dashboard viewing is not implemented.
-
-## FAQ
-
-<details>
-<summary><strong>How is this different from the Salesforce CLI or VS Code?</strong></summary>
-
-The Salesforce CLI is command-oriented and VS Code is source-oriented.
-sf-deck is org-oriented: browse live state, switch environments, compare them,
-and assemble a working set. It complements both tools rather than replacing
-them.
-
-</details>
-
-<details>
-<summary><strong>Will this consume all of my org's API calls?</strong></summary>
-
-sf-deck caches describes and list results, loads detail lazily, and does no
-background polling. The header shows the active API count so the cost of an
-action remains visible. You can clear or tune the local cache from Settings.
-
-</details>
 
 ## Documentation
 

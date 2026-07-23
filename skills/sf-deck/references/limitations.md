@@ -73,7 +73,8 @@ cycles trying to make it.
 - **Compare feature** (`/compare` org-to-org metadata compare) —
   TUI-only.
 - **Inline record edit** — TUI-only.
-- **Most chip surfaces** (perms, queues, public groups) — TUI-only
-  except for the bare `chip.apply` driver.
+- **Some chip-backed views** (permissions, queues, public groups) have
+  no dedicated data verbs. `chip.apply` can navigate or filter the live
+  TUI but does not return those rows directly.
 - **Code viewer / syntax highlighting** — TUI-only. The IPC layer
   returns raw source bodies.

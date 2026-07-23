@@ -33,15 +33,18 @@ duration of one operation.
    The `effective` field is what gets checked. `override` shows
    whether the user has set it explicitly.
 
-3. **Is the effective level already at-or-above what the verb needs?**
-   If yes → just fire. If no → you need to raise it.
+3. **Did the user request this write?** A writable safety level is
+   not authorization. Do not write merely because the gate permits it.
 
-4. **Is the org a production org?** Check the user's memory for
-   their list of production orgs + their list of pre-authorised
-   sandboxes. ALWAYS ask before raising production safety;
-   pre-authorised sandboxes can be raised without confirmation.
+4. **Is the effective level already at-or-above what the verb needs?**
+   If yes, perform the requested write. If no, you need to raise it.
 
-5. **Raise** to the required level, do the work, **drop back**:
+5. **If the level must be raised, is the org a production org?**
+   Check the current request, project instructions, and any saved agent
+   context. Always ask before raising production safety unless the user
+   explicitly authorized that exact production change.
+
+6. **Raise** to the required level, do the work, **drop back**:
 
    ```bash
    sf-deck org safety set --org <alias> --level metadata --json
@@ -79,12 +82,12 @@ and refreshes per-org safety badges on save.
 
 ## Production rules
 
-The skill describes the model; the user's memory describes the
-specific policy. Before any write, check memory for:
+The skill describes the model; the user's instructions describe the
+specific policy. Before any write, check for:
 
 - Which org aliases the user treats as production
 - Which sandbox aliases are pre-authorised for writes
 - Any per-org confirmation rules the user has set
 
-Default rule when memory is silent: treat every org as production
-and ask before any write.
+Default rule when policy is absent: treat every org as production. If the
+request did not explicitly authorize the exact write, ask before doing it.
