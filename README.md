@@ -5,7 +5,7 @@
 
 # sf-deck
 
-**A keyboard-first Salesforce workspace for people working across multiple orgs.**
+**A keyboard-first Salesforce workspace for admins, developers, architects, and consultants working across multiple orgs.**
 
 <p>
   <a href="https://github.com/Jacob-Stokes/sf-deck/actions/workflows/ci.yml"><img src="https://github.com/Jacob-Stokes/sf-deck/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -18,24 +18,21 @@
 <p>
   <a href="#install-and-try-it">Install</a> ·
   <a href="#keyboard-basics">Keyboard</a> ·
-  <a href="#core-workflows">Capabilities</a> ·
-  <a href="#safety-by-default">Safety</a> ·
+  <a href="#what-you-can-do">Capabilities</a> ·
   <a href="#automation-and-agents">Automation</a> ·
   <a href="https://sfdeck.dev/docs/">Docs</a>
 </p>
 
 </div>
 
-sf-deck puts your Salesforce orgs in one terminal. Browse objects and records,
-run SOQL, inspect permissions, and switch orgs without opening another tab.
+sf-deck puts every Salesforce org you work with in one terminal. Switch orgs
+without losing your place, investigate metadata and permissions, query records,
+inspect code and automation, and jump directly into Lightning, Setup, Flow
+Builder, or your editor when you need the full interface.
 
 It uses the orgs already authenticated with Salesforce CLI. No managed package,
 connected app, Setup changes, or extra credentials. If `sf org list` works,
 sf-deck is ready.
-
-Before the first real-org connection, sf-deck asks you to acknowledge its
-[user agreement](USER_AGREEMENT.md) and [privacy notice](PRIVACY.md). Demo mode
-does not require acceptance because it cannot contact Salesforce.
 
 ## Install and try it
 
@@ -83,37 +80,31 @@ go build -o sf-deck ./cmd/sf-deck
 
 The mouse also works. See the [complete keymap](https://sfdeck.dev/docs/reference/keymap/).
 
-## Core workflows
+## What you can do
 
-- **Explore objects and metadata.** Browse schema, fields, record types,
-  field-level security, Apex, Flows, components, packages, and settings.
-- **Query and edit data.** Run SOQL with completion and history, work with
-  records and reports, and export CSV, XLSX, or JSON.
-- **Administer an org.** Inspect users, permissions, logins, deploys, tests,
-  debug logs, jobs, and audit history.
-- **Work across orgs.** Switch quickly, collect work with tags and dev
-  projects, build sfdx bundles, and use the beta comparison tools.
+- **Move between orgs without losing your place.** Each org keeps its own
+  workspace, filters, selection, and navigation state.
+- **Find anything quickly.** Search objects, fields, records, Flows, Apex,
+  components, and other loaded metadata from anywhere with `Ctrl+F`.
+- **Jump into the right Salesforce tool.** Press `o` to open the selected item
+  in Lightning, Setup, Flow Builder, or your editor. `Ctrl+O` shows every
+  available destination; `y` copies its URL and `Ctrl+Y` copies the relevant
+  ID, API name, or query.
+- **Investigate an object end to end.** Browse fields, record types, validation
+  rules, permissions, field-level security, records, automation, and related
+  source without crossing a maze of Setup pages.
+- **Query and work with data.** Write SOQL with metadata completion, reuse saved
+  queries and history, inspect or edit records, and export CSV, XLSX, or JSON.
+- **Inspect code and automation.** Explore Flows, Apex, triggers, Lightning
+  components, tests, debug logs, and deployments from the same workspace.
+- **Administer and diagnose orgs.** Review users, permission assignments, login
+  activity, packages, limits, jobs, audit history, and system health.
+- **Turn discoveries into deployable work.** Collect mixed metadata into tagged
+  dev projects and sfdx bundles, then retrieve, validate, deploy, and follow the
+  result. These workflows remain beta.
 
-Open a record in Lightning, a Flow in Flow Builder, or source in your editor
-when you need a full canvas. See the [task walkthroughs](https://sfdeck.dev/docs/tasks/find-a-record/)
-for complete workflows.
-
-## Safety by default
-
-Every org has a local safety level, always visible in the header:
-
-| Level | Permitted through sf-deck |
-| --- | --- |
-| `read-only` | Browse, query, compare, and export |
-| `records` | Read-only actions plus record create/update/delete |
-| `metadata` | Record actions plus metadata writes, validation, and deploys |
-| `full` | Destructive metadata operations and anonymous Apex |
-
-Production orgs start read-only. Writes above the selected level are hidden in
-the TUI and rejected by the CLI and IPC backend. Salesforce still enforces the
-connected user's permissions; sf-deck adds another guardrail.
-
-Read the full [safety model](https://sfdeck.dev/docs/concepts/safety/).
+See the [task walkthroughs](https://sfdeck.dev/docs/tasks/find-a-record/) for
+complete workflows.
 
 ## Automation and agents
 
@@ -154,20 +145,6 @@ the copy after updating the repository.
 
 </details>
 
-## Authentication and local data
-
-- Salesforce CLI owns authentication; access tokens are not cached or logged.
-- Salesforce record lists/details, SOQL and report rows, and list-view results
-  stay in process memory and are not written to the persistent cache.
-- Local state lives under `~/.sf-deck/`. There is no telemetry, hosted backend,
-  sf-deck account, or remote licence check.
-- IPC is user-only and local. Update checks are anonymous, version-free,
-  limited to once daily, and never install anything.
-
-See the [on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/) and
-[security policy](.github/SECURITY.md). Use `sf-deck data inspect` to see local
-paths and `sf-deck data erase --yes` to remove sf-deck-owned application state.
-
 ## Platform support and maturity
 
 sf-deck v0.1 is young, solo-maintained, and used daily against real orgs.
@@ -189,6 +166,18 @@ run the Linux build and Salesforce CLI together inside WSL2.
 - [Task walkthroughs](https://sfdeck.dev/docs/tasks/cross-org-workflow/)
 - [CLI and IPC reference](https://sfdeck.dev/docs/reference/cli/)
 - [Agent integration](https://sfdeck.dev/docs/agent-integration/)
+
+## Privacy, security, and safety
+
+sf-deck uses existing Salesforce CLI sessions and keeps its working state
+local. It has no telemetry, hosted backend, or sf-deck account; Salesforce
+record and query results are not written to its persistent cache. Production
+orgs start read-only, with explicit per-org safety levels for writes.
+
+Before connecting a real org, read the [user agreement](USER_AGREEMENT.md),
+[privacy notice](PRIVACY.md), [safety model](https://sfdeck.dev/docs/concepts/safety/),
+[on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/), and
+[security policy](.github/SECURITY.md).
 
 ## Contributing
 

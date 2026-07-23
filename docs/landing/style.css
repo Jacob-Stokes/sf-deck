@@ -256,27 +256,82 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-
 .story:nth-of-type(odd) .eyebrow { color: var(--cyan); }
 
 .capabilities { padding-block: 70px; }
-.capabilities .section-head { margin-bottom: 34px; }
+.capabilities .section-head { margin-bottom: 38px; }
 .capability-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0;
+  max-width: 920px;
   padding: 0;
-  margin: 0;
+  margin: 0 auto;
   list-style: none;
 }
 .capability-list li {
-  padding: 18px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: rgba(41, 44, 68, .62);
-  color: var(--fg);
-  font-size: 14px;
-  font-weight: 750;
-  text-align: center;
-  transition: transform .18s ease, border-color .18s ease;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  width: min(100%, 760px);
+  padding: 27px 0;
+  border-bottom: 1px solid rgba(72, 81, 119, .48);
 }
-.capability-list li:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+.capability-list li:first-child { border-top: 1px solid rgba(72, 81, 119, .48); }
+.capability-list li:nth-child(even) {
+  grid-template-columns: minmax(0, 1fr) 74px;
+  margin-left: auto;
+  text-align: right;
+}
+.capability-list li:nth-child(even) .capability-icon {
+  grid-column: 2;
+  grid-row: 1;
+}
+.capability-list li:nth-child(even) .capability-copy {
+  grid-column: 1;
+  grid-row: 1;
+}
+.capability-icon {
+  color: var(--cyan);
+  font: 850 clamp(31px, 5vw, 45px)/1 "SFMono-Regular", Consolas, ui-monospace, monospace;
+  letter-spacing: -.1em;
+  text-align: center;
+  text-shadow: 0 0 28px rgba(134, 225, 252, .2);
+}
+.icon-code, .icon-ship { color: var(--magenta); text-shadow: 0 0 28px rgba(192, 153, 255, .2); }
+.icon-admin { color: var(--green); text-shadow: 0 0 28px rgba(195, 232, 141, .18); }
+.icon-open { color: var(--yellow); text-shadow: 0 0 28px rgba(255, 199, 119, .2); }
+.capability-copy h3 {
+  margin: 0 0 5px;
+  font-size: clamp(19px, 2.5vw, 24px);
+  font-weight: 820;
+  letter-spacing: -.025em;
+}
+.capability-copy p {
+  max-width: 640px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.capability-list li:nth-child(even) .capability-copy p { margin-left: auto; }
+.capability-copy code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--cyan);
+  background: rgba(130, 170, 255, .09);
+  font-size: .9em;
+}
+.feature-status {
+  position: relative;
+  top: -2px;
+  display: inline-block;
+  padding: 2px 6px;
+  margin-left: 5px;
+  border: 1px solid rgba(192, 153, 255, .48);
+  border-radius: 999px;
+  color: var(--magenta);
+  font: 750 9px/1.2 "SFMono-Regular", Consolas, ui-monospace, monospace;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
 
 .roadmap-card {
   display: grid;
@@ -387,7 +442,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-
 .js .reveal.in { opacity: 1; transform: none; }
 
 @media (max-width: 980px) {
-  .capability-list { grid-template-columns: repeat(2, 1fr); }
   .roadmap-card { grid-template-columns: 1fr; }
 }
 
@@ -408,7 +462,20 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-
 @media (max-width: 540px) {
   .hero h1 { font-size: 40px; }
   .kicker { font-size: 11.5px; }
-  .capability-list { grid-template-columns: 1fr; }
+  .capability-list li,
+  .capability-list li:nth-child(even) {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 17px;
+    text-align: left;
+  }
+  .capability-list li:nth-child(even) .capability-icon {
+    grid-column: 1;
+  }
+  .capability-list li:nth-child(even) .capability-copy {
+    grid-column: 2;
+  }
+  .capability-list li:nth-child(even) .capability-copy p { margin-left: 0; }
+  .capability-icon { text-align: left; }
   .hero-proof-list { gap: 5px 14px; font-size: 12px; }
   .command { padding-left: 11px; }
   .command code { font-size: 11.5px; }
@@ -420,5 +487,5 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .js .reveal { opacity: 1; transform: none; transition: none; }
-  .btn, .capability-list li { transition: none; }
+  .btn { transition: none; }
 }
