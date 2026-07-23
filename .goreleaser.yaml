@@ -66,9 +66,10 @@ changelog:
 #     brew tap Jacob-Stokes/tap
 #     brew install --cask sf-deck
 #
-# Needs a PAT with `repo` scope, set in the sf-deck repo as the
-# HOMEBREW_TAP_GITHUB_TOKEN secret. The default GITHUB_TOKEN can't
-# push to a different repo, hence the dedicated PAT.
+# Needs a fine-grained PAT limited to Jacob-Stokes/homebrew-tap with
+# Contents read/write access, set in the sf-deck repo as the
+# HOMEBREW_TAP_GITHUB_TOKEN secret. The default GITHUB_TOKEN cannot push
+# to a different repository, hence the dedicated token.
 
 # GoReleaser v2.16 deprecated precompiled-binary formulas in favour of
 # Homebrew Casks, including for CLI binaries. The cask stages the complete
