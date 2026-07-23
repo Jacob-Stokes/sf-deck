@@ -443,22 +443,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, (&m).triggerOpenApexClass(msg.classID)
 
 	case sidebarPositionChangedMsg:
-		// Persist the choice and apply it live. "auto" is a no-op today
-		// (coming soon) — leave the sidebar where it is; rhs/bottom move
-		// it immediately so the setting has visible effect.
+		// Persist the choice and apply it live. Normalise the retired
+		// "auto" value to its historical effective layout so old messages
+		// and settings cannot revive an unsupported picker option.
+		pos := msg.pos
+		if pos == settings.SidebarPositionAuto {
+			pos = settings.SidebarPositionRHS
+		}
 		if m.settings != nil {
-			m.settings.SetSidebarPosition(msg.pos)
+			m.settings.SetSidebarPosition(pos)
 			_ = m.settings.Save()
 		}
-		switch msg.pos {
+		switch pos {
 		case settings.SidebarPositionRHS:
 			m.sidebarStacked = false
 			m.flash("sidebar: right")
 		case settings.SidebarPositionBottom:
 			m.sidebarStacked = true
 			m.flash("sidebar: bottom")
-		case settings.SidebarPositionAuto:
-			m.flash("sidebar: auto (coming soon) — position unchanged for now")
 		}
 		return m, nil
 

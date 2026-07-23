@@ -29,7 +29,7 @@ body:
     attributes:
       label: sf-deck version
       description: Output of `sf-deck --version`
-      placeholder: "sf-deck 0.1.0  commit: ...  built: ..."
+      placeholder: "sf-deck x.y.z  commit: ...  built: ..."
     validations:
       required: true
 

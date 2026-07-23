@@ -270,10 +270,6 @@ after running — re-running OVERWRITES the file.
 - **Chips** — domain `publicgroups`
 - **Identity** — yes
 
-#### `perms-sharing-rules` — Sharing Rules
-
-- _no hooks_ (placeholder / stub)
-
 
 ### Drill destinations
 

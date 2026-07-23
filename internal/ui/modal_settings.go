@@ -785,7 +785,7 @@ func (m *Model) openStartupModal() tea.Cmd {
 	s := m.settings
 	opts := []choiceOption{
 		{Label: "Sidebar open on launch", Hint: "current: " + onOff(s.StartupSidebarOpen(true)), Value: "sidebar_open"},
-		{Label: "Sidebar position", Hint: "current: " + sidebarPositionLabel(s.SidebarPosition()) + " · right, bottom, or auto", Value: "sidebar_position"},
+		{Label: "Sidebar position", Hint: "current: " + sidebarPositionLabel(s.SidebarPosition()) + " · right or bottom", Value: "sidebar_position"},
 		{Label: "SOQL query line visible", Hint: "current: " + onOff(s.StartupQueryLineVisible(false)), Value: "query_line_visible"},
 		{Label: "Left org rail pinned open", Hint: "current: " + onOff(s.StartupLeftRailOpen(false)), Value: "left_rail_open"},
 		{Label: "Start tab", Hint: "current: " + s.StartupStartTab(), Value: "start_tab"},
@@ -811,13 +811,15 @@ func sidebarPositionLabel(pos string) string {
 	case settings.SidebarPositionBottom:
 		return "bottom (stacked below main)"
 	case settings.SidebarPositionAuto:
-		return "auto (coming soon)"
+		// Preserve old settings files without exposing the retired
+		// placeholder choice. Auto has always rendered beside main.
+		return "right (beside main)"
 	default:
 		return "right (beside main)"
 	}
 }
 
-// openSidebarPositionModal is the RHS / Bottom / Auto picker. Applies
+// openSidebarPositionModal is the RHS / Bottom picker. Applies
 // the choice live (the sidebar moves immediately) via a msg so the
 // mutation lands on the live Model, then persists.
 func (m *Model) openSidebarPositionModal() tea.Cmd {
@@ -827,7 +829,6 @@ func (m *Model) openSidebarPositionModal() tea.Cmd {
 	opts := []choiceOption{
 		{Label: "Right (beside main)", Hint: "sidebar sits to the right of the main pane (default)", Value: settings.SidebarPositionRHS},
 		{Label: "Bottom (stacked below main)", Hint: "sidebar sits below main (2/3 + 1/3) — more column width", Value: settings.SidebarPositionBottom},
-		{Label: "Auto (coming soon)", Hint: "reactive placement by terminal width — not yet active; leaves the sidebar where it is", Value: settings.SidebarPositionAuto},
 	}
 	cursor := 0
 	for i, o := range opts {

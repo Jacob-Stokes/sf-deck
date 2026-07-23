@@ -60,10 +60,6 @@ func (m Model) renderPermsDashboard(w, innerH int) string {
 		content = m.renderQueueList(w, inner, body, o)
 	case SubtabPermsPublicGroups:
 		content = m.renderPublicGroupList(w, inner, body, o)
-	case SubtabPermsSharingRules:
-		return joinPlaceholder(strip, "SHARING RULES",
-			"Sharing Rules — owner / criteria-based per sObject.",
-			"/lightning/setup/SharingRules/home", inner)
 	default:
 		content = theme.Subtle.Render("  (no subtab)")
 	}

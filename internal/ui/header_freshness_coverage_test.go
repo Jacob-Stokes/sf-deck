@@ -13,12 +13,9 @@ func TestHeaderFreshnessCoverage(t *testing.T) {
 		TabDevProjects: true, TabDevProjectDetail: true, TabBundleDetail: true,
 		TabTags: true, TabTagDetail: true, TabProjects: true,
 	}
-	// Subtabs that render static link pages or session-local state,
-	// not org fetches: sharing rules is a Setup-link page; system-api
-	// is the in-memory API call ring buffer (no fetch time to show).
+	// Subtabs that render session-local state rather than org fetches.
 	exemptSub := map[Subtab]bool{
-		SubtabPermsSharingRules: true,
-		SubtabSystemAPI:         true,
+		SubtabSystemAPI: true,
 	}
 	for tab, spec := range tabSpecs() {
 		if exempt[tab] {
