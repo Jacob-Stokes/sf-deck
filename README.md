@@ -17,8 +17,8 @@
 
 <p>
   <a href="#install-and-try-it">Install</a> ·
-  <a href="#the-one-minute-tour">One-minute tour</a> ·
-  <a href="#what-you-can-do">Capabilities</a> ·
+  <a href="#keyboard-basics">Keyboard</a> ·
+  <a href="#core-workflows">Capabilities</a> ·
   <a href="#safety-by-default">Safety</a> ·
   <a href="#automation-and-agents">Automation</a> ·
   <a href="https://sfdeck.dev/docs/">Docs</a>
@@ -64,7 +64,7 @@ go build -o sf-deck ./cmd/sf-deck
 
 </details>
 
-## The one-minute tour
+## Keyboard basics
 
 | Key | Action |
 | --- | --- |
@@ -79,14 +79,16 @@ go build -o sf-deck ./cmd/sf-deck
 
 The mouse also works. See the [complete keymap](https://sfdeck.dev/docs/reference/keymap/).
 
-## What it covers
+## Core workflows
 
-| Area | Capabilities |
-| --- | --- |
-| Objects and metadata | Schema, fields, record types, field-level security, Apex, Flows, components, packages, and settings |
-| Data | SOQL completion and history, records, reports, and CSV/XLSX/JSON export |
-| Administration | Users, permissions, logins, deploys, tests, debug logs, jobs, and audit history |
-| Cross-org work | Fast org switching, tags, dev projects, sfdx bundles, and beta org comparison |
+- **Explore objects and metadata.** Browse schema, fields, record types,
+  field-level security, Apex, Flows, components, packages, and settings.
+- **Query and edit data.** Run SOQL with completion and history, work with
+  records and reports, and export CSV, XLSX, or JSON.
+- **Administer an org.** Inspect users, permissions, logins, deploys, tests,
+  debug logs, jobs, and audit history.
+- **Work across orgs.** Switch quickly, collect work with tags and dev
+  projects, build sfdx bundles, and use the beta comparison tools.
 
 Open a record in Lightning, a Flow in Flow Builder, or source in your editor
 when you need a full canvas. See the [task walkthroughs](https://sfdeck.dev/docs/tasks/find-a-record/)
@@ -111,11 +113,8 @@ Read the full [safety model](https://sfdeck.dev/docs/concepts/safety/).
 
 ## Automation and agents
 
-| Surface | Best for | Example |
-| --- | --- | --- |
-| TUI | Interactive exploration and review | `sf-deck` |
-| CLI | One-shot commands, shell scripts, and CI | `sf-deck soql run ... --json` |
-| IPC | Driving a running TUI and its live state | `tab.open`, `chip.apply`, `soql.seed` |
+Run `sf-deck` for interactive work. Use headless commands in scripts and CI,
+or the local IPC socket to drive a running TUI.
 
 Core commands return a stable JSON envelope and scriptable exit codes:
 
