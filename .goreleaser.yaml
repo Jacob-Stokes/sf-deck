@@ -47,10 +47,9 @@ snapshot:
 
 changelog:
   # First-release special-case: no previous tag, so the auto-generated
-  # commit log would be enormous and unhelpful. Disable it for v0.1.0;
-  # the release.header below carries the full hand-written notes from
-  # RELEASE_NOTES_v0.1.0.md. Re-enable for v0.2.0+ by flipping this to
-  # false (or removing the field).
+  # commit log would be enormous and unhelpful. The release workflow passes
+  # RELEASE_NOTES_v0.1.0.md directly to GoReleaser. Re-enable changelog
+  # generation for v0.2.0+ by flipping this to false (or removing the field).
   disable: true
   sort: asc
   filters:
@@ -92,15 +91,11 @@ homebrew_casks:
     commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
     directory: Casks
     homepage: "https://github.com/Jacob-Stokes/sf-deck"
-    description: "A terminal UI for working across your Salesforce orgs."
-    url:
-      verified: "github.com/Jacob-Stokes/sf-deck/"
+    description: "Keyboard-first Salesforce workspace across multiple orgs"
     hooks:
       post:
         install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sf-deck"]
-          end
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sf-deck"] if OS.mac?
 
 release:
   github:
@@ -109,130 +104,3 @@ release:
   draft: false
   prerelease: auto
   name_template: "{{.ProjectName}} {{.Version}}"
-
-  # First-release body. The canonical source is
-  # RELEASE_NOTES_v0.1.0.md at the repo root; this header inlines
-  # the same content so goreleaser can post it without a separate
-  # template-eval step (the goreleaser v2 release block has no
-  # file-read field). For v0.2.0+ either:
-  #   (1) replace this with a brief "What's new in v0.2.0" header
-  #       and re-enable changelog.disable=false above so the auto
-  #       commit-log fills the body, OR
-  #   (2) replace with the next RELEASE_NOTES_<tag>.md content.
-  header: |
-    **sf-deck is a terminal UI for working across your Salesforce orgs.**
-
-    Schema, field-level security, SOQL, records, deploys, users, and
-    metadata diffs — all on one screen, for every org you're
-    authenticated to. Switch orgs with a keystroke, and reach most
-    things in a few more.
-
-    This is the first public release. sf-deck has been in private
-    daily use for several months; this version wraps that up into
-    something installable.
-
-    ## Install
-
-    **macOS / Linux — Homebrew:**
-
-    ```sh
-    brew install --cask Jacob-Stokes/tap/sf-deck
-    ```
-
-    **Or download a binary** for your platform from the assets list
-    below.
-
-    **Or build from source** (requires Go 1.26.5+):
-
-    ```sh
-    git clone https://github.com/Jacob-Stokes/sf-deck
-    cd sf-deck && go build -o sf-deck ./cmd/sf-deck
-    ```
-
-    You'll also need the
-    [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
-    (`sf`) with at least one authenticated org.
-
-    ## First run
-
-    ```sh
-    sf-deck
-    ```
-
-    Press a digit to open a tab. `?` lists every key the current
-    screen understands. `Esc` backs out. That's most of it.
-
-    To browse without a real org:
-
-    ```sh
-    sf-deck --demo
-    ```
-
-    ## What's in the box
-
-    - **Multi-org TUI** — every authenticated org is a keystroke
-      away. Safety pill in the header shows what the active org's
-      level is.
-    - **Schema, records, SOQL, FLS, flows, apex, deploys, users,
-      perms, metadata** — all numbered tabs.
-    - **Chips** — saved filter views per surface, cyclable with
-      `[` `]`, cross-org.
-    - **Dev projects** — collect items from anywhere into a named
-      working set that spans orgs.
-    - **Bundles** — materialise a dev project as an sfdx project
-      directory and retrieve / validate / deploy from inside
-      sf-deck.
-    - **Tags** — apply your own tags to any item across any org.
-    - **SOQL editor** with autocomplete against your org's schema,
-      saved library, per-org history.
-    - **Compare** — Apex, Flows, and metadata diffed org-to-org.
-    - **Headless CLI** — core automation runs as
-      `sf-deck <noun> <verb> --json` with a stable envelope.
-    - **IPC socket** — a running sf-deck window exposes a Unix
-      socket agents can drive, including live navigation and editor
-      state that only make sense inside the TUI.
-    - **Verb registry** — single source of truth for what sf-deck
-      can do. `sf-deck verbs list --json` returns the live list.
-    - **Safety model** — four levels (read-only / records /
-      metadata / full), per-org, gates every write *before* the API
-      call. Anonymous Apex requires `full`.
-    - **Agent skill** — `skills/sf-deck/` packages the contract
-      for AI agents driving sf-deck.
-
-    ## Three things worth knowing up front
-
-    **Every write is gated.** Each org has a safety level shown in
-    the header. You can mark production read-only here even if your
-    user has full perms in the org.
-
-    **Core operations are scriptable.** CLI and IPC share the same
-    JSON envelope, backend, and safety gate; each also has intentional
-    transport-specific verbs. `sf-deck verbs list --json` reports the
-    exact support for every verb.
-
-    **No telemetry, no third-party calls.** sf-deck talks to
-    Salesforce; that's it. State lives under `~/.sf-deck/`.
-
-    ## Known limitations
-
-    - **Windows not supported** in this release. WSL works fine via
-      the Linux binary.
-    - **No bulk record API.** `record.create / .update / .delete`
-      are per-record. Use the `sf` CLI for bulk operations.
-    - **No async Apex test runner over IPC.** Long test runs fall
-      through to the `sf` CLI.
-
-    ## Docs
-
-    - [Getting started](https://jacob-stokes.github.io/sf-deck/docs/getting-started/install/)
-    - [Concepts](https://jacob-stokes.github.io/sf-deck/docs/concepts/panels/)
-    - [Tasks](https://jacob-stokes.github.io/sf-deck/docs/tasks/find-a-record/)
-    - [Reference](https://jacob-stokes.github.io/sf-deck/docs/reference/cli/)
-    - [Agent integration](https://jacob-stokes.github.io/sf-deck/docs/agent-integration/)
-
-    ## Feedback
-
-    [Issues](https://github.com/Jacob-Stokes/sf-deck/issues) and
-    [discussions](https://github.com/Jacob-Stokes/sf-deck/discussions)
-    welcome. For security reports, see
-    [SECURITY.md](https://github.com/Jacob-Stokes/sf-deck/blob/main/SECURITY.md).
