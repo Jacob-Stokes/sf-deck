@@ -273,6 +273,20 @@ func (m Model) headerActivity() string {
 func (m Model) headerRight() string {
 	var parts []string
 
+	if m.updateResult.UpdateAvailable {
+		fg := theme.Cyan
+		switch m.updateResult.Kind {
+		case "minor":
+			fg = theme.Yellow
+		case "major":
+			fg = theme.Red
+		}
+		parts = append(parts, lipgloss.NewStyle().
+			Foreground(fg).
+			Bold(true).
+			Render("↑ "+m.updateResult.LatestVersion))
+	}
+
 	if m.tab() == TabSOQL && m.soqlTooling {
 		parts = append(parts, lipgloss.NewStyle().
 			Foreground(theme.Magenta).

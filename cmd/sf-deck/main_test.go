@@ -1,6 +1,9 @@
 package main
 
 import (
+	"flag"
+	"io"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -38,6 +41,40 @@ func TestUsageHeaderNamesTheTool(t *testing.T) {
 	if !strings.Contains(usageHeader, "sf-deck") ||
 		!strings.Contains(usageHeader, "Salesforce") {
 		t.Error("usage header should name sf-deck and Salesforce")
+	}
+}
+
+func TestMainVersionFlag(t *testing.T) {
+	oldArgs := os.Args
+	oldStdout := os.Stdout
+	oldFlags := flag.CommandLine
+	t.Cleanup(func() {
+		os.Args = oldArgs
+		os.Stdout = oldStdout
+		flag.CommandLine = oldFlags
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+	os.Args = []string{"sf-deck", "--version"}
+	flag.CommandLine = flag.NewFlagSet("sf-deck-test", flag.ContinueOnError)
+
+	main()
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = r.Close()
+	if got := string(out); !strings.Contains(got, "sf-deck dev") ||
+		!strings.Contains(got, "commit:") ||
+		!strings.Contains(got, "built:") {
+		t.Fatalf("--version output = %q", got)
 	}
 }
 

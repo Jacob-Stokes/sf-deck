@@ -69,11 +69,34 @@ these directly, but it's good to know they exist:
 | `~/.sf-deck/settings.toml` | chips, theme, per-org safety overrides |
 | `~/.sf-deck/cache.db` | local read-cache: org list, describes, list results |
 | `~/.sf-deck/devprojects.db` | dev projects, items, bundles, tags, saved queries, snippets |
+| `~/.sf-deck/update-state.json` | timestamp and result of the last stable-release check |
 | `~/.sf-deck/instances.json` | running-instance registry |
 | `~/.sf-deck/control-<N>.sock` | per-instance IPC socket (when started with `--control`) |
 
-Nothing leaves your machine. There is no telemetry. sf-deck talks
-to Salesforce; that's it.
+There is no telemetry. Normal data traffic goes to Salesforce. By default,
+release builds also make at most one anonymous request to GitHub Releases every
+24 hours to discover newer stable sf-deck versions. The request does not include
+your current version, and sf-deck never downloads or installs an update.
+
+Manage this under **Settings → Updates**, or disable automatic checks for a
+process:
+
+```sh
+SF_DECK_NO_UPDATE_CHECK=1 sf-deck
+```
+
+Check explicitly from a shell:
+
+```sh
+sf-deck update check
+sf-deck update check --force --json
+```
+
+Homebrew users install a discovered update with:
+
+```sh
+brew upgrade --cask sf-deck
+```
 
 ## Try the demo
 

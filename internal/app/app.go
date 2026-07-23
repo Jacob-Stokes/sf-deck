@@ -44,6 +44,7 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/services/userops"
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
+	"github.com/Jacob-Stokes/sf-deck/internal/updatecheck"
 	"github.com/Jacob-Stokes/sf-deck/internal/usage"
 )
 
@@ -122,6 +123,10 @@ type App struct {
 
 	// Notifications owns per-user notification read-state writes.
 	Notifications *notificationops.Service
+
+	// Updates performs cached, read-only stable-release discovery. It never
+	// downloads or installs a release.
+	Updates updatecheck.Service
 
 	// demoDir is the throwaway temp dir holding the demo cache +
 	// devproject store when opened with OpenOptions.Demo. Removed on
@@ -316,6 +321,7 @@ func Open(opts OpenOptions) (*App, error) {
 	a.Permissions = permissionops.New(a.WriteGate)
 	a.Users = userops.New(a.WriteGate)
 	a.Notifications = notificationops.New(a.WriteGate)
+	a.Updates = updatecheck.New()
 
 	if !opts.SkipUsage {
 		if t, err := usage.Open(); err == nil {

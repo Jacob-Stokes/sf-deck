@@ -675,6 +675,20 @@ var registry = []Spec{
 		CLI:       &CLIBinding{Usage: "sf-deck instance kill --number <n> --json"},
 	},
 
+	// ===== update ===================================================
+	{
+		Noun: "update", Verb: "check",
+		Summary:   "Check GitHub Releases for a newer stable sf-deck version.",
+		Stability: "stable",
+		CLI: &CLIBinding{
+			Usage: "sf-deck update check [--force] --json",
+			Flags: []FlagSpec{
+				{Name: "force", Type: "bool", Description: "bypass the 24-hour release cache"},
+			},
+		},
+		Notes: "Read-only and notification-only: it never downloads or installs a release.",
+	},
+
 	// ===== notification =============================================
 	{
 		Noun: "notification", Verb: "send",

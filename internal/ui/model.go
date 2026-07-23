@@ -23,6 +23,7 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/treechip"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/treechip/sources"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
+	"github.com/Jacob-Stokes/sf-deck/internal/updatecheck"
 )
 
 type focus int
@@ -1295,6 +1296,7 @@ func New(c *cache.Cache) Model {
 			cache:    c,
 			settings: st,
 			exports:  newExportRegistry(st.ExportHistoryMax()),
+			updates:  updatecheck.New(),
 		},
 		modelRuntime: modelRuntime{
 			lastCompositor: lipgloss.NewCompositor(),
@@ -1433,6 +1435,11 @@ func (m Model) Init() tea.Cmd {
 	}
 	// First-launch welcome modal (no-op after the first run, or in demo).
 	if cmd := m.welcomeTriggerCmd(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	// Cached stable-release discovery runs asynchronously and is skipped for
+	// development/demo builds or when the user disables it.
+	if cmd := m.updateCheckCmd(false); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	// Re-register demo targets if a demo org was imported in a prior

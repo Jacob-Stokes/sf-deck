@@ -12,6 +12,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/updatecheck"
 )
 
 // modelRuntime groups terminal/render/runtime state that is not tied to a
@@ -109,6 +111,14 @@ type modelRuntime struct {
 
 	banner      string
 	bannerUntil time.Time
+
+	// Update discovery is process-wide, read-only state. Automatic checks run
+	// at most daily and never block first paint; these fields drive the Home
+	// notice, header badge, Settings status, and About modal.
+	updateResult   updatecheck.Result
+	updateChecked  bool
+	updateChecking bool
+	updateErr      string
 
 	// exportTickRunning guards a single-flight tea.Tick that drives
 	// the activity ellipsis animation while exports are in flight.

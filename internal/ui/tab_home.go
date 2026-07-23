@@ -138,6 +138,9 @@ func (m Model) renderHomeLanding(inner, budget int) []string {
 	// Tagline.
 	out = append(out, "")
 	out = append(out, centerLine("a salesforce TUI", inner, theme.BorderHi, false))
+	if notice := m.updateNoticeText(); notice != "" {
+		out = append(out, "", centerLine(notice, inner, theme.Yellow, false))
+	}
 	// Bottom breathing room — three blanks before the destinations grid.
 	out = append(out, "", "", "")
 	// Destinations grid. destRow is the cursored entry's absolute row

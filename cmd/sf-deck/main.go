@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/app"
+	"github.com/Jacob-Stokes/sf-deck/internal/buildinfo"
 	"github.com/Jacob-Stokes/sf-deck/internal/control"
 	"github.com/Jacob-Stokes/sf-deck/internal/headless/cli"
 	"github.com/Jacob-Stokes/sf-deck/internal/instance"
@@ -16,6 +17,7 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/resource"
+	"github.com/Jacob-Stokes/sf-deck/internal/updatecheck"
 	"github.com/Jacob-Stokes/sf-deck/internal/usage"
 )
 
@@ -52,6 +54,8 @@ func (a trackerAdapter) Recent() []ui.UsageCall {
 }
 
 func main() {
+	buildinfo.Set(version, commit, date)
+
 	// Headless dispatch wins when the first positional arg is a
 	// known noun. Detect this BEFORE flag.Parse so a noun like
 	// "chip" doesn't get eaten by the global FlagSet, and so
@@ -186,7 +190,7 @@ func main() {
 		Permissions: a.PermissionWrites(),
 		Metadata:    a.MetadataWrites(), MetadataEditors: a.MetadataEditorWrites(),
 		Users: a.UserWrites(),
-	})
+	}).WithUpdateChecker(a.Updates)
 	if a.Projects != nil {
 		model = model.WithDevProjects(a.Projects)
 	}
@@ -319,6 +323,7 @@ Headless commands (add --help to any for its flags):
   project       Manage dev projects and their items
   bundle        Create and operate sfdx-project bundles linked to dev projects
   instance      List the sf-deck instances currently running
+  update        Check for a newer stable sf-deck release
   verbs         Discover the full noun.verb surface (single source of truth)
 
 Add --json to any command for a stable, scriptable envelope.
@@ -337,6 +342,12 @@ Docs:  https://github.com/Jacob-Stokes/sf-deck
 //     but the org-targeted verbs need it AND every safety check
 //     needs to know the org's kind.
 func runHeadless(args cli.Args) {
+	if args.Noun == "update" {
+		// Release discovery needs neither Salesforce nor any local database,
+		// so keep it usable on a fresh machine before the sf CLI is installed.
+		a := &app.App{Updates: updatecheck.New()}
+		os.Exit(cli.Dispatch(a, args, os.Stdout, os.Stderr))
+	}
 	a, err := app.Open(app.OpenOptions{
 		SkipUsage:  true,
 		SkipApplog: true,

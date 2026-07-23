@@ -52,8 +52,10 @@ func (m *Model) openSettingsModal() tea.Cmd {
 		{Label: "Cache & refresh", Hint: "TTLs per resource type", Value: "cache"},
 		{Label: "Export", Hint: "save dir: " + exportDir + " · history cap", Value: "export"},
 		{Label: "Integrations", Hint: "Inspector URL: " + inspector + " · browser", Value: "integrations"},
+		{Label: "Updates", Hint: "stable releases · " + m.updateStatusLabel(), Value: "updates"},
 		{Label: "Keybindings", Hint: "edit and save key bindings", Value: "keybindings"},
 		{Label: "Debug", Hint: "developer/testing toggles (force welcome modal)", Value: "debug"},
+		{Label: "About sf-deck", Hint: aboutSettingsHint(), Value: "about"},
 	}
 	state := choiceModalState{
 		Title:   "Settings",
@@ -1190,10 +1192,23 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 		return m.openExportSettingsModal()
 	case "integrations":
 		return m.openIntegrationsModal()
+	case "updates":
+		return m.openUpdatesModal()
 	case "keybindings":
 		return m.openKeybindingsModal()
 	case "debug":
 		return m.openDebugModal()
+	case "about":
+		return m.openAboutModal()
+
+	// Update leaves.
+	case "updates.automatic":
+		return m.boolSettingModal("Automatic update checks",
+			"On", "check GitHub Releases at most once every 24 hours",
+			"Off", "only check when you explicitly ask",
+			m.settings.AutomaticUpdateChecks(), m.settings.SetAutomaticUpdateChecks)
+	case "updates.check_now":
+		return m.updateCheckCmd(true)
 
 	// Debug leaves.
 	case "debug.force_welcome":

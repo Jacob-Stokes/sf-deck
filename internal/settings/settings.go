@@ -58,6 +58,13 @@
 //	deploy_poll_ms       = 1000
 //	bulk_poll_ms         = 5000
 //	api_version          = ""
+//
+//	# Stable sf-deck release discovery. Enabled by default; setting the
+//	# environment variable SF_DECK_NO_UPDATE_CHECK=1 disables automatic
+//	# checks for that process without changing this preference.
+//	[ui.updates]
+//	automatic     = true
+//	automatic_set = true
 package settings
 
 import (
@@ -102,6 +109,7 @@ type UIConfig struct {
 	Cache           CacheConfig      `toml:"cache"`
 	Extensions      ExtensionsConfig `toml:"extensions"`
 	Debug           DebugConfig      `toml:"debug"`
+	Updates         UpdatesConfig    `toml:"updates,omitempty"`
 
 	// SortPerView, when true, gives each view (chip) on a list surface
 	// its own sort — switching views restores that view's last sort.
@@ -505,6 +513,14 @@ type HomeConfigSection struct {
 	HideBanner bool `toml:"hide_banner,omitempty"`
 }
 
+// UpdatesConfig controls release discovery. The paired Set field preserves
+// the built-in default (enabled) while still allowing a user to explicitly
+// choose false.
+type UpdatesConfig struct {
+	Automatic    bool `toml:"automatic,omitempty"`
+	AutomaticSet bool `toml:"automatic_set,omitempty"`
+}
+
 // ChipsConfigSection tunes shared chip-driven fetch behaviour. Used
 // by both /records (server-side SOQL chips) and /users · All users
 // (the same shape, different sObject).
@@ -626,6 +642,38 @@ func boolOr(val, set, def bool) bool {
 		return val
 	}
 	return def
+}
+
+// UpdateChecksDisabledByEnv reports the process-level escape hatch. It only
+// disables automatic checks; an explicit Settings → Updates → Check now or
+// `sf-deck update check` remains an intentional network action.
+func UpdateChecksDisabledByEnv() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SF_DECK_NO_UPDATE_CHECK"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// AutomaticUpdateChecks reports whether the TUI should perform its cached
+// daily stable-release lookup. Default true.
+func (s *Settings) AutomaticUpdateChecks() bool {
+	if UpdateChecksDisabledByEnv() {
+		return false
+	}
+	if s == nil {
+		return true
+	}
+	return boolOr(s.UI.Updates.Automatic, s.UI.Updates.AutomaticSet, true)
+}
+
+// SetAutomaticUpdateChecks persists the user's preference. Caller Saves.
+func (s *Settings) SetAutomaticUpdateChecks(enabled bool) {
+	if s == nil {
+		return
+	}
+	s.UI.Updates.Automatic = enabled
+	s.UI.Updates.AutomaticSet = true
 }
 
 // StartupSidebarOpen / etc. resolve each tri-state bool. def is the

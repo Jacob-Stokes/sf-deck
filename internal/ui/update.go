@@ -218,6 +218,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// would. After handling, re-arm the writes pump so the next
 	// inbound message gets delivered.
 	switch m2 := msg.(type) {
+	case updateCheckMsg:
+		return m, m.applyUpdateCheck(m2)
 	case welcomeModalMsg:
 		return m.applyWelcomeModal()
 	case welcomeActionMsg:

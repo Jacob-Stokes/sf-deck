@@ -471,6 +471,15 @@ Patch a tag's name/color/icon.
 - Usage: `sf-deck tag update --id <id> [--name <n>] [--color <c>] [--icon <i>] --json`
 - IPC equivalent: `tag.update`
 
+## `update`
+
+### `update.check`
+
+Check GitHub Releases for a newer stable sf-deck version.
+
+- Usage: `sf-deck update check [--force] --json`
+- Note: Read-only and notification-only: it never downloads or installs a release.
+
 ## `verbs`
 
 ### `verbs.list`

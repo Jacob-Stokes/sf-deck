@@ -98,6 +98,10 @@ type infoModalState struct {
 	// top. When the content fits, scroll is irrelevant and any key
 	// dismisses as before.
 	Scroll int
+
+	// OnDismiss optionally reopens a parent surface. Most help/info modals
+	// leave this nil; About and update details use it to return to Settings.
+	OnDismiss func() tea.Cmd
 }
 
 // infoRow is one row of an info modal. Label is rendered bold in
@@ -267,7 +271,11 @@ func (m Model) handleInfoModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	// esc, enter, or anything else: dismiss.
+	onDismiss := m.infoModal.OnDismiss
 	m.infoModal = nil
+	if onDismiss != nil {
+		return m, onDismiss()
+	}
 	return m, nil
 }
 

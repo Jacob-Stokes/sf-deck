@@ -17,6 +17,7 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/services/records"
 	"github.com/Jacob-Stokes/sf-deck/internal/services/userops"
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
+	"github.com/Jacob-Stokes/sf-deck/internal/updatecheck"
 )
 
 // modelServices groups process-wide dependencies and stores.
@@ -32,6 +33,7 @@ type modelServices struct {
 	metaEditors *metadataops.EditorService
 	users       *userops.Service
 	exports     *exportRegistry
+	updates     updatecheck.Service
 	// control is the live-IPC bridge. Nil when sf-deck is launched
 	// without --control. When set, the update loop publishes snapshots
 	// to it after each frame and drains inbound write messages from
@@ -66,5 +68,13 @@ func (m Model) WithWriteServices(services WriteServices) Model {
 	m.metadata = services.Metadata
 	m.metaEditors = services.MetadataEditors
 	m.users = services.Users
+	return m
+}
+
+// WithUpdateChecker injects the shared release-discovery service.
+func (m Model) WithUpdateChecker(checker updatecheck.Service) Model {
+	if checker != nil {
+		m.updates = checker
+	}
 	return m
 }

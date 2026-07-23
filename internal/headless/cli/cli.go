@@ -74,6 +74,7 @@ var KnownNouns = map[string]bool{
 	"instance":     true,
 	"bundle":       true,
 	"verbs":        true,
+	"update":       true,
 }
 
 // Parse splits argv into the top-level shape. It's lenient: unknown
@@ -180,6 +181,8 @@ func Dispatch(a *app.App, args Args, stdout, stderr io.Writer) int {
 		return dispatchBundle(a, args, stdout, mode)
 	case "verbs":
 		return dispatchVerbs(a, args, stdout, mode)
+	case "update":
+		return dispatchUpdate(a, args, stdout, mode)
 	}
 
 	// Unknown noun — shouldn't happen if cmd/sf-deck respected

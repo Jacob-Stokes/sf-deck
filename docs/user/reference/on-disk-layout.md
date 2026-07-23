@@ -1,7 +1,6 @@
 # On-disk layout
 
-sf-deck stores everything under `~/.sf-deck/`. Nothing leaves your
-machine.
+sf-deck stores its own settings and state under `~/.sf-deck/`.
 
 ```
 ~/.sf-deck/
@@ -9,6 +8,7 @@ machine.
 ├── cache.db                  local read-cache (SQLite)
 ├── devprojects.db            dev projects, items, bundles, tags, ...
 ├── keybindings.toml          optional user keymap overrides
+├── update-state.json         cached stable-release check
 ├── instances.json            running-instance registry
 ├── control-<N>.sock          per-instance IPC socket (when --control is on)
 └── logs/                     app log (gitignored by default)
@@ -25,6 +25,7 @@ Sections:
 - `[ui]` — theme, sidebar defaults, font preferences
 - `[ui.api]` — API timeouts (HTTP, CLI, retrieve/deploy, deploy
   polling, bulk polling)
+- `[ui.updates]` — automatic stable-release discovery (enabled by default)
 - `[org.<username>]` — per-org overrides, including `safety = "..."`
   and any per-org pinned chips
 - `[[chips.records]]` / `[[chips.objects]]` / `[[chips.flows]]` …
@@ -104,6 +105,18 @@ agent uses to discover sockets.
 
 Stale entries (pid no longer running) are pruned on read.
 
+## update-state.json
+
+A non-sensitive cache containing the last GitHub Releases check time and the
+latest stable release metadata. Automatic checks use it to make at most one
+anonymous request every 24 hours. It contains no Salesforce data, credentials,
+machine identifier, or analytics.
+
+Safe to delete at any time. The next enabled automatic check recreates it.
+Disable automatic checks in **Settings → Updates** or with
+`SF_DECK_NO_UPDATE_CHECK=1`. An explicit `sf-deck update check --force` bypasses
+the cache but still never downloads or installs anything.
+
 ## Bundle directories
 
 By default sf-deck writes bundles into
@@ -130,6 +143,7 @@ link`.
 | `cache.db` | tracked in a `meta` table; auto-migrated |
 | `devprojects.db` | same |
 | `settings.toml` | unversioned; sf-deck reads only the keys it knows about |
+| `update-state.json` | unversioned disposable cache |
 
 Schema migrations are forward-only. Downgrading the binary may fail
 to open a newer DB.

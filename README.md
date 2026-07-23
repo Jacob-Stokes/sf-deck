@@ -209,6 +209,10 @@ and parse the JSON contract rather than terminal text. See the
   `~/.sf-deck/`. User-requested exports and bundles go to the path you choose.
 - There is no telemetry, analytics, remote license check, or sf-deck cloud
   service. Normal data traffic goes to the selected Salesforce instance.
+- Automatic update discovery makes at most one anonymous, version-free request
+  to GitHub Releases every 24 hours. It only reports newer stable releases and
+  never downloads or installs them. Disable it in **Settings → Updates** or set
+  `SF_DECK_NO_UPDATE_CHECK=1`.
 - The optional IPC socket is local and user-only. Diagnostics are opt-in,
   loopback-only, and authenticated.
 
@@ -277,6 +281,24 @@ reuse the in-memory token.
 sf-deck caches describes and list results, loads detail lazily, and does no
 background polling. The header shows the active API count so the cost of an
 action remains visible. You can clear or tune the local cache from Settings.
+
+</details>
+
+<details>
+<summary><strong>How does sf-deck tell me about updates?</strong></summary>
+
+Release builds check GitHub Releases asynchronously at most once every 24
+hours. Patch, minor, and major stable releases are reported; prereleases are
+ignored. The TUI shows a small notice and **Settings → Updates** has a manual
+check. Scripts can use:
+
+```sh
+sf-deck update check --json
+```
+
+sf-deck never downloads or installs an update. Homebrew users upgrade with
+`brew upgrade --cask sf-deck`. Automatic checks can be disabled in Settings or
+with `SF_DECK_NO_UPDATE_CHECK=1`.
 
 </details>
 

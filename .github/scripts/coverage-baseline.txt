@@ -6,9 +6,10 @@ coverage: 0.0
 coverage: 0.0
 coverage: 0.0
 coverage: 0.0
-github.com/Jacob-Stokes/sf-deck/cmd/sf-deck 19.1
-github.com/Jacob-Stokes/sf-deck/internal/app 55.7
+github.com/Jacob-Stokes/sf-deck/cmd/sf-deck 32.4
+github.com/Jacob-Stokes/sf-deck/internal/app 55.9
 github.com/Jacob-Stokes/sf-deck/internal/applog 82.7
+github.com/Jacob-Stokes/sf-deck/internal/buildinfo 77.3
 github.com/Jacob-Stokes/sf-deck/internal/cache 70.0
 github.com/Jacob-Stokes/sf-deck/internal/control 75.1
 github.com/Jacob-Stokes/sf-deck/internal/devproject 60.0
@@ -35,13 +36,13 @@ github.com/Jacob-Stokes/sf-deck/internal/services/projects 79.7
 github.com/Jacob-Stokes/sf-deck/internal/services/records 76.8
 github.com/Jacob-Stokes/sf-deck/internal/services/tags 73.8
 github.com/Jacob-Stokes/sf-deck/internal/services/userops 83.8
-github.com/Jacob-Stokes/sf-deck/internal/settings 57.1
-github.com/Jacob-Stokes/sf-deck/internal/sf 21.6
+github.com/Jacob-Stokes/sf-deck/internal/settings 57.3
+github.com/Jacob-Stokes/sf-deck/internal/sf 21.7
 github.com/Jacob-Stokes/sf-deck/internal/sfurl 75.4
 github.com/Jacob-Stokes/sf-deck/internal/soqlauto 73.6
 github.com/Jacob-Stokes/sf-deck/internal/soqlfmt 87.9
 github.com/Jacob-Stokes/sf-deck/internal/theme 87.7
-github.com/Jacob-Stokes/sf-deck/internal/ui 25.8
+github.com/Jacob-Stokes/sf-deck/internal/ui 26.0
 github.com/Jacob-Stokes/sf-deck/internal/ui/highlight 71.6
 github.com/Jacob-Stokes/sf-deck/internal/ui/keymap 53.9
 github.com/Jacob-Stokes/sf-deck/internal/ui/qchip 47.0
@@ -49,5 +50,6 @@ github.com/Jacob-Stokes/sf-deck/internal/ui/qchip/migrate 64.4
 github.com/Jacob-Stokes/sf-deck/internal/ui/resource 55.6
 github.com/Jacob-Stokes/sf-deck/internal/ui/tablemodel 73.1
 github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout 32.7
+github.com/Jacob-Stokes/sf-deck/internal/updatecheck 72.4
 github.com/Jacob-Stokes/sf-deck/internal/usage 51.9
 github.com/Jacob-Stokes/sf-deck/internal/verbs 88.0
