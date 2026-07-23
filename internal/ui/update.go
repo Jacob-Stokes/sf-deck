@@ -207,6 +207,11 @@ func (m *Model) ensureDataFor(v Tab) tea.Cmd {
 // messages. Each cluster lives in its own update_*_dispatch.go file
 // and returns handled=true when it matched.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Preserve walkthrough completion before this message can close or
+	// otherwise undo the state that satisfied the active step (for example,
+	// dismissing global search or toggling zen back off).
+	m.observeWalkthrough()
+
 	// Inbound control-channel messages dispatch first so that an IPC
 	// agent can drive the TUI even when another modal/dialogue is
 	// open. The handlers themselves call into the same code keystrokes
