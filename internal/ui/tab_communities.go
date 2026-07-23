@@ -9,7 +9,8 @@ package ui
 // view that lists the org's community-type FlexiPages. FlexiPages don't
 // carry a foreign key to their Network, so the pages are grouped by
 // name prefix as a best-effort approximation — the detail view says so.
-// Layer 3 (page CONTENT via ExperienceBundle) is a documented TODO.
+// Full page content remains in Experience Builder rather than being
+// loaded through this best-effort list.
 
 import (
 	"strings"
@@ -71,7 +72,7 @@ func (m Model) renderCommunityDetail(w, innerH int) string {
 	var lines []string
 	lines = append(lines, "")
 	lines = append(lines, sectionTitle("  "+d.CommunityCurName+" · pages"))
-	lines = append(lines, sideDim("  ⚠ org-wide community pages, best-effort grouping · full page content is a TODO", inner))
+	lines = append(lines, sideDim("  ⚠ org-wide pages, best-effort grouping · open Experience Builder for full page content", inner))
 	if res == nil || res.FetchedAt().IsZero() {
 		if res != nil && res.Busy() {
 			lines = append(lines, dimLine("  loading pages…", inner))

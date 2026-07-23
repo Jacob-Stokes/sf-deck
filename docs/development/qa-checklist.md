@@ -336,11 +336,6 @@ pass at ~100-col width.
   - [ ] `o` opens the right Lightning page, `ctrl+o` lists every open target; `y` copies the URL, `ctrl+y` copies a value (label / API name / Id / SOQL …)
   - [ ] sidebar matches the cursored row; updates on move; `i` inspect when truncated
 
-### Sharing Rules
-
-  - [ ] loads on entry (cold + from cache); `r` refreshes; error state readable on a broken org
-  - [ ] sidebar matches the cursored row; updates on move; `i` inspect when truncated
-
 ### drill: /perm
 
   - [ ] loads on entry (cold + from cache); `r` refreshes; error state readable on a broken org

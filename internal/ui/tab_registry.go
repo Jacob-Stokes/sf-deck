@@ -1079,7 +1079,6 @@ func tabRegistry() map[Tab]TabSpec {
 				{ID: SubtabProfiles, Label: "Profiles", Chips: &profilesChipSurface, Open: &profilesOpenSurface, List: &profilesListSurface, Identity: identityFromProfilesList, PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.Profiles.FetchedAt() }},
 				{ID: SubtabPermsQueues, Label: "Queues", Chips: &queuesChipSurface, Open: &queuesOpenSurface, List: &queuesListSurface, Identity: identityFromQueuesList, PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.Queues.FetchedAt() }},
 				{ID: SubtabPermsPublicGroups, Label: "Public Groups", Chips: &publicGroupsChipSurface, Open: &publicGroupsOpenSurface, List: &publicGroupsListSurface, Identity: identityFromPublicGroupsList, PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.PublicGroups.FetchedAt() }},
-				{ID: SubtabPermsSharingRules, Label: "Sharing Rules"},
 			},
 		},
 		// Renderer-only entries — these tabs share the registry's

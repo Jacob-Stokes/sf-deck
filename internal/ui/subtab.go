@@ -97,8 +97,9 @@ const (
 	SubtabHomeAPI   Subtab = "home-api"
 	SubtabHomeAudit Subtab = "home-audit"
 
-	// /perms subtabs — existing PermSets/PSGs/Profiles + routing &
-	// sharing additions.
+	// /perms subtabs — existing PermSets/PSGs/Profiles + routing
+	// additions. The sharing-rules ID is retained for compatibility
+	// with persisted state but is hidden until it has a real surface.
 	SubtabPermsQueues       Subtab = "perms-queues"
 	SubtabPermsPublicGroups Subtab = "perms-public-groups"
 	SubtabPermsSharingRules Subtab = "perms-sharing-rules"
