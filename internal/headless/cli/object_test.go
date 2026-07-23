@@ -49,7 +49,48 @@ func TestObjectShow_RequiresName(t *testing.T) {
 		t.Errorf("exit = %d, want %d", code, headless.ExitInvalidArg)
 	}
 	errObj, _ := got["error"].(map[string]any)
-	if !strings.Contains(errObj["message"].(string), "--name") {
+	if !strings.Contains(errObj["message"].(string), "--sobject") {
+		t.Errorf("error.message = %v", errObj["message"])
+	}
+}
+
+func TestObjectDescribe_AcceptsDocumentedSObjectFlag(t *testing.T) {
+	a := newObjectTestApp()
+	code, got := runObjectCLI(t, a, "--json", "object", "describe",
+		"--org", "missing", "--sobject", "Account")
+	if code != headless.ExitNotFound {
+		t.Errorf("exit = %d, want %d", code, headless.ExitNotFound)
+	}
+	if got["command"] != "object.describe" {
+		t.Errorf("command = %v, want object.describe", got["command"])
+	}
+	errObj, _ := got["error"].(map[string]any)
+	if errObj["code"] != headless.ErrNotFound {
+		t.Errorf("error.code = %v", errObj["code"])
+	}
+}
+
+func TestObjectDescribe_RetainsNameCompatibility(t *testing.T) {
+	a := newObjectTestApp()
+	code, got := runObjectCLI(t, a, "--json", "object", "describe",
+		"--org", "missing", "--name", "Account")
+	if code != headless.ExitNotFound {
+		t.Errorf("exit = %d, want %d", code, headless.ExitNotFound)
+	}
+	if got["command"] != "object.describe" {
+		t.Errorf("command = %v, want object.describe", got["command"])
+	}
+}
+
+func TestObjectDescribe_RejectsConflictingNameAliases(t *testing.T) {
+	a := newObjectTestApp()
+	code, got := runObjectCLI(t, a, "--json", "object", "describe",
+		"--org", "dev", "--name", "Contact", "--sobject", "Account")
+	if code != headless.ExitInvalidArg {
+		t.Errorf("exit = %d, want %d", code, headless.ExitInvalidArg)
+	}
+	errObj, _ := got["error"].(map[string]any)
+	if !strings.Contains(errObj["message"].(string), "must match") {
 		t.Errorf("error.message = %v", errObj["message"])
 	}
 }
