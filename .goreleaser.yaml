@@ -46,10 +46,8 @@ snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
 changelog:
-  # First-release special-case: no previous tag, so the auto-generated
-  # commit log would be enormous and unhelpful. The release workflow passes
-  # .github/release-notes/v0.1.0.md directly to GoReleaser. Re-enable changelog
-  # generation for v0.2.0+ by flipping this to false (or removing the field).
+  # Releases use curated notes from .github/release-notes/<tag>.md.
+  # The workflow requires, publishes, and verifies the matching file.
   disable: true
   sort: asc
   filters:

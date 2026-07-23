@@ -52,14 +52,30 @@ jobs:
             echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured"
             exit 1
           fi
+          release_notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -s "$release_notes" ]; then
+            echo "::error::Missing or empty release notes: $release_notes"
+            exit 1
+          fi
       - name: Run goreleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
           version: "v2.17.0"
-          args: release --clean --release-notes .github/release-notes/v0.1.0.md
+          args: release --clean --release-notes .github/release-notes/${{ github.ref_name }}.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Publish and verify release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          gh release edit "$GITHUB_REF_NAME" --notes-file "$release_notes"
+          published_length="$(gh release view "$GITHUB_REF_NAME" --json body --jq '.body | length')"
+          if [ "$published_length" -eq 0 ]; then
+            echo "::error::Published release notes are empty"
+            exit 1
+          fi
       - name: Verify release archive notices
         run: ./.github/scripts/check-release-archives.sh
