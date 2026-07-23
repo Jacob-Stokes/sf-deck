@@ -25,7 +25,7 @@ func dispatchObject(a *app.App, args Args, stdout io.Writer, mode headless.Write
 	case "list":
 		return objectList(a, args.Rest, stdout, mode)
 	case "show", "describe":
-		return objectShow(a, args.Rest, stdout, mode)
+		return objectShow(a, args.Rest, stdout, mode, "object."+verb)
 	case "fields":
 		return objectFields(a, args.Rest, stdout, mode)
 	}
@@ -76,26 +76,43 @@ func objectList(a *app.App, rest []string, stdout io.Writer, mode headless.Write
 	return headless.ExitCodeFor(r)
 }
 
-func objectShow(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
-	fs := newFlagSet("object show")
+func objectShow(
+	a *app.App,
+	rest []string,
+	stdout io.Writer,
+	mode headless.WriteMode,
+	command string,
+) int {
+	fs := newFlagSet(command)
 	target := fs.String("org", "", "Alias or username (empty = default)")
-	name := fs.String("name", "", "sObject API name (required)")
+	name := fs.String("name", "", "sObject API name (legacy alias for --sobject)")
+	sobject := fs.String("sobject", "", "sObject API name (required)")
 	if err := fs.Parse(rest); err != nil {
-		return writeArgErr("object.show", err, stdout, mode)
+		return writeArgErr(command, err, stdout, mode)
 	}
-	if *name == "" {
-		return writeArgErr("object.show",
-			errors.New("--name is required"), stdout, mode)
+	resolvedName := strings.TrimSpace(*sobject)
+	legacyName := strings.TrimSpace(*name)
+	if resolvedName != "" && legacyName != "" && resolvedName != legacyName {
+		return writeArgErr(command,
+			errors.New("--name and --sobject must match when both are provided"),
+			stdout, mode)
+	}
+	if resolvedName == "" {
+		resolvedName = legacyName
+	}
+	if resolvedName == "" {
+		return writeArgErr(command,
+			errors.New("--sobject is required"), stdout, mode)
 	}
 	o, err := a.ResolveOrg(*target)
 	if err != nil {
-		return writeOrgErr("object.show", *target, err, stdout, mode)
+		return writeOrgErr(command, *target, err, stdout, mode)
 	}
-	d, err := sf.Describe(app.TargetArg(o), *name)
+	d, err := sf.Describe(app.TargetArg(o), resolvedName)
 	if err != nil {
-		return writeDescribeErr("object.show", o.Username, *name, err, stdout, mode)
+		return writeDescribeErr(command, o.Username, resolvedName, err, stdout, mode)
 	}
-	r := headless.Success("object.show", o.Username, app.TargetArg(o), false,
+	r := headless.Success(command, o.Username, app.TargetArg(o), false,
 		map[string]any{"object": d})
 	_ = r.Write(stdout, mode)
 	return headless.ExitCodeFor(r)
