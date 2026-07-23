@@ -85,15 +85,18 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-
   position: sticky;
   top: 0;
   z-index: 50;
+  width: 100%;
+  border-bottom: 1px solid rgba(72, 81, 119, .45);
+  background: rgba(27, 29, 43, .76);
+  backdrop-filter: blur(16px);
+}
+.nav-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: min(100%, var(--maxw));
   margin: 0 auto;
   padding: 17px 24px;
-  border-bottom: 1px solid rgba(72, 81, 119, .45);
-  background: rgba(27, 29, 43, .76);
-  backdrop-filter: blur(16px);
 }
 .brand { font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
 .brand-mark { color: var(--blue); }
