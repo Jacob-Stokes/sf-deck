@@ -40,9 +40,45 @@ func dispatchOrg(a *app.App, args Args, stdout io.Writer, mode headless.WriteMod
 		// `org safety <subverb>` — nested noun-verb for the safety
 		// inspector / setter pair.
 		return orgSafety(a, args.Rest, stdout, mode)
+	case "logout":
+		return orgLogout(a, args.Rest, stdout, mode)
 	}
 	r := headless.Fail("org."+verb, "", headless.ErrInvalidArgument,
 		fmt.Sprintf("unknown org verb %q", verb), nil)
+	_ = r.Write(stdout, mode)
+	return headless.ExitCodeFor(r)
+}
+
+func orgLogout(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
+	fs := newFlagSet("org logout")
+	target := fs.String("org", "", "Alias or username to disconnect")
+	yes := fs.Bool("yes", false, "confirm removal of the local Salesforce CLI session")
+	if err := fs.Parse(rest); err != nil {
+		return writeArgErr("org.logout", err, stdout, mode)
+	}
+	if strings.TrimSpace(*target) == "" {
+		return writeArgErr("org.logout", errors.New("--org is required"), stdout, mode)
+	}
+	if !*yes {
+		return writeArgErr("org.logout",
+			errors.New("--yes is required; this removes the local Salesforce CLI session"),
+			stdout, mode)
+	}
+	o, err := a.ResolveOrg(*target)
+	if err != nil {
+		return writeOrgErr("org.logout", *target, err, stdout, mode)
+	}
+	sfTarget := app.TargetArg(o)
+	if err := sf.Logout(sfTarget); err != nil {
+		r := headless.Fail("org.logout", o.Username, headless.ErrAuth,
+			err.Error(), map[string]any{"target": sfTarget})
+		_ = r.Write(stdout, mode)
+		return headless.ExitCodeFor(r)
+	}
+	r := headless.Success("org.logout", o.Username, sfTarget, true, map[string]any{
+		"disconnected": true,
+		"note":         "Removed the local Salesforce CLI authorization. This does not deactivate the Salesforce user or revoke the connected app for other sessions.",
+	})
 	_ = r.Write(stdout, mode)
 	return headless.ExitCodeFor(r)
 }

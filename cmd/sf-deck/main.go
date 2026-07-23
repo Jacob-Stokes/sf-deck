@@ -11,8 +11,10 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/app"
 	"github.com/Jacob-Stokes/sf-deck/internal/buildinfo"
 	"github.com/Jacob-Stokes/sf-deck/internal/control"
+	"github.com/Jacob-Stokes/sf-deck/internal/headless"
 	"github.com/Jacob-Stokes/sf-deck/internal/headless/cli"
 	"github.com/Jacob-Stokes/sf-deck/internal/instance"
+	productlegal "github.com/Jacob-Stokes/sf-deck/internal/legal"
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui"
@@ -199,6 +201,12 @@ func main() {
 		// config file was ignored.
 		model = model.WithStartupWarning(warn)
 	}
+	if *enableControl && !a.Settings.LegalAccepted(productlegal.PolicyVersion) {
+		*enableControl = false
+		model = model.WithStartupWarning(
+			"Control socket stayed off until the user agreement is accepted. Restart with --control after accepting.",
+		)
+	}
 	for _, w := range a.StartupWarnings {
 		// App-level non-fatal problems (e.g. devprojects.db restored
 		// from backup) — the user must SEE data-loss warnings, not
@@ -323,6 +331,8 @@ Headless commands (add --help to any for its flags):
   project       Manage dev projects and their items
   bundle        Create and operate sfdx-project bundles linked to dev projects
   instance      List the sf-deck instances currently running
+  legal         Review or accept the current privacy notice and user agreement
+  data          Inspect or erase sf-deck-owned local data
   update        Check for a newer stable sf-deck release
   verbs         Discover the full noun.verb surface (single source of truth)
 
@@ -342,11 +352,25 @@ Docs:  https://github.com/Jacob-Stokes/sf-deck
 //     but the org-targeted verbs need it AND every safety check
 //     needs to know the org's kind.
 func runHeadless(args cli.Args) {
-	if args.Noun == "update" {
+	mode := headlessMode(args)
+	switch headlessRouteFor(args.Noun) {
+	case headlessLocal:
+		// These commands are local-only and must remain usable before
+		// acknowledgement (especially status and data deletion).
+		os.Exit(cli.Dispatch(nil, args, os.Stdout, os.Stderr))
+	case headlessUpdate:
 		// Release discovery needs neither Salesforce nor any local database,
 		// so keep it usable on a fresh machine before the sf CLI is installed.
 		a := &app.App{Updates: updatecheck.New()}
 		os.Exit(cli.Dispatch(a, args, os.Stdout, os.Stderr))
+	}
+	st, err := settings.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "settings:", err)
+		os.Exit(1)
+	}
+	if command, required := headlessLegalRequirement(args, st); required {
+		os.Exit(cli.WriteLegalRequired(command, os.Stdout, mode))
 	}
 	a, err := app.Open(app.OpenOptions{
 		SkipUsage:  true,
@@ -358,4 +382,41 @@ func runHeadless(args cli.Args) {
 	}
 	defer a.Close()
 	os.Exit(cli.Dispatch(a, args, os.Stdout, os.Stderr))
+}
+
+type headlessRoute int
+
+const (
+	headlessApp headlessRoute = iota
+	headlessLocal
+	headlessUpdate
+)
+
+func headlessRouteFor(noun string) headlessRoute {
+	switch noun {
+	case "legal", "data", "instance", "verbs":
+		return headlessLocal
+	case "update":
+		return headlessUpdate
+	default:
+		return headlessApp
+	}
+}
+
+func headlessLegalRequirement(args cli.Args, st *settings.Settings) (string, bool) {
+	if st != nil && st.LegalAccepted(productlegal.PolicyVersion) {
+		return "", false
+	}
+	command := args.Noun
+	if args.Verb != "" {
+		command += "." + args.Verb
+	}
+	return command, true
+}
+
+func headlessMode(args cli.Args) headless.WriteMode {
+	if args.JSON {
+		return headless.JSONMode
+	}
+	return headless.TextMode
 }

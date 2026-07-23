@@ -220,6 +220,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m2 := msg.(type) {
 	case updateCheckMsg:
 		return m, m.applyUpdateCheck(m2)
+	case legalModalMsg:
+		return m.applyLegalModal()
+	case legalAcceptedMsg:
+		return m.applyLegalAccepted()
 	case welcomeModalMsg:
 		return m.applyWelcomeModal()
 	case welcomeActionMsg:

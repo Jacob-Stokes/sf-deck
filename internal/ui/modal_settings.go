@@ -53,6 +53,7 @@ func (m *Model) openSettingsModal() tea.Cmd {
 		{Label: "Export", Hint: "save dir: " + exportDir + " · history cap", Value: "export"},
 		{Label: "Integrations", Hint: "Inspector URL: " + inspector + " · browser", Value: "integrations"},
 		{Label: "Updates", Hint: "stable releases · " + m.updateStatusLabel(), Value: "updates"},
+		{Label: "Privacy & local data", Hint: "what stays in memory, what is stored, and how to erase it", Value: "privacy"},
 		{Label: "Keybindings", Hint: "edit and save key bindings", Value: "keybindings"},
 		{Label: "Debug", Hint: "developer/testing toggles (force welcome modal)", Value: "debug"},
 		{Label: "About sf-deck", Hint: aboutSettingsHint(), Value: "about"},
@@ -1194,6 +1195,8 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 		return m.openIntegrationsModal()
 	case "updates":
 		return m.openUpdatesModal()
+	case "privacy":
+		return m.openPrivacyModal()
 	case "keybindings":
 		return m.openKeybindingsModal()
 	case "debug":

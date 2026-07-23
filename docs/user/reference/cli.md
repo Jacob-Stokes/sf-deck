@@ -136,6 +136,21 @@ Patch a chip's columns/clauses/label.
 
 - Usage: `sf-deck chip update --id <id> [--columns <c>] [--clauses <c>] --json`
 
+## `data`
+
+### `data.erase`
+
+Delete sf-deck-owned local application state.
+
+- Usage: `sf-deck data erase --yes [--include-bundles] --json`
+- Note: Requires all sf-deck instances to be closed. Custom export/bundle paths and Salesforce CLI credentials are not deleted.
+
+### `data.inspect`
+
+Show sf-deck local-data locations and persistence boundaries.
+
+- Usage: `sf-deck data inspect --json`
+
 ## `instance`
 
 ### `instance.kill`
@@ -149,6 +164,20 @@ Send SIGTERM to a running sf-deck instance.
 List running sf-deck instances + their control sockets.
 
 - Usage: `sf-deck instance list --json`
+
+## `legal`
+
+### `legal.accept`
+
+Acknowledge the current privacy notice and user agreement.
+
+- Usage: `sf-deck legal accept --yes --json`
+
+### `legal.status`
+
+Show the current privacy/user-terms revision and acceptance status.
+
+- Usage: `sf-deck legal status --json`
 
 ## `metadata`
 
@@ -207,6 +236,13 @@ Return the cached SObjectDescribe for an sobject.
 List sf CLI-known orgs with their connection status.
 
 - Usage: `sf-deck org list --json`
+
+### `org.logout`
+
+Remove one org's local Salesforce CLI authorization.
+
+- Usage: `sf-deck org logout --org <alias> --yes --json`
+- Note: Does not deactivate the Salesforce user or revoke other sessions.
 
 ### `org.safety.get`
 

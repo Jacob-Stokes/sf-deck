@@ -81,6 +81,9 @@ nav:
       - reference/ipc.md
       - reference/error-codes.md
       - reference/on-disk-layout.md
+  - Privacy and terms:
+      - privacy-and-data.md
+      - user-agreement.md
   - Agent integration:
       - agent-integration/index.md
       - agent-integration/discovering-verbs.md

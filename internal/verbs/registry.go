@@ -111,6 +111,19 @@ var registry = []Spec{
 			},
 		},
 	},
+	{
+		Noun: "org", Verb: "logout",
+		Summary:   "Remove one org's local Salesforce CLI authorization.",
+		Stability: "stable",
+		CLI: &CLIBinding{
+			Usage: "sf-deck org logout --org <alias> --yes --json",
+			Flags: []FlagSpec{
+				{Name: "org", Type: "string", Required: true, Description: "alias or username"},
+				{Name: "yes", Type: "bool", Required: true, Description: "confirm removal of the local CLI session"},
+			},
+		},
+		Notes: "Does not deactivate the Salesforce user or revoke other sessions.",
+	},
 
 	// ===== project ==================================================
 	{
@@ -673,6 +686,44 @@ var registry = []Spec{
 		Summary:   "Send SIGTERM to a running sf-deck instance.",
 		Stability: "stable",
 		CLI:       &CLIBinding{Usage: "sf-deck instance kill --number <n> --json"},
+	},
+
+	// ===== privacy + local data =====================================
+	{
+		Noun: "legal", Verb: "status",
+		Summary:   "Show the current privacy/user-terms revision and acceptance status.",
+		Stability: "stable",
+		CLI:       &CLIBinding{Usage: "sf-deck legal status --json"},
+	},
+	{
+		Noun: "legal", Verb: "accept",
+		Summary:   "Acknowledge the current privacy notice and user agreement.",
+		Stability: "stable",
+		CLI: &CLIBinding{
+			Usage: "sf-deck legal accept --yes --json",
+			Flags: []FlagSpec{
+				{Name: "yes", Type: "bool", Required: true, Description: "confirm after reviewing both policies"},
+			},
+		},
+	},
+	{
+		Noun: "data", Verb: "inspect",
+		Summary:   "Show sf-deck local-data locations and persistence boundaries.",
+		Stability: "stable",
+		CLI:       &CLIBinding{Usage: "sf-deck data inspect --json"},
+	},
+	{
+		Noun: "data", Verb: "erase",
+		Summary:   "Delete sf-deck-owned local application state.",
+		Stability: "stable",
+		CLI: &CLIBinding{
+			Usage: "sf-deck data erase --yes [--include-bundles] --json",
+			Flags: []FlagSpec{
+				{Name: "yes", Type: "bool", Required: true, Description: "confirm local-data deletion"},
+				{Name: "include-bundles", Type: "bool", Description: "also delete ~/sf-deck-bundles"},
+			},
+		},
+		Notes: "Requires all sf-deck instances to be closed. Custom export/bundle paths and Salesforce CLI credentials are not deleted.",
 	},
 
 	// ===== update ===================================================
