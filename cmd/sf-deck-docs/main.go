@@ -1,9 +1,9 @@
 // Command sf-deck-docs regenerates the auto-generated reference
 // pages of the docs site from the verb + keymap registries:
 //
-//	docs-site/docs/reference/cli.md
-//	docs-site/docs/reference/ipc.md
-//	docs-site/docs/reference/keymap.md
+//	docs/user/reference/cli.md
+//	docs/user/reference/ipc.md
+//	docs/user/reference/keymap.md
 //
 // Run from the repo root:
 //
@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	cliPath    = "docs-site/docs/reference/cli.md"
-	ipcPath    = "docs-site/docs/reference/ipc.md"
-	keymapPath = "docs-site/docs/reference/keymap.md"
+	cliPath    = "docs/user/reference/cli.md"
+	ipcPath    = "docs/user/reference/ipc.md"
+	keymapPath = "docs/user/reference/keymap.md"
 )
 
 func main() {

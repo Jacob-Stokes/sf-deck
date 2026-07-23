@@ -16,9 +16,9 @@
 /coverage.*
 
 # Generated website and local Python environments
-/docs-site/site/
+/docs/site/
 /.venv/
-/docs-site/.venv/
+/docs/.venv/
 __pycache__/
 *.py[cod]
 

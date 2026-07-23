@@ -1,6 +1,6 @@
 package ui
 
-// inventory.go — generates the human-readable docs/surfaces.md
+// inventory.go — generates the human-readable docs/development/surfaces.md
 // reference by walking the tabRegistry. Called from
 // cmd/inventory/main.go.
 //
@@ -15,7 +15,7 @@ package ui
 //   - openable Targets() per row type when introspectable
 //
 // What's NOT auto-derived (and gets a "TODO" or hand-filled in
-// docs/surfaces.md after generation):
+// docs/development/surfaces.md after generation):
 //   - the human description of what each surface IS
 //   - drill destinations (closures aren't introspectable)
 //   - sidebar contents

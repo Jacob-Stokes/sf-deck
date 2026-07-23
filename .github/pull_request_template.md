@@ -4,7 +4,7 @@ Thanks for the PR.
 For anything bigger than a one-line fix, please open an issue first
 so we can agree on the direction before code lands.
 
-A few patterns worth respecting — see CONTRIBUTING.md for the full
+A few patterns worth respecting — see `.github/CONTRIBUTING.md` for the full
 list:
 
 - New verbs go in internal/verbs/registry.go FIRST. The drift test
@@ -36,7 +36,7 @@ Tick what applies. Strike (e.g. ~~docs~~) the ones that don't.
 - [ ] If a verb was added or changed: `internal/verbs/registry.go` updated
 - [ ] If the registry changed: `go run ./cmd/sf-deck-docs` re-run
 - [ ] If a write verb was added or modified: safety gate level set + tested
-- [ ] If user-facing behaviour changed: relevant docs updated (`docs-site/docs/...`)
+- [ ] If user-facing behaviour changed: relevant docs updated (`docs/user/...`)
 - [ ] Commit messages explain WHY, not WHAT
 
 ## Test plan

@@ -666,7 +666,7 @@ type chipImportListViewsFetchedMsg struct {
 // applyChipImportListViews is the Update-side handler for
 // chipImportListViewsFetchedMsg. Resolves the live Resource on the
 // active org and writes the payload — see "async discipline" in
-// docs/architecture.md for the rule this enforces.
+// docs/development/architecture.md for the rule this enforces.
 func (m Model) applyChipImportListViews(msg chipImportListViewsFetchedMsg) (Model, tea.Cmd) {
 	if len(m.orgs) == 0 {
 		return m, nil

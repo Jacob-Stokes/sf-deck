@@ -83,10 +83,20 @@ jobs:
         run: go run github.com/zricethezav/gitleaks/v8@v8.28.0 dir . --no-banner --redact
 
       - name: Third-party license notices
-        run: ./scripts/check-third-party-licenses.sh
+        run: ./.github/scripts/check-third-party-licenses.sh
 
       - name: Coverage ratchet
         # Per-package coverage must never drop below the checked-in
-        # baseline (scripts/coverage-baseline.txt). Gains get locked
+        # baseline (.github/scripts/coverage-baseline.txt). Gains get locked
         # in by re-running with --update; losses fail here.
-        run: ./scripts/coverage-ratchet.sh
+        run: ./.github/scripts/coverage-ratchet.sh
+
+      - name: Build release archives
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: "v2.17.0"
+          args: release --snapshot --clean
+
+      - name: Verify release archive notices
+        run: ./.github/scripts/check-release-archives.sh

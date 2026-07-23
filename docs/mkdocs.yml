@@ -1,6 +1,7 @@
 site_name: sf-deck
 site_description: A terminal UI for working across your Salesforce orgs.
-site_url: https://jacob-stokes.github.io/sf-deck/docs/
+site_url: https://sfdeck.dev/docs/
+docs_dir: user
 repo_url: https://github.com/Jacob-Stokes/sf-deck
 repo_name: Jacob-Stokes/sf-deck
 

@@ -2,12 +2,12 @@
 
 This is the prescriptive guide. **Do exactly what's here** unless you have a documented reason not to. If you do diverge, leave a comment in the spec saying why — future-you will thank you.
 
-The architecture overview (`docs/architecture.md`) explains *why* things are shaped this way. This file says *what to do*. For visual map see [`docs/architecture-diagram.md`](architecture-diagram.md).
+The architecture overview (`docs/development/architecture.md`) explains *why* things are shaped this way. This file says *what to do*. For a visual map see [`architecture-diagram.md`](architecture-diagram.md).
 
 > **TL;DR**: every tab is a `TabSpec` literal in `tab_registry.go`. Lists hang off `orgData`. Chips, opens, identity, and renders are declarative. Subtabs route through `dispatchSubtab`. New tabs are 80% data plumbing, 20% spec wiring. If a feature you need isn't on `TabSpec`, you're probably reaching for an escape hatch when a registry slot would do.
 
 > **Scaffold it first.** For a list-backed surface, run
-> `go run ./scripts/newsurface -name X -row XRow -key x_v1 -fetch ListX`
+> `go run ./cmd/newsurface -name X -row XRow -key x_v1 -fetch ListX`
 > to generate the sf fetcher + every boilerplate snippet. The plumbing
 > that used to be ~10 hand edits across 6 files is now **one
 > `registerListResource(...)` entry** (see

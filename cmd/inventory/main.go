@@ -1,11 +1,11 @@
 package main
 
-// cmd/inventory — emits docs/surfaces.md by walking sf-deck's
+// cmd/inventory — emits docs/development/surfaces.md by walking sf-deck's
 // tabRegistry. Run from repo root:
 //
 //	go run ./cmd/inventory
 //
-// Pass -qa for docs/qa-checklist.md or -check to fail when the
+// Pass -qa for docs/development/qa-checklist.md or -check to fail when the
 // checked-in output is stale.
 
 import (
@@ -21,10 +21,10 @@ func main() {
 	qa := flag.Bool("qa", false, "emit the generated QA checklist instead of the surface inventory")
 	check := flag.Bool("check", false, "exit non-zero if the checked-in output is stale")
 	flag.Parse()
-	out := "docs/surfaces.md"
+	out := "docs/development/surfaces.md"
 	build := ui.BuildSurfaceInventoryMarkdown
 	if *qa {
-		out = "docs/qa-checklist.md"
+		out = "docs/development/qa-checklist.md"
 		build = ui.BuildQAChecklistMarkdown
 	}
 	if v := os.Getenv("SF_DECK_INVENTORY_OUT"); v != "" {

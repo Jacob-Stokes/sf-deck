@@ -4,9 +4,9 @@ A reference for the mental model, written for future-you and new
 contributors. The code is the source of truth — if you find drift
 between this doc and the code, fix the doc (or flag it).
 
-> **If you're here to add a new tab**, read [`docs/adding-a-tab.md`](adding-a-tab.md) instead. This file explains *why* things are shaped this way; that file is the prescriptive how-to.
+> **If you're here to add a new tab**, read [`adding-a-tab.md`](adding-a-tab.md) instead. This file explains *why* things are shaped this way; that file is the prescriptive how-to.
 >
-> **If you want the picture, not the prose**, see [`docs/architecture-diagram.md`](architecture-diagram.md) — four layered diagrams covering package layers, the request lifecycle, registry dispatch, and the list render pipeline.
+> **If you want the picture, not the prose**, see [`architecture-diagram.md`](architecture-diagram.md) — four layered diagrams covering package layers, the request lifecycle, registry dispatch, and the list render pipeline.
 
 ---
 
@@ -354,7 +354,7 @@ from another's contents in a way that could go stale.
 
 `ListView[T]` is the standard pattern for "browseable list with `/`
 filter". Almost every list-shaped surface in the app uses this. See
-"Filtered memo + invalidation" in `docs/adding-a-tab.md` for the
+"Filtered memo + invalidation" in `docs/development/adding-a-tab.md` for the
 caller contract.
 
 ---

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Coverage ratchet: per-package coverage must never drop below the
-# checked-in baseline (scripts/coverage-baseline.txt). When a package
+# checked-in baseline (.github/scripts/coverage-baseline.txt). When a package
 # RISES above its baseline, the script tells you to raise it — gains
 # become permanent, losses fail the build.
 #
 # Usage:
-#   scripts/coverage-ratchet.sh           # check against baseline
-#   scripts/coverage-ratchet.sh --update  # rewrite baseline from current
+#   .github/scripts/coverage-ratchet.sh           # check against baseline
+#   .github/scripts/coverage-ratchet.sh --update  # rewrite baseline from current
 #
 # Tolerance of 0.3pt absorbs run-to-run jitter (parallel test
 # scheduling can shift fractions). A real coverage loss is bigger.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
-BASELINE="scripts/coverage-baseline.txt"
+BASELINE=".github/scripts/coverage-baseline.txt"
 TOLERANCE="0.3"
 MODE="${1:-check}"
 
@@ -29,7 +29,7 @@ if [ "$MODE" = "--update" ]; then
 fi
 
 if [ ! -f "$BASELINE" ]; then
-  echo "no baseline at $BASELINE — run: scripts/coverage-ratchet.sh --update" >&2
+  echo "no baseline at $BASELINE — run: .github/scripts/coverage-ratchet.sh --update" >&2
   exit 1
 fi
 
@@ -38,7 +38,7 @@ while read -r pkg pct; do
   [ -z "$pkg" ] && continue
   base="$(awk -v p="$pkg" '$1==p {print $2}' "$BASELINE")"
   if [ -z "$base" ]; then
-    echo "NEW package $pkg at ${pct}% — add it: scripts/coverage-ratchet.sh --update"
+    echo "NEW package $pkg at ${pct}% — add it: .github/scripts/coverage-ratchet.sh --update"
     continue
   fi
   drop="$(echo "$base - $pct" | bc -l)"
@@ -48,14 +48,14 @@ while read -r pkg pct; do
   fi
   rise="$(echo "$pct - $base" | bc -l)"
   if [ "$(echo "$rise > 1.0" | bc -l)" = "1" ]; then
-    echo "note: $pkg rose to ${pct}% (baseline ${base}%) — lock it in: scripts/coverage-ratchet.sh --update"
+    echo "note: $pkg rose to ${pct}% (baseline ${base}%) — lock it in: .github/scripts/coverage-ratchet.sh --update"
   fi
 done <<< "$current"
 
 if [ "$fail" = "1" ]; then
   echo ""
   echo "Coverage dropped. Either add tests or (with justification)"
-  echo "rewrite the baseline: scripts/coverage-ratchet.sh --update"
+  echo "rewrite the baseline: .github/scripts/coverage-ratchet.sh --update"
   exit 1
 fi
 echo "coverage ratchet: ok"
