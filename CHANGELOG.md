@@ -6,7 +6,7 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.1.0] — first public release
+## [0.1.0] - 2026-07-23
 
 The initial public release. sf-deck has been in private use for
 several months; this release wraps up what was already there into
@@ -30,7 +30,6 @@ a first installable version.
 - **Tags** — apply your own tags to any item across any org.
 - **SOQL editor** — multi-line, autocomplete against the org's
   schema, saved library, history.
-- **Compare** — Apex, Flows, and metadata diffed org-to-org.
 - **Headless CLI** — core automation runs as `sf-deck <noun>
   <verb> --json`, with a stable JSON envelope and exit codes.
 - **IPC socket** — a running sf-deck window exposes a Unix-domain
@@ -68,9 +67,11 @@ Or download a binary from the
   through to the `sf` CLI.
 - **No bundle-vs-org diff over IPC.** The TUI has the preview; the
   IPC layer doesn't expose it yet.
+- **Cross-org comparison is unfinished beta functionality** and is
+  not part of the initial launch promise.
 
-See [Limitations](docs/user/concepts/) in the docs site for
-the full list.
+See the [documentation](https://sfdeck.dev/docs/) for
+feature-specific limitations.
 
 [Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Jacob-Stokes/sf-deck/releases/tag/v0.1.0
