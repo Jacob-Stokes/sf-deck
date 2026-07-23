@@ -1,10 +1,10 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" class="no-js">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>sf-deck — a keyboard-first Salesforce workspace</title>
-  <meta name="description" content="Explore Salesforce orgs, schema, records, code, permissions, deploys, and working sets from one safety-gated terminal workspace.">
+  <meta name="description" content="Explore Salesforce orgs, schema, records, code, permissions, deploys, and working sets from one keyboard-first terminal workspace.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#1b1d2b">
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -15,7 +15,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sfdeck.dev/">
   <meta property="og:title" content="sf-deck — every Salesforce org, one keystroke away">
-  <meta property="og:description" content="A keyboard-first, safety-gated Salesforce workspace that uses your existing sf CLI sessions and keeps working state local.">
+  <meta property="og:description" content="A keyboard-first Salesforce workspace that uses your existing sf CLI sessions and keeps working state local.">
   <meta property="og:image" content="https://sfdeck.dev/assets/social-card.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
@@ -23,10 +23,10 @@
   <meta property="og:image:alt" content="sf-deck — every Salesforce org, one keystroke away">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="sf-deck — every Salesforce org, one keystroke away">
-  <meta name="twitter:description" content="A keyboard-first, safety-gated Salesforce workspace for your terminal.">
+  <meta name="twitter:description" content="A keyboard-first Salesforce workspace for your terminal.">
   <meta name="twitter:image" content="https://sfdeck.dev/assets/social-card.png">
 
-  <link rel="stylesheet" href="style.css?v=20260723">
+  <link rel="stylesheet" href="style.css?v=20260723-compact">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -43,7 +43,6 @@
     </a>
     <nav class="nav-links" aria-label="Primary navigation">
       <a href="#stories">See it work</a>
-      <a href="#safety">Safety</a>
       <a href="#roadmap">Coming soon</a>
       <a href="#install">Install</a>
       <a class="nav-gh" href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">GitHub ↗</a>
@@ -98,10 +97,8 @@
     <section class="trust" aria-label="Product trust points">
       <ul class="trust-list reveal">
         <li><span>01</span> Uses your existing <code>sf</code> sessions</li>
-        <li><span>02</span> Local cache reduces repeat API calls</li>
-        <li><span>03</span> No package or connected app to install</li>
-        <li><span>04</span> No application telemetry</li>
-        <li><span>05</span> Update checks are optional and never auto-install</li>
+        <li><span>02</span> No package or connected app to install</li>
+        <li><span>03</span> No application telemetry</li>
       </ul>
     </section>
 
@@ -109,7 +106,7 @@
       <div class="section-head reveal">
         <span class="eyebrow">See the workflow</span>
         <h2>Built for the work between orgs</h2>
-        <p>Five short journeys through the fully offline Northwind demo. Every name, record, and org shown below is fictional.</p>
+        <p>Four workflows, recorded against fictional Northwind orgs.</p>
       </div>
 
       <article class="story reveal">
@@ -118,12 +115,12 @@
           <div>
             <span class="eyebrow">Multi-org by design</span>
             <h3>Switch orgs. Each keeps its place.</h3>
-            <p>Move from development to UAT to production without rebuilding your workspace. Each org remembers its own context, while the active safety level stays visible.</p>
+            <p>Move from development to UAT to production without rebuilding your workspace. Each org remembers its own context.</p>
             <a class="text-link" href="https://sfdeck.dev/docs/tasks/cross-org-workflow/">Follow the cross-org workflow →</a>
           </div>
         </div>
         <div class="term">
-          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">three fictional Northwind orgs</span><span class="term-proof">FULL · META · READ</span></div>
+          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">three fictional Northwind orgs</span><span class="term-proof">DEMO</span></div>
           <picture>
             <source media="(prefers-reduced-motion: reduce)" srcset="assets/orgs-poster.png?v=20260723-reel">
             <img src="assets/orgs.gif?v=20260723-reel" alt="Switching between fictional Northwind development, UAT, and production orgs, then returning to the preserved Shipment__c schema context." width="1320" height="760" loading="lazy" decoding="async">
@@ -189,38 +186,21 @@
       </article>
     </section>
 
-    <section id="safety" class="section safety">
+    <section id="features" class="section capabilities">
       <div class="section-head reveal">
-        <span class="eyebrow">Per-org guardrails</span>
-        <h2>Production stays read-only until you decide otherwise.</h2>
-        <p>Every org has an explicit safety level. Actions outside that level are hidden or blocked, and the active level stays visible while you work.</p>
+        <span class="eyebrow">Also built in</span>
+        <h2>The rest is a keystroke away.</h2>
       </div>
-      <div class="safety-scale reveal">
-        <div class="level"><span class="level-index">01</span><strong>Read-only</strong><span>Browse, query, compare, and export</span></div>
-        <div class="level"><span class="level-index">02</span><strong>Records</strong><span>Allow record changes</span></div>
-        <div class="level"><span class="level-index">03</span><strong>Metadata</strong><span>Allow metadata writes and deploys</span></div>
-        <div class="level danger"><span class="level-index">04</span><strong>Full</strong><span>Allow destructive operations and anonymous Apex</span></div>
-      </div>
-      <p class="safety-note reveal">Salesforce still enforces the connected user's permissions. sf-deck adds a local guardrail; it does not replace platform security.</p>
-    </section>
-
-    <section id="features" class="section features">
-      <div class="section-head reveal">
-        <span class="eyebrow">The wider workspace</span>
-        <h2>More of the Salesforce workday, in one terminal.</h2>
-        <p>The stories above are the fast tour. The same navigation model extends across the rest of the workspace.</p>
-      </div>
-      <div class="feature-grid">
-        <article class="feature reveal"><span>01</span><h3>Objects &amp; schema</h3><p>Fields, record types, validation rules, triggers, layouts, related flows, and editable FLS.</p></article>
-        <article class="feature reveal"><span>02</span><h3>Records &amp; reports</h3><p>Browse, search, drill, edit, and export records; navigate and export report results.</p></article>
-        <article class="feature reveal"><span>03</span><h3>SOQL</h3><p>Schema-aware editor, saved queries, per-org history, Tooling API mode, and CSV/XLSX/JSON export.</p></article>
-        <article class="feature reveal"><span>04</span><h3>Apex &amp; automation</h3><p>Classes, triggers, anonymous Apex, logs, Flow versions, Lightning components, jobs, and interviews.</p></article>
-        <article class="feature reveal"><span>05</span><h3>Users &amp; permissions</h3><p>Logins, sessions, profiles, permission sets, permission set groups, queues, and public groups.</p></article>
-        <article class="feature reveal"><span>06</span><h3>Deploys <small>beta</small></h3><p>History, component failures, test results, validation, deployment, and live status.</p></article>
-        <article class="feature reveal"><span>07</span><h3>Tags &amp; dev projects <small>beta</small></h3><p>Collect related work across orgs, tag it, materialise bundles, retrieve, validate, and deploy.</p></article>
-        <article class="feature reveal"><span>08</span><h3>Org health</h3><p>Limits, storage, licences, notifications, recent activity, audit history, packages, and diagnostics.</p></article>
-        <article class="feature reveal"><span>09</span><h3>Open the right canvas</h3><p>Jump to a record, Object Manager, Flow Builder, Setup, source file, or other matching destination.</p></article>
-      </div>
+      <ul class="capability-list reveal">
+        <li>SOQL</li>
+        <li>Records &amp; reports</li>
+        <li>Apex &amp; Flows</li>
+        <li>Users &amp; permissions</li>
+        <li>Deploys</li>
+        <li>Tags &amp; projects</li>
+        <li>Org health</li>
+        <li>Open in Salesforce</li>
+      </ul>
     </section>
 
     <section id="roadmap" class="section roadmap">
@@ -228,8 +208,7 @@
         <div class="roadmap-copy">
           <span class="eyebrow">Coming soon · beta in progress</span>
           <h2>Compare orgs before you ship.</h2>
-          <p>Cross-org comparison is being built for reviewing Apex, flows, and selected metadata between environments. The goal is a focused changed-component list, inspectable diffs, and saved comparisons you can reopen during release review.</p>
-          <p class="roadmap-status"><span></span> Compare is available as an unfinished beta and is not part of the initial launch promise yet.</p>
+          <p>A focused org-to-org diff for Apex, flows, and selected metadata—currently an unfinished beta, not part of the initial launch promise.</p>
         </div>
         <div class="diff-motif" aria-hidden="true">
           <div class="diff-head"><span>northwind-dev</span><b>↔</b><span>northwind-uat</span></div>
@@ -244,61 +223,15 @@
       </div>
     </section>
 
-    <section id="headless" class="section headless">
-      <div class="headless-grid">
-        <div class="section-head left reveal">
-          <span class="eyebrow">The same guardrails, scriptable</span>
-          <h2>Automate the workflow without inventing another API.</h2>
-          <p>Core operations expose versioned JSON, predictable exit codes, and the same per-org safety checks. Scripts and agents can also control a running sf-deck window through its local Unix socket.</p>
-          <a class="text-link" href="https://sfdeck.dev/docs/agent-integration/">Read the agent integration guide →</a>
-        </div>
-        <div class="code-block reveal">
-          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">shell</span></div>
-          <pre><code><span class="c-cmd">sf-deck</span> soql run <span class="c-flag">--org</span> dev \
-  <span class="c-flag">--query</span> <span class="c-str">"SELECT Id, Name FROM Account LIMIT 5"</span> \
-  <span class="c-flag">--json</span>
-
-<span class="c-cmd">sf-deck</span> org safety get <span class="c-flag">--org</span> prod <span class="c-flag">--json</span>
-
-<span class="c-out">{ <span class="c-key">"ok"</span>: true, <span class="c-key">"changed"</span>: false, <span class="c-key">"data"</span>: { … } }</span></code></pre>
-        </div>
-      </div>
-    </section>
-
     <section id="install" class="section install">
-      <div class="section-head reveal">
-        <span class="eyebrow">Try it locally</span>
-        <h2>Explore the whole workspace without an org.</h2>
-        <p>Launch the fully offline Northwind demo, browse three fictional orgs, and decide whether sf-deck fits your workflow before authenticating anything.</p>
-      </div>
-      <div class="install-grid">
-        <article class="install-card primary reveal">
-          <span class="install-label">Recommended</span>
-          <h3>Homebrew</h3>
-          <p>macOS and Linux</p>
-          <div class="command">
-            <code>brew install --cask Jacob-Stokes/tap/sf-deck</code>
-            <button type="button" class="copy" data-copy="brew install --cask Jacob-Stokes/tap/sf-deck" data-copy-label="Homebrew install command" aria-label="Copy Homebrew install command">Copy</button>
-          </div>
-          <div class="command">
-            <code>sf-deck --demo</code>
-            <button type="button" class="copy" data-copy="sf-deck --demo" data-copy-label="demo command" aria-label="Copy demo command">Copy</button>
-          </div>
-        </article>
-        <article class="install-card reveal">
-          <span class="install-label">Requirements</span>
-          <h3>Connect your orgs</h3>
-          <p>Install the Salesforce CLI and authenticate at least one org. If this returns your orgs, sf-deck is ready:</p>
-          <div class="command">
-            <code>sf org list</code>
-            <button type="button" class="copy" data-copy="sf org list" data-copy-label="Salesforce org list command" aria-label="Copy Salesforce org list command">Copy</button>
-          </div>
-          <a class="text-link" href="https://sfdeck.dev/docs/getting-started/install/">Read the install guide →</a>
-        </article>
-      </div>
-      <div class="install-links reveal">
-        <a class="btn btn-ghost" href="https://github.com/Jacob-Stokes/sf-deck/releases" target="_blank" rel="noopener">Pre-built binaries ↗</a>
-        <a class="btn btn-ghost" href="https://sfdeck.dev/docs/">Read the docs →</a>
+      <div class="install-cta reveal">
+        <span class="eyebrow">Ready?</span>
+        <h2>Install sf-deck.</h2>
+        <p>Homebrew for macOS and Linux, or download a pre-built release.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://sfdeck.dev/docs/getting-started/install/">Installation guide</a>
+          <a class="btn btn-ghost" href="https://github.com/Jacob-Stokes/sf-deck/releases" target="_blank" rel="noopener">Pre-built binaries ↗</a>
+        </div>
       </div>
     </section>
   </main>
