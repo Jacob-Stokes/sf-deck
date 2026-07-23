@@ -1,16 +1,38 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  goreleaser:
+  tap-smoke-test:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    steps:
+      - name: Verify Homebrew tap access
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured"
+            exit 1
+          fi
+          can_push="$(gh api repos/Jacob-Stokes/homebrew-tap --jq '.permissions.push')"
+          if [ "$can_push" != "true" ]; then
+            echo "::error::The token cannot write to Jacob-Stokes/homebrew-tap"
+            exit 1
+          fi
+          echo "Homebrew tap token has write access."
+
+  goreleaser:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
