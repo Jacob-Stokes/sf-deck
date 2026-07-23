@@ -26,34 +26,28 @@
 
 </div>
 
-sf-deck brings schema, records, permissions, Apex, Flows, reports,
-deployments, and org-to-org comparison into one fast terminal interface.
-Switch orgs with a keystroke, search by name, and open Lightning only when
-you need its canvas.
+sf-deck puts your Salesforce orgs in one terminal. Browse objects and records,
+run SOQL, inspect permissions, and switch orgs without opening another tab.
 
-It reuses the Salesforce CLI session already on your machine. There is no
-connected app, managed package, Setup change, or second credential store.
-If `sf org list` works, sf-deck is ready to use.
+It uses the orgs already authenticated with Salesforce CLI. No managed package,
+connected app, Setup changes, or extra credentials. If `sf org list` works,
+sf-deck is ready.
 
 ## Install and try it
 
-You need the
-[Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
-with at least one authenticated org. Then install sf-deck on macOS or Linux:
+You need the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
+with at least one authenticated org.
 
 ```sh
 brew install --cask Jacob-Stokes/tap/sf-deck
 sf-deck
 ```
 
-Want to look around without connecting a real org?
+Or explore three fictional orgs without making a network call:
 
 ```sh
 sf-deck --demo
 ```
-
-Demo mode boots three fictional orgs with populated records, metadata,
-projects, bundles, and activity. It makes no network calls.
 
 <details>
 <summary><strong>Other installation options</strong></summary>
@@ -68,88 +62,39 @@ cd sf-deck
 go build -o sf-deck ./cmd/sf-deck
 ```
 
-There is no native Windows build yet. WSL2 is supported; install the Linux
-`sf` CLI and sf-deck inside WSL so they share the same authentication store.
-
 </details>
-
-## Why sf-deck
-
-- **Work across orgs without losing context.** Every authenticated org is one
-  key away, and the header always shows the active org and its safety level.
-- **Find things by name.** Search locally cached metadata or live records
-  instead of walking through layers of Object Manager and Setup.
-- **Keep related work together.** Tags and dev projects collect records and
-  metadata from multiple orgs into one working set.
-- **Use one tool interactively and in automation.** The TUI, headless CLI,
-  and local IPC socket share the same backend and safety checks.
 
 ## The one-minute tour
 
 | Key | Action |
 | --- | --- |
 | `1`–`9` | Open a main workspace |
-| `'` | Open the org rail and switch org |
-| `/` | Filter the current list; in a code viewer, find in the body |
-| `Enter` | Drill into the selected item |
-| `Esc` | Go back or close the current modal |
-| `Ctrl+F` | Search metadata or records across the active org |
-| `[` / `]` | Cycle saved view chips or subtabs, depending on context |
+| `'` | Switch org |
+| `/` | Filter the current list |
+| `Enter` | Open the selected item |
+| `Ctrl+F` | Search the active org |
+| `[` / `]` | Cycle saved views or subtabs |
 | `o` | Open the matching page in Lightning, Setup, or your editor |
-| `?` | Show every key available on the current screen |
+| `?` | Show the keys available on the current screen |
 
-The mouse also works for tabs, subtabs, chips, rail buttons, and list
-scrolling. The full generated keymap is in the
-[reference documentation](https://sfdeck.dev/docs/reference/keymap/).
+The mouse also works. See the [complete keymap](https://sfdeck.dev/docs/reference/keymap/).
 
-## What you can do
+## What it covers
 
-### Explore an org
+| Area | Capabilities |
+| --- | --- |
+| Objects and metadata | Schema, fields, record types, field-level security, Apex, Flows, components, packages, and settings |
+| Data | SOQL completion and history, records, reports, and CSV/XLSX/JSON export |
+| Administration | Users, permissions, logins, deploys, tests, debug logs, jobs, and audit history |
+| Cross-org work | Fast org switching, tags, dev projects, sfdx bundles, and beta org comparison |
 
-- See API and storage limits, licenses, notifications, recent activity, and
-  the active org's safety state from the home workspace.
-- Browse sObjects, fields, record types, validation rules, triggers, page
-  layouts, and record-triggered Flows in one drill path.
-- Inspect field-level security by profile or permission set and edit it when
-  the active safety level allows.
-- Browse Apex, Flows, Lightning Web Components, Aura bundles, packages,
-  custom metadata, labels, settings, static resources, named credentials,
-  and remote sites.
-
-### Query and work with data
-
-- Write SOQL with schema-aware completion, saved queries, per-org history,
-  Tooling API mode, and CSV/XLSX/JSON export.
-- Browse and search records, inspect every field, edit values, and export the
-  current view.
-- Navigate report folders, preview reports, and export formatted or detailed
-  CSV/XLSX output.
-
-### Administer and troubleshoot
-
-- Search users, inspect logins and permissions, freeze or unfreeze accounts,
-  reset passwords, and review failed login history.
-- Browse permission sets, permission set groups, profiles, queues, and public
-  groups.
-- Inspect deploy history, component failures, Apex test results, debug logs,
-  audit activity, jobs, and Flow interviews.
-
-### Build, compare, and ship
-
-- Compare Apex, Flows, and metadata between two orgs to find drift.
-- Tag any supported item and collect cross-org work into named dev projects.
-- Materialise a dev project as an sfdx bundle, then retrieve, validate, and
-  deploy it without leaving sf-deck.
-- Open source files, Lightning records, Flow Builder, and Setup pages in the
-  right external tool when the task needs a richer editor or canvas.
-
-Task-oriented walkthroughs live in the
-[documentation](https://sfdeck.dev/docs/tasks/find-a-record/).
+Open a record in Lightning, a Flow in Flow Builder, or source in your editor
+when you need a full canvas. See the [task walkthroughs](https://sfdeck.dev/docs/tasks/find-a-record/)
+for complete workflows.
 
 ## Safety by default
 
-sf-deck adds a local safety gate in front of Salesforce's own permissions.
-Each org has an explicit level shown in the header:
+Every org has a local safety level, always visible in the header:
 
 | Level | Permitted through sf-deck |
 | --- | --- |
@@ -158,17 +103,13 @@ Each org has an explicit level shown in the header:
 | `metadata` | Record actions plus metadata writes, validation, and deploys |
 | `full` | Destructive metadata operations and anonymous Apex |
 
-Production orgs default to read-only. Raising a level is a deliberate,
-per-org settings action; unavailable writes do not appear in the TUI and are
-rejected by the CLI and IPC backend. Salesforce still enforces the connected
-user's permissions—the sf-deck gate is an additional guardrail, not a
-replacement for platform security.
+Production orgs start read-only. Writes above the selected level are hidden in
+the TUI and rejected by the CLI and IPC backend. Salesforce still enforces the
+connected user's permissions; sf-deck adds another guardrail.
 
 Read the full [safety model](https://sfdeck.dev/docs/concepts/safety/).
 
 ## Automation and agents
-
-sf-deck has three surfaces with different jobs:
 
 | Surface | Best for | Example |
 | --- | --- | --- |
@@ -184,45 +125,36 @@ sf-deck record get     --org dev --id 001... --json
 sf-deck org safety get --org prod --json
 ```
 
-CLI and IPC deliberately differ where context demands it: navigation and
-editor seeding require a live window, while some file and process operations
-are CLI-only. Discover the exact current surface instead of relying on a
-static list:
+List the commands supported by each surface:
 
 ```sh
-sf-deck verbs list --json
 sf-deck verbs list --surface cli --json
 sf-deck verbs list --surface ipc --json
 ```
 
-The bundled [`skills/sf-deck`](skills/sf-deck) package teaches AI agents to
-discover verbs, inspect safety before writes, ask before production changes,
-and parse the JSON contract rather than terminal text. See the
-[agent integration guide](https://sfdeck.dev/docs/agent-integration/).
+The bundled [`skills/sf-deck`](skills/sf-deck) package gives AI agents the same
+command discovery and safety model. See the [agent integration guide](https://sfdeck.dev/docs/agent-integration/).
 
-## Local data and authentication
+## Authentication and local data
 
-- Authentication remains owned by the Salesforce CLI. sf-deck requests the
-  current access token, keeps it in process memory, and never writes it to its
-  cache or logs.
+- Salesforce CLI owns authentication. Access tokens stay in memory and are not
+  written to the cache or logs.
 - Cached org data, settings, tags, saved queries, and dev projects live under
-  `~/.sf-deck/`. User-requested exports and bundles go to the path you choose.
-- There is no telemetry, analytics, remote license check, or sf-deck cloud
-  service. Normal data traffic goes to the selected Salesforce instance.
-- Automatic update discovery makes at most one anonymous, version-free request
-  to GitHub Releases every 24 hours. It only reports newer stable releases and
-  never downloads or installs them. Disable it in **Settings → Updates** or set
-  `SF_DECK_NO_UPDATE_CHECK=1`.
-- The optional IPC socket is local and user-only. Diagnostics are opt-in,
-  loopback-only, and authenticated.
+  `~/.sf-deck/`. Exports and bundles go where you choose.
+- There is no telemetry, hosted backend, remote licence check, or sf-deck
+  account.
+- Update checks make at most one anonymous, version-free request to GitHub
+  Releases every 24 hours. sf-deck never downloads or installs updates.
+- IPC is local and user-only. Diagnostics are opt-in, authenticated, and
+  loopback-only.
 
 See the [on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/)
-and [security policy](.github/SECURITY.md) for the complete details.
+and [security policy](.github/SECURITY.md). Disable update checks in
+**Settings → Updates** or with `SF_DECK_NO_UPDATE_CHECK=1`.
 
 ## Platform support and maturity
 
-sf-deck v0.1 is young, solo-maintained, and already used daily against real
-orgs. The maturity labels are intentionally conservative:
+sf-deck v0.1 is young, solo-maintained, and used daily against real orgs.
 
 | Status | Areas |
 | --- | --- |
@@ -230,14 +162,11 @@ orgs. The maturity labels are intentionally conservative:
 | **Beta** | Reports, deploys and metadata writes, dev projects/bundles, cross-org compare, find-in-another-org |
 | **Partial / planned** | System API-usage detail, dashboard viewing, native Windows support |
 
-Supported release targets are macOS and Linux on arm64 and amd64. WSL2 is the
-supported Windows path today. Beta means the workflow is implemented and in
-regular use, but has had less real-world mileage and may still have rough
-edges.
+Release builds support macOS and Linux on arm64 and amd64. Windows users can
+run the Linux build and Salesforce CLI together inside WSL2.
 
 Current limitations:
 
-- No native Windows binary; use WSL2.
 - No bulk record mutation API; use the Salesforce CLI for bulk imports and
   updates.
 - No async Apex test runner over IPC; long-running test workflows fall
@@ -247,31 +176,12 @@ Current limitations:
 ## FAQ
 
 <details>
-<summary><strong>Is anything installed in my Salesforce org?</strong></summary>
-
-No. sf-deck uses the local Salesforce CLI session. There is no connected app,
-managed package, permission set, or Setup change to remove later.
-
-</details>
-
-<details>
 <summary><strong>How is this different from the Salesforce CLI or VS Code?</strong></summary>
 
 The Salesforce CLI is command-oriented and VS Code is source-oriented.
-sf-deck is org-oriented: it is designed for navigating live org state,
-switching environments, comparing them, and assembling a working set. It
-uses and complements both tools rather than replacing them.
-
-</details>
-
-<details>
-<summary><strong>What happens when the Salesforce CLI refreshes my token?</strong></summary>
-
-Newer Salesforce CLI releases expose the access token through a dedicated
-non-interactive command. A cold token refresh therefore takes an extra CLI
-round trip, and an org with MFA or passkey policy may ask you to verify again.
-The header shows `getting new token…` during that work; subsequent API calls
-reuse the in-memory token.
+sf-deck is org-oriented: browse live state, switch environments, compare them,
+and assemble a working set. It complements both tools rather than replacing
+them.
 
 </details>
 
@@ -281,33 +191,6 @@ reuse the in-memory token.
 sf-deck caches describes and list results, loads detail lazily, and does no
 background polling. The header shows the active API count so the cost of an
 action remains visible. You can clear or tune the local cache from Settings.
-
-</details>
-
-<details>
-<summary><strong>How does sf-deck tell me about updates?</strong></summary>
-
-Release builds check GitHub Releases asynchronously at most once every 24
-hours. Patch, minor, and major stable releases are reported; prereleases are
-ignored. The TUI shows a small notice and **Settings → Updates** has a manual
-check. Scripts can use:
-
-```sh
-sf-deck update check --json
-```
-
-sf-deck never downloads or installs an update. Homebrew users upgrade with
-`brew upgrade --cask sf-deck`. Automatic checks can be disabled in Settings or
-with `SF_DECK_NO_UPDATE_CHECK=1`.
-
-</details>
-
-<details>
-<summary><strong>Can a team share tags and dev projects?</strong></summary>
-
-Not yet. They live in a local SQLite database and do not sync between users or
-machines. Commit generated sfdx bundles to your normal source repository when
-you need a shared, reviewable artifact.
 
 </details>
 
@@ -323,11 +206,10 @@ you need a shared, reviewable artifact.
 ## Contributing
 
 Bug reports, focused fixes, and documentation improvements are welcome. Open
-an issue before a large feature so the design can be aligned with the existing
-list-surface, verb-registry, and safety-gate architecture.
+an issue before starting a large feature.
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, tests, release
-process, and architectural conventions.
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for setup, tests, releases, and
+architectural conventions.
 
 ## License
 
