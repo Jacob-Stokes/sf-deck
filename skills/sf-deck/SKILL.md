@@ -13,6 +13,20 @@ sf-deck has three interfaces:
 
 The transports share a Backend, safety gates, and JSON envelope (`{ok, command, data, error}`), but some operations exist on only one surface by design. Always use the registry to choose a supported transport.
 
+## Before accessing a real org
+
+sf-deck requires the current privacy notice and user agreement to be
+acknowledged before it enumerates or contacts Salesforce orgs. Check locally:
+
+```bash
+sf-deck legal status --json
+```
+
+If it is not accepted, show the user the returned privacy/terms URLs and ask
+them to review and accept. Never run `sf-deck legal accept --yes` on the user's
+behalf without their explicit approval. Demo mode is fully offline and does not
+require acceptance.
+
 ## First thing to do â€” discover, don't enumerate
 
 **The single source of truth is the verb registry, not this skill.** Verbs change; prose lists go stale; the registry never does.
@@ -117,12 +131,23 @@ sf-deck persists under `~/.sf-deck/`. The agent must NEVER edit these directly â
 | Path | Purpose |
 |---|---|
 | `~/.sf-deck/settings.toml` | chips, favourites, org safety overrides, theme |
-| `~/.sf-deck/cache.db` | SQLite read-cache: org list + per-org describes |
+| `~/.sf-deck/cache.db` | SQLite read-cache: org catalogue + metadata/schema data |
 | `~/.sf-deck/devprojects.db` | SQLite: DevProjects, items, tags, saved queries, snippets, history |
 | `~/.sf-deck/keybindings.toml` | optional user keymap overrides |
 | `~/.sf-deck/instances.json` | running-instance registry (read by `instance list`) |
 | `~/.sf-deck/control-<N>.sock` | per-instance IPC socket (when `--control` is on) |
 | `~/sf-deck-bundles/` | default bundle output directory (sfdx project per bundle) |
+
+Salesforce record lists/details, SOQL/report result rows, list-view results,
+RecentlyViewed rows, and related-record lookups are process-memory only and are
+not written to the persistent response cache. Saved query text/history is local
+working state; returned rows are not persisted.
+
+Use `sf-deck data inspect --json` to report known locations. Local deletion is
+destructive: only run `sf-deck data erase --yes` after explicit user approval
+and after all sf-deck instances are closed. It does not remove custom export
+paths or Salesforce CLI credentials. Use `org.logout` when the user explicitly
+asks to disconnect an org.
 
 ## What sf-deck can't do
 

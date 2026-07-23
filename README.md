@@ -33,6 +33,10 @@ It uses the orgs already authenticated with Salesforce CLI. No managed package,
 connected app, Setup changes, or extra credentials. If `sf org list` works,
 sf-deck is ready.
 
+Before the first real-org connection, sf-deck asks you to acknowledge its
+[user agreement](USER_AGREEMENT.md) and [privacy notice](PRIVACY.md). Demo mode
+does not require acceptance because it cannot contact Salesforce.
+
 ## Install and try it
 
 You need the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
@@ -153,13 +157,16 @@ the copy after updating the repository.
 ## Authentication and local data
 
 - Salesforce CLI owns authentication; access tokens are not cached or logged.
+- Salesforce record lists/details, SOQL and report rows, and list-view results
+  stay in process memory and are not written to the persistent cache.
 - Local state lives under `~/.sf-deck/`. There is no telemetry, hosted backend,
   sf-deck account, or remote licence check.
 - IPC is user-only and local. Update checks are anonymous, version-free,
   limited to once daily, and never install anything.
 
 See the [on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/) and
-[security policy](.github/SECURITY.md).
+[security policy](.github/SECURITY.md). Use `sf-deck data inspect` to see local
+paths and `sf-deck data erase --yes` to remove sf-deck-owned application state.
 
 ## Platform support and maturity
 

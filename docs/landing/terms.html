@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User agreement — sf-deck</title>
+  <meta name="description" content="The user agreement for accessing Salesforce through sf-deck.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1b1d2b">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; style-src 'self'; img-src 'self' data:">
+  <link rel="canonical" href="https://sfdeck.dev/terms.html">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=20260723-legal">
+</head>
+<body class="legal-page">
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/" aria-label="sf-deck home"><span class="brand-mark">sf</span><span class="brand-rest">-deck</span></a>
+      <nav class="nav-links" aria-label="Legal navigation">
+        <a href="/privacy.html">Privacy</a>
+        <a class="nav-gh" href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+  <main class="legal-content">
+    <p class="eyebrow">Policy version 2026-07-23</p>
+    <h1>User agreement</h1>
+    <p class="legal-date">Effective 23 July 2026</p>
+    <p class="legal-lede">This agreement applies when you use sf-deck to access a real Salesforce org. The software remains licensed under Apache-2.0. This agreement does not remove open-source licence rights or charge a fee for sf-deck.</p>
+
+    <h2>Your authorization</h2>
+    <p>Use sf-deck only with Salesforce orgs, data, and functionality you are authorized to access. You are responsible for complying with the <a href="https://www.salesforce.com/company/legal/sfdc-api-terms-of-service/">agreements and API limits</a> that apply to your Salesforce account, choosing an appropriate user and permission set, protecting your computer and local state, and reviewing commands and targets before approving writes.</p>
+    <p>sf-deck reuses Salesforce CLI authorization. It does not grant additional Salesforce rights or bypass Salesforce permissions.</p>
+
+    <h2>Local tool, not a hosted service</h2>
+    <p>sf-deck runs on your computer and communicates directly with the selected Salesforce instance. The maintainer does not receive, host, or control your Salesforce customer data. See the <a href="/privacy.html">privacy notice</a> for the exact in-memory and on-disk behaviour.</p>
+    <p>You direct all reads, writes, exports, bundles, scripts, and agent actions. Local safety levels are an additional guardrail, not a substitute for Salesforce permissions, change control, backups, review, or your own security obligations.</p>
+
+    <h2>Automation and agents</h2>
+    <p>If you use the headless CLI, control socket, bundled agent skill, or another automated system, you are responsible for its identity, permissions, instructions, supervision, and output. Follow the Salesforce terms applicable to your use, including the <a href="https://developer.salesforce.com/salesforce-agent-integration-protocols">Salesforce Agent Integration Protocols</a> when applicable. Use least privilege and human review for consequential or destructive actions.</p>
+
+    <h2>Open-source status and third parties</h2>
+    <p>sf-deck is free and open source under Apache-2.0. It is not affiliated with, endorsed by, or sponsored by Salesforce, Inc. Salesforce CLI, Salesforce services, GitHub, Homebrew, operating systems, and other third-party tools have their own terms and privacy policies.</p>
+
+    <h2>No warranty</h2>
+    <p>The software is provided on the warranty and liability terms in the Apache License 2.0, on an “AS IS” basis and without warranties or conditions of any kind. You decide whether sf-deck is suitable for a particular org or workflow.</p>
+
+    <h2>Ending use and changes</h2>
+    <p>You can stop using sf-deck at any time, erase local data, and disconnect Salesforce CLI sessions using the steps in the <a href="/privacy.html">privacy notice</a>. Material changes receive a new policy version and require acknowledgement before sf-deck contacts a real org again. Check the current status with <code>sf-deck legal status</code>.</p>
+    <p>Questions can be sent to <a href="mailto:hello@jacobstokes.com">hello@jacobstokes.com</a>.</p>
+  </main>
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="brand"><span class="brand-mark">sf</span><span class="brand-rest">-deck</span></span>
+      <nav class="footer-links" aria-label="Footer navigation"><a href="/">Home</a><a href="/privacy.html">Privacy</a><a href="https://sfdeck.dev/docs/">Docs</a></nav>
+    </div>
+  </footer>
+</body>
+</html>

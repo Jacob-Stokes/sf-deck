@@ -146,7 +146,7 @@ routing").
 | `queues` | queue list | 30 min |
 | `public_groups` | public group list | 1 hr |
 | `notifications` | notification feed | 30 sec |
-| `recently_viewed` | RecentlyViewed | 30 sec |
+| `recently_viewed` | RecentlyViewed | 30 sec (`NoCache`) |
 | `recent` | local /recent log | (no TTL, append-only) |
 | `home_users` | recent logins | 5 min |
 | `reports` | reports listing | 30 min |
@@ -164,6 +164,9 @@ These run as `NoCache:true` Resources — they're still in-memory
   data. PII concerns; staleness misleads (record might have
   been edited/deleted).
 - **Record details** (`recorddetail:`) — same reasoning.
+- **Recently viewed rows** (`recently_viewed`,
+  `recently_viewed_per_sobject:`) — record identifiers and names are
+  live/user-specific and remain process-local.
 - **Custom object baselines** (`object_baseline:`) — toggles can
   change via Setup outside our control; staleness misleads.
 - **Report runs** (`reportrun:`) — point-in-time aggregates.
@@ -188,6 +191,7 @@ on every process start:
 _, _ = c.DeleteKeyPrefix("records:")
 _, _ = c.DeleteKeyPrefix("listviews:")
 _, _ = c.DeleteKeyPrefix("listview:")
+_, _ = c.DeleteKeyPrefix("recently_viewed")
 ```
 
 These are belt-and-braces — the corresponding Resources are all
@@ -489,7 +493,7 @@ Everything that can cause a Resource to refresh, in one table:
 | `orgLifecycleResultMsg{Refetch:true}` | same as orgsChangedMsg | same |
 | Alias change (per-org) | `ensureOrgData` rebuilds `orgData` | every Resource on that org (they captured the old alias) |
 | Cache-miss on cold load | `Apply` + `MaybeRefreshAfterCacheLoad` | fires network refresh |
-| Startup wipes | `DeleteKeyPrefix("records:" / "listviews:" / "listview:")` | leaked legacy cache rows |
+| Startup wipes | `DeleteKeyPrefix("records:" / "listviews:" / "listview:" / "recently_viewed")` | leaked legacy cache rows |
 | User runs `rm ~/.sf-deck/cache.db` | manual nuke | Layer 1 entirely; Layer 2/3 unaffected for current session |
 
 ## Adding a new Resource

@@ -7,8 +7,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Jacob-Stokes/sf-deck/internal/headless"
 	"github.com/Jacob-Stokes/sf-deck/internal/headless/cli"
+	productlegal "github.com/Jacob-Stokes/sf-deck/internal/legal"
+	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
 // TestUsageListsEveryHeadlessCommand guards against the --help command
@@ -32,6 +36,40 @@ func TestUsageListsEveryHeadlessCommand(t *testing.T) {
 		if !cli.KnownNouns[noun] {
 			t.Errorf("--help lists %q but it isn't a real command", noun)
 		}
+	}
+}
+
+func TestHeadlessPreflightHelpers(t *testing.T) {
+	for _, noun := range []string{"legal", "data", "instance", "verbs"} {
+		if got := headlessRouteFor(noun); got != headlessLocal {
+			t.Errorf("headlessRouteFor(%q) = %v", noun, got)
+		}
+	}
+	if got := headlessRouteFor("update"); got != headlessUpdate {
+		t.Errorf("update route = %v", got)
+	}
+	if got := headlessRouteFor("org"); got != headlessApp {
+		t.Errorf("org route = %v", got)
+	}
+
+	args := cli.Args{Noun: "org", Verb: "list"}
+	if command, required := headlessLegalRequirement(args, nil); !required || command != "org.list" {
+		t.Fatalf("nil settings requirement = %q, %v", command, required)
+	}
+	if command, required := headlessLegalRequirement(cli.Args{Noun: "org"}, &settings.Settings{}); !required || command != "org" {
+		t.Fatalf("fresh settings requirement = %q, %v", command, required)
+	}
+	st := &settings.Settings{}
+	st.AcceptLegal(productlegal.PolicyVersion, time.Now())
+	if command, required := headlessLegalRequirement(args, st); required || command != "" {
+		t.Fatalf("accepted requirement = %q, %v", command, required)
+	}
+
+	if got := headlessMode(cli.Args{JSON: true}); got != headless.JSONMode {
+		t.Errorf("JSON mode = %v", got)
+	}
+	if got := headlessMode(cli.Args{}); got != headless.TextMode {
+		t.Errorf("text mode = %v", got)
 	}
 }
 

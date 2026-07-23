@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/buildinfo"
+	productlegal "github.com/Jacob-Stokes/sf-deck/internal/legal"
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
@@ -62,11 +63,15 @@ func (m *Model) openAboutModal() tea.Cmd {
 		{Label: "Source", Body: "https://github.com/Jacob-Stokes/sf-deck"},
 		{Label: "Website", Body: "https://sfdeck.dev"},
 		{Label: "Security", Body: "hello@jacobstokes.com"},
+		{Label: "Privacy", Body: productlegal.PrivacyURL},
+		{Label: "User terms", Body: productlegal.TermsURL},
 		{},
 		{Body: "Salesforce is a registered trademark of Salesforce, Inc."},
 		{Body: "sf-deck is not affiliated with, endorsed by, or sponsored by Salesforce."},
 		{},
-		{Body: "No telemetry or analytics. Update checks are anonymous, cached, optional, and never install software."},
+		{Body: "No hosted backend, telemetry, or analytics. The developer does not receive Salesforce org data."},
+		{Body: "Salesforce record payloads stay in memory and are not written to the persistent cache."},
+		{Body: "Update checks are anonymous, cached, optional, and never install software."},
 	}
 	if m.updateResult.UpdateAvailable {
 		rows = append(rows, infoRow{

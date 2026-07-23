@@ -181,6 +181,7 @@ func initOrgDataResources(d *orgData, username, alias string, st *settings.Setti
 	// would feel stale but shorter would re-query every visit.
 	d.RecentlyViewed = Resource[[]sf.RecentlyViewedRow]{
 		Scope: username, Key: "recently_viewed", TTL: ttl("recently_viewed", 5*time.Minute),
+		NoCache: true,
 		Fetch: func() ([]sf.RecentlyViewedRow, error) {
 			// Source cap matches the local log's max-entries cap so
 			// the merged stream's worst case (no overlap, no kind

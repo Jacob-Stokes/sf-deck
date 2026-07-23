@@ -1424,6 +1424,18 @@ func (m Model) WithDevProjects(s *devproject.Store) Model {
 }
 
 func (m Model) Init() tea.Cmd {
+	// Re-register demo targets before any resource commands are built. This is
+	// local-only and safe before the real-org acknowledgement gate.
+	restoreDemoOrgOnBoot(m.settings.DemoOrgImported())
+	if cmd := m.legalTriggerCmd(); cmd != nil {
+		return cmd
+	}
+	return m.runtimeStartupCmd()
+}
+
+// runtimeStartupCmd starts work that may discover or contact authenticated
+// Salesforce orgs. Keep this behind the versioned legal acknowledgement.
+func (m Model) runtimeStartupCmd() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.orgsRes.Ensure(m.cache),
 		m.projectsRes.Ensure(m.cache),
@@ -1442,10 +1454,6 @@ func (m Model) Init() tea.Cmd {
 	if cmd := m.updateCheckCmd(false); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// Re-register demo targets if a demo org was imported in a prior
-	// session, so its surfaces serve seeded cache instead of attempting
-	// live calls this launch.
-	restoreDemoOrgOnBoot(m.settings.DemoOrgImported())
 	return tea.Batch(cmds...)
 }
 

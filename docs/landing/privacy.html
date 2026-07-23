@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy notice — sf-deck</title>
+  <meta name="description" content="How sf-deck processes Salesforce data and stores local working state.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1b1d2b">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; style-src 'self'; img-src 'self' data:">
+  <link rel="canonical" href="https://sfdeck.dev/privacy.html">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=20260723-legal">
+</head>
+<body class="legal-page">
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/" aria-label="sf-deck home"><span class="brand-mark">sf</span><span class="brand-rest">-deck</span></a>
+      <nav class="nav-links" aria-label="Legal navigation">
+        <a href="/terms.html">User agreement</a>
+        <a class="nav-gh" href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+  <main class="legal-content">
+    <p class="eyebrow">Policy version 2026-07-23</p>
+    <h1>Privacy notice</h1>
+    <p class="legal-date">Effective 23 July 2026</p>
+    <p class="legal-lede">sf-deck is a free, open-source application maintained by Jacob Stokes. It runs on your computer. There is no sf-deck account, hosted application backend, analytics service, advertising system, or application telemetry.</p>
+
+    <h2>What the maintainer receives</h2>
+    <p>The sf-deck application does not send the maintainer Salesforce records, metadata, results, credentials, tokens, usernames, org identifiers, usage analytics, crash reports, machine identifiers, or profiling data. The maintainer therefore does not host, sell, share, profile, or otherwise control your Salesforce customer data.</p>
+    <p>If you email the project or interact through GitHub, the information you choose to provide is received through that service and used to respond, maintain the project, and address security or support questions.</p>
+
+    <h2>How Salesforce data is processed</h2>
+    <p>sf-deck uses Salesforce orgs already authenticated through Salesforce CLI. It may request the current access token from the CLI, hold it in process memory, and use it for direct Salesforce REST or SOAP requests. It does not write the token to its own databases or logs.</p>
+    <p><strong>Salesforce record payloads are not persistently cached.</strong> Record lists and details, SOQL and report result rows, list-view results, Salesforce RecentlyViewed rows, and related-record lookups remain in process memory and disappear when the process ends.</p>
+
+    <h2>Local data</h2>
+    <p>Working state under <code>~/.sf-deck/</code> can include settings, safety levels, chips, recently visited item references, org catalogue details, metadata/schema caches, saved SOQL text and history (not returned rows), saved Apex and history, dev projects, tags, bundle registrations, usage counters, logs, and optional update-check state.</p>
+    <p>Exports and SFDX bundles are written to paths you choose. The default bundle path is <code>~/sf-deck-bundles/</code>. Local files are intended to be readable only by your operating-system user.</p>
+
+    <h2>Network requests</h2>
+    <p>Normal data traffic goes directly from your computer to the selected Salesforce instance. When enabled, the update checker makes at most one request every 24 hours to GitHub Releases. It sends no installed version, Salesforce data, credentials, or sf-deck identifier and never installs software. GitHub may receive ordinary network information such as an IP address under its own privacy terms.</p>
+
+    <h2>Inspect, delete, and revoke</h2>
+    <pre><code>sf-deck data inspect
+sf-deck data erase --yes
+sf-deck org logout --org &lt;alias-or-username&gt; --yes</code></pre>
+    <p>Close every sf-deck process before erasing. Add <code>--include-bundles</code> to delete the default bundle directory. Custom export and bundle paths must be deleted manually. Local deletion does not revoke Salesforce sessions elsewhere; administrators can revoke sessions or connected-app access in Salesforce when needed.</p>
+
+    <h2>Changes and contact</h2>
+    <p>Material changes receive a new policy version and require acknowledgement before sf-deck contacts a real org again. Questions can be sent to <a href="mailto:hello@jacobstokes.com">hello@jacobstokes.com</a>. Security issues should follow the <a href="https://github.com/Jacob-Stokes/sf-deck/blob/main/.github/SECURITY.md">security policy</a>.</p>
+  </main>
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="brand"><span class="brand-mark">sf</span><span class="brand-rest">-deck</span></span>
+      <nav class="footer-links" aria-label="Footer navigation"><a href="/">Home</a><a href="/terms.html">User agreement</a><a href="https://sfdeck.dev/docs/">Docs</a></nav>
+    </div>
+  </footer>
+</body>
+</html>

@@ -32,6 +32,11 @@ sf-deck's threat model is narrow because the surface is small:
 - **Application state lives under `~/.sf-deck/`.** User-requested exports and
   bundles are written to the destination the user selects, and ephemeral
   demo/no-cache data may use an OS temporary directory.
+- **Salesforce record payloads are memory-only.** Record lists/details,
+  SOQL/report rows, Salesforce RecentlyViewed rows, related-record lookups, and
+  list-view results are not written to the persistent response cache. Metadata
+  and catalogue data may be cached; saved query text/history is local working
+  state, not a cache of returned rows.
 - **No code execution on the user's behalf beyond what they
   invoke.** Anonymous Apex requires explicit safety raise and
   confirmation; metadata deploys require their own safety raise.
@@ -47,10 +52,9 @@ Concretely in scope:
   the IPC socket and drive the running sf-deck instance, which
   inherits the user's Salesforce session. The socket relies on
   filesystem permissions for isolation.
-- Cache integrity: `~/.sf-deck/cache.db` holds local memoised
-  Salesforce data. Tampering with it could cause sf-deck to render
-  stale or fabricated information. Treat the cache as the user's
-  own data.
+- Cache integrity: `~/.sf-deck/cache.db` holds local memoised Salesforce
+  metadata and catalogue data. Tampering with it could cause sf-deck to render
+  stale or fabricated information. Treat the cache as the user's own data.
 - The safety gate is local to sf-deck. It constrains what sf-deck
   will attempt; Salesforce still enforces its own permissions.
 

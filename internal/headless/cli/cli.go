@@ -73,6 +73,8 @@ var KnownNouns = map[string]bool{
 	"metadata":     true,
 	"instance":     true,
 	"bundle":       true,
+	"data":         true,
+	"legal":        true,
 	"verbs":        true,
 	"update":       true,
 }
@@ -179,6 +181,10 @@ func Dispatch(a *app.App, args Args, stdout, stderr io.Writer) int {
 		return dispatchInstance(a, args, stdout, mode)
 	case "bundle":
 		return dispatchBundle(a, args, stdout, mode)
+	case "data":
+		return dispatchData(args, stdout, mode)
+	case "legal":
+		return dispatchLegal(args, stdout, mode)
 	case "verbs":
 		return dispatchVerbs(a, args, stdout, mode)
 	case "update":

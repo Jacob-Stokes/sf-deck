@@ -6,7 +6,7 @@ coverage: 0.0
 coverage: 0.0
 coverage: 0.0
 coverage: 0.0
-github.com/Jacob-Stokes/sf-deck/cmd/sf-deck 32.4
+github.com/Jacob-Stokes/sf-deck/cmd/sf-deck 35.5
 github.com/Jacob-Stokes/sf-deck/internal/app 55.9
 github.com/Jacob-Stokes/sf-deck/internal/applog 82.7
 github.com/Jacob-Stokes/sf-deck/internal/buildinfo 77.3

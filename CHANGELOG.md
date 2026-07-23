@@ -6,6 +6,28 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A versioned first-run acknowledgement now appears before sf-deck discovers or
+  contacts a real Salesforce org. Headless users can inspect and accept the
+  same privacy notice and user agreement with `sf-deck legal`.
+- `sf-deck data inspect` documents local storage boundaries, while
+  `sf-deck data erase --yes` removes sf-deck-owned application state after all
+  running instances are closed.
+- `sf-deck org logout --org <target> --yes` removes a selected local
+  Salesforce CLI authorization.
+- Privacy and user-agreement pages are linked from the website, README,
+  documentation, Settings, and About screen.
+
+### Changed
+
+- Salesforce record lists/details, SOQL and report result rows, list-view
+  results, related-record lookups, and Salesforce RecentlyViewed rows are
+  explicitly process-memory only. Startup removes legacy record-shaped cache
+  entries created by earlier builds.
+- The agent skill now requires policy-status discovery and explicit user
+  approval before accepting terms or erasing local data.
+
 ## [0.1.1] - 2026-07-23
 
 ### Fixed

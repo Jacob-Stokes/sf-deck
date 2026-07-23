@@ -22,7 +22,8 @@ change and may overwrite manual edits.
 
 Sections:
 
-- `[ui]` — theme, sidebar defaults, font preferences
+- `[ui]` — theme, sidebar defaults, policy-acceptance revision, and other UI
+  preferences
 - `[ui.api]` — API timeouts (HTTP, CLI, retrieve/deploy, deploy
   polling, bulk polling)
 - `[ui.updates]` — automatic stable-release discovery (enabled by default)
@@ -41,12 +42,18 @@ SQLite. Two top-level tables:
   refreshes the org list via `sf org list`. Same source the CLI's
   org-resolver reads.
 - **`kv`** — per-org key/value JSON blobs. Used to memoize
-  describes, sObject lists, recently-viewed payloads, FLS grids,
-  recent records. Composite primary key `(org_username, key)`.
+  metadata and catalogue data such as describes, sObject lists, FLS
+  grids, flows, and packages. Composite primary key
+  `(org_username, key)`.
 
-Blobs are opaque from outside — the keys (`describe_v3:Account`,
-`flows_v2`, `records:Shipment__c`, …) match what the loaders
-expect. Don't hand-edit.
+Blobs are opaque from outside — keys such as
+`describe_v3:Account` and `flows_v2` match what the loaders expect.
+Don't hand-edit.
+
+Record payloads are never written here. Record lists/details, Salesforce
+RecentlyViewed rows, SOQL/report rows, related-record lookups, and list-view
+results are process-memory only. Startup also removes legacy record cache rows
+created by older builds.
 
 Safe to delete cache.db at any time; sf-deck rebuilds it on next
 launch.
@@ -133,8 +140,24 @@ link`.
 - Salesforce session tokens — those stay in the `sf` CLI's keychain
   / `~/.sfdx/`. sf-deck reuses the `sf` session.
 - Org credentials — same.
-- Salesforce data beyond what's been cached. Cache entries are
-  shaped to be safe to drop at any time.
+- Salesforce record payloads in its persistent cache. Metadata/schema and
+  catalogue data may be cached; saved query text/history is stored separately,
+  but returned query rows are not.
+
+## Inspect and erase
+
+```sh
+sf-deck data inspect
+sf-deck data erase --yes
+```
+
+Close all running sf-deck processes before erasing. Add
+`--include-bundles` to remove the default `~/sf-deck-bundles/` directory too.
+Exports and bundles at custom paths remain at those paths.
+
+Deleting `~/.sf-deck/` does not revoke Salesforce CLI authentication. Use
+`sf-deck org logout --org <alias-or-username> --yes` to disconnect a local org
+session.
 
 ## Versioning the layout
 

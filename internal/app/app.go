@@ -299,6 +299,7 @@ func Open(opts OpenOptions) (*App, error) {
 	_, _ = c.DeleteKeyPrefix("records:")
 	_, _ = c.DeleteKeyPrefix("listviews:")
 	_, _ = c.DeleteKeyPrefix("listview:")
+	_, _ = c.DeleteKeyPrefix("recently_viewed")
 
 	// Start every process with a clean in-memory REST client cache.
 	// Auth / alias lifecycle changes also invalidate this during the

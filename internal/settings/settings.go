@@ -134,6 +134,13 @@ type UIConfig struct {
 	// opening the TUI.
 	WelcomeSeen bool `toml:"welcome_seen,omitempty"`
 
+	// LegalAcceptedVersion records the privacy/user-terms revision accepted
+	// before sf-deck first contacts a real Salesforce org. The timestamp is
+	// informational; the version is the actual gate. Demo mode never needs
+	// acceptance because it cannot access Salesforce.
+	LegalAcceptedVersion string `toml:"legal_accepted_version,omitempty"`
+	LegalAcceptedAt      string `toml:"legal_accepted_at,omitempty"`
+
 	// DemoOrgImported is set true once the user has imported the demo
 	// org from the welcome modal (or the re-entry action). Drives the
 	// checkbox state ("already done") and whether the demo org is
@@ -2667,6 +2674,34 @@ func (s *Settings) SetWelcomeSeen(v bool) {
 		return
 	}
 	s.UI.WelcomeSeen = v
+}
+
+// LegalAccepted reports whether the current policy revision was accepted.
+// Nil settings are not accepted: a degraded startup must not silently cross
+// the acknowledgement gate.
+func (s *Settings) LegalAccepted(version string) bool {
+	if s == nil || strings.TrimSpace(version) == "" {
+		return false
+	}
+	return s.UI.LegalAcceptedVersion == version
+}
+
+// AcceptLegal records acceptance of a specific policy revision and its UTC
+// timestamp. Caller is responsible for Save().
+func (s *Settings) AcceptLegal(version string, at time.Time) {
+	if s == nil {
+		return
+	}
+	s.UI.LegalAcceptedVersion = strings.TrimSpace(version)
+	s.UI.LegalAcceptedAt = at.UTC().Format(time.RFC3339)
+}
+
+// LegalAcceptance returns the stored revision and timestamp for status UIs.
+func (s *Settings) LegalAcceptance() (version, acceptedAt string) {
+	if s == nil {
+		return "", ""
+	}
+	return s.UI.LegalAcceptedVersion, s.UI.LegalAcceptedAt
 }
 
 // DebugForceWelcome reports whether the debug "always show welcome"
