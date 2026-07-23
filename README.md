@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
 </p>
 
-<img src="landing/assets/hero.gif" alt="sf-deck demo showing org switching, schema browsing, SOQL, global search, safety levels, and dev projects" width="920">
+<img src="docs/landing/assets/hero.gif" alt="sf-deck demo showing org switching, schema browsing, SOQL, global search, safety levels, and dev projects" width="920">
 
 <p>
   <a href="#install-and-try-it">Install</a> ·
@@ -21,7 +21,7 @@
   <a href="#what-you-can-do">Capabilities</a> ·
   <a href="#safety-by-default">Safety</a> ·
   <a href="#automation-and-agents">Automation</a> ·
-  <a href="https://jacob-stokes.github.io/sf-deck/docs/">Docs</a>
+  <a href="https://sfdeck.dev/docs/">Docs</a>
 </p>
 
 </div>
@@ -100,7 +100,7 @@ There is no native Windows build yet. WSL2 is supported; install the Linux
 
 The mouse also works for tabs, subtabs, chips, rail buttons, and list
 scrolling. The full generated keymap is in the
-[reference documentation](https://jacob-stokes.github.io/sf-deck/docs/reference/keymap/).
+[reference documentation](https://sfdeck.dev/docs/reference/keymap/).
 
 ## What you can do
 
@@ -144,7 +144,7 @@ scrolling. The full generated keymap is in the
   right external tool when the task needs a richer editor or canvas.
 
 Task-oriented walkthroughs live in the
-[documentation](https://jacob-stokes.github.io/sf-deck/docs/tasks/find-a-record/).
+[documentation](https://sfdeck.dev/docs/tasks/find-a-record/).
 
 ## Safety by default
 
@@ -164,7 +164,7 @@ rejected by the CLI and IPC backend. Salesforce still enforces the connected
 user's permissions—the sf-deck gate is an additional guardrail, not a
 replacement for platform security.
 
-Read the full [safety model](https://jacob-stokes.github.io/sf-deck/docs/concepts/safety/).
+Read the full [safety model](https://sfdeck.dev/docs/concepts/safety/).
 
 ## Automation and agents
 
@@ -198,7 +198,7 @@ sf-deck verbs list --surface ipc --json
 The bundled [`skills/sf-deck`](skills/sf-deck) package teaches AI agents to
 discover verbs, inspect safety before writes, ask before production changes,
 and parse the JSON contract rather than terminal text. See the
-[agent integration guide](https://jacob-stokes.github.io/sf-deck/docs/agent-integration/).
+[agent integration guide](https://sfdeck.dev/docs/agent-integration/).
 
 ## Local data and authentication
 
@@ -212,8 +212,8 @@ and parse the JSON contract rather than terminal text. See the
 - The optional IPC socket is local and user-only. Diagnostics are opt-in,
   loopback-only, and authenticated.
 
-See the [on-disk layout](https://jacob-stokes.github.io/sf-deck/docs/reference/on-disk-layout/)
-and [security policy](SECURITY.md) for the complete details.
+See the [on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/)
+and [security policy](.github/SECURITY.md) for the complete details.
 
 ## Platform support and maturity
 
@@ -291,12 +291,12 @@ you need a shared, reviewable artifact.
 
 ## Documentation
 
-- [Install and first launch](https://jacob-stokes.github.io/sf-deck/docs/getting-started/install/)
-- [Keyboard basics](https://jacob-stokes.github.io/sf-deck/docs/getting-started/keyboard-basics/)
-- [Concepts: panels, chips, projects, bundles, tags, and safety](https://jacob-stokes.github.io/sf-deck/docs/concepts/panels/)
-- [Task walkthroughs](https://jacob-stokes.github.io/sf-deck/docs/tasks/cross-org-workflow/)
-- [CLI and IPC reference](https://jacob-stokes.github.io/sf-deck/docs/reference/cli/)
-- [Agent integration](https://jacob-stokes.github.io/sf-deck/docs/agent-integration/)
+- [Install and first launch](https://sfdeck.dev/docs/getting-started/install/)
+- [Keyboard basics](https://sfdeck.dev/docs/getting-started/keyboard-basics/)
+- [Concepts: panels, chips, projects, bundles, tags, and safety](https://sfdeck.dev/docs/concepts/panels/)
+- [Task walkthroughs](https://sfdeck.dev/docs/tasks/cross-org-workflow/)
+- [CLI and IPC reference](https://sfdeck.dev/docs/reference/cli/)
+- [Agent integration](https://sfdeck.dev/docs/agent-integration/)
 
 ## Contributing
 
@@ -304,14 +304,14 @@ Bug reports, focused fixes, and documentation improvements are welcome. Open
 an issue before a large feature so the design can be aligned with the existing
 list-surface, verb-registry, and safety-gate architecture.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, tests, release
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, tests, release
 process, and architectural conventions.
 
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). Dependency license
 texts included with release binaries live under
-[`third_party_licenses/`](third_party_licenses/).
+[`docs/third_party_licenses/`](docs/third_party_licenses/).
 
 "Salesforce" is a registered trademark of Salesforce, Inc. This project is
 not affiliated with, endorsed by, or sponsored by Salesforce, Inc.

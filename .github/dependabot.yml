@@ -37,7 +37,7 @@ updates:
           - "patch"
 
   - package-ecosystem: "pip"
-    directory: "/docs-site"
+    directory: "/docs"
     schedule:
       interval: "weekly"
       day: "monday"

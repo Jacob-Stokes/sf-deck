@@ -12,7 +12,7 @@ reasons:
   painful to review and painful to close. A 5-line issue is
   cheap.
 - Some things look like missing features but are intentional
-  (see [What sf-deck can't do](docs-site/docs/concepts/) — the
+  (see [What sf-deck can't do](../docs/user/concepts/) — the
   Limitations sections per page). Worth checking before you
   build.
 
@@ -69,7 +69,7 @@ CI runs `go run ./cmd/sf-deck-docs -check` to catch drift.
 `internal/ui/list_surface*.go` files declare list surfaces with
 columns, sort, search, scroll. Don't hand-roll a new list
 renderer; reuse `listSurface` + `ListView[T]` + `renderListModel`.
-See `docs/surfaces.md` for the cookbook recipe.
+See `docs/development/surfaces.md` for the cookbook recipe.
 
 ### 3. Every write goes through the safety gate
 
@@ -104,11 +104,11 @@ Conventions:
 - **Integration tests against real orgs only run on a dedicated
   throwaway sandbox.** Never write to a real production org or
   any org you don't fully own from a test. See
-  `docs/qa-checklist.md`.
-- **Coverage ratchet** (`scripts/coverage-ratchet.sh`) is enforced
+  `docs/development/qa-checklist.md`.
+- **Coverage ratchet** (`.github/scripts/coverage-ratchet.sh`) is enforced
   in CI. A drop fails the build; you can either add tests or, with
   justification in the commit message, raise the baseline via
-  `scripts/coverage-ratchet.sh --update`.
+  `.github/scripts/coverage-ratchet.sh --update`.
 - **No mocks for SF write tests.** Real org, throwaway artifacts,
   cleanup after.
 
@@ -124,11 +124,12 @@ Conventions:
 
 ## Architecture docs
 
-Internal architecture notes live in [`docs/`](docs/) — render
-pipeline, cache layout, scrolling, and the list-surface cookbook.
-The user-facing docs site lives in `docs-site/`. Read
-the architecture notes when you need to; they're not required
-reading to make a small change.
+Internal architecture notes live in
+[`docs/development/`](../docs/development/) — render pipeline, cache
+layout, scrolling, and the list-surface cookbook. User-facing docs live
+in `docs/user/`; website source and release licence notices share the
+top-level `docs/` workspace. Read the architecture notes when you need
+to; they're not required reading to make a small change.
 
 ## Releasing
 

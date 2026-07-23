@@ -8,7 +8,7 @@
 //
 // Usage:
 //
-//	go run ./scripts/newsurface \
+//	go run ./cmd/newsurface \
 //	    -name CronJob \        # Go identifier stem (PascalCase)
 //	    -row CronJobRow \      # sf row type (in package sf)
 //	    -key cron_jobs_v1 \    # resource cache key

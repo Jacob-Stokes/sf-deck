@@ -69,7 +69,7 @@ Or download a binary from the
 - **No bundle-vs-org diff over IPC.** The TUI has the preview; the
   IPC layer doesn't expose it yet.
 
-See [Limitations](docs-site/docs/concepts/) in the docs site for
+See [Limitations](docs/user/concepts/) in the docs site for
 the full list.
 
 [Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.0...HEAD

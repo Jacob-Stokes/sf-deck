@@ -57,7 +57,9 @@ jobs:
         with:
           distribution: goreleaser
           version: "v2.17.0"
-          args: release --clean --release-notes RELEASE_NOTES_v0.1.0.md
+          args: release --clean --release-notes .github/release-notes/v0.1.0.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Verify release archive notices
+        run: ./.github/scripts/check-release-archives.sh

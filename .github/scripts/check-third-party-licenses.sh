@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 generated="$(mktemp -d)"
 trap 'rm -rf "$generated"' EXIT
 
@@ -30,7 +30,7 @@ for module in github.com/mattn/go-isatty github.com/ncruces/go-strftime; do
   fi
 done
 
-if ! diff -ru "$repo_root/third_party_licenses" "$generated"; then
-  echo "third_party_licenses is stale; regenerate it before release" >&2
+if ! diff -ru "$repo_root/docs/third_party_licenses" "$generated"; then
+  echo "docs/third_party_licenses is stale; regenerate it before release" >&2
   exit 1
 fi

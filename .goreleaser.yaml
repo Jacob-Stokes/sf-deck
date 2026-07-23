@@ -37,7 +37,7 @@ archives:
       - LICENSE
       - NOTICE
       - README.md
-      - third_party_licenses/**
+      - docs/third_party_licenses/**
 
 checksum:
   name_template: "checksums.txt"
@@ -48,7 +48,7 @@ snapshot:
 changelog:
   # First-release special-case: no previous tag, so the auto-generated
   # commit log would be enormous and unhelpful. The release workflow passes
-  # RELEASE_NOTES_v0.1.0.md directly to GoReleaser. Re-enable changelog
+  # .github/release-notes/v0.1.0.md directly to GoReleaser. Re-enable changelog
   # generation for v0.2.0+ by flipping this to false (or removing the field).
   disable: true
   sort: asc

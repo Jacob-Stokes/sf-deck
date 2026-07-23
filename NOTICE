@@ -8,3 +8,6 @@ This product was originally created by Jacob Stokes
 project is not affiliated with, endorsed by, or sponsored by
 Salesforce, Inc. The name "sf-deck" refers to the official
 Salesforce CLI command (`sf`), not the Salesforce mark.
+
+Third-party dependency copyright notices and licence texts are
+included in docs/third_party_licenses/.
