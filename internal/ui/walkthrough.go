@@ -11,8 +11,9 @@ package ui
 // Each step's Done predicate reads EXISTING model state (active tab,
 // selected org, zen, sort/search/column state) rather than new
 // instrumentation, and is used only to render the ✓ — not to advance.
-// Info-only steps (M/V, refresh, open/yank, dev-projects, tags) carry no
-// predicate and simply teach; the user presses w to continue.
+// Info-only steps (safety, open/yank, view management, refresh, projects
+// and tags) carry no predicate and simply teach; the user presses w to
+// continue.
 
 import (
 	"strings"
@@ -51,15 +52,21 @@ type tourKey struct {
 // walkthroughBaseline snapshots the model state a step needs to detect a
 // delta. Captured when a step becomes active.
 type walkthroughBaseline struct {
-	tab         Tab
-	selectedOrg int
-	zen         bool
-	overflowSet bool
-	subtabIdx   int
-	chipIdx     int
-	sidebarOpen bool
-	sorted      bool
-	colSig      string // combined tag/project/flag column visibility
+	tab                     Tab
+	selectedOrg             int
+	zen                     bool
+	overflowSet             bool
+	subtabIdx               int
+	chipIdx                 int
+	rightSidebarOpen        bool
+	sorted                  bool
+	colSig                  string // combined tag/project/flag column visibility
+	homeRecentSalesforce    bool
+	recordsSourceSalesforce bool
+	soqlRunGen              uint64
+	usersSubtab             int
+	permsSubtab             int
+	systemSubtab            int
 }
 
 // sortActive reports whether the active list surface has a sort applied.
@@ -80,6 +87,15 @@ func (m Model) listSearchActive() bool {
 // completion signal for the "switch view source (L)" step.
 func (m Model) recordsSourceIsSalesforce() bool {
 	d, sobj := m.activeRecordsSObject()
+	// The source-toggle step follows record detail. Preserve the parent
+	// object's mode while the user is drilled into that record so merely
+	// pressing Esc cannot look like a source change.
+	if d == nil && m.tab() == TabRecordDetail && m.recordDetailReturnTab == TabObjectDetail {
+		d = m.activeOrgData()
+		if d != nil {
+			sobj = d.DescribeCur
+		}
+	}
 	return d != nil && sobj != "" && currentChipMode(d, sobj) == ChipModeSalesforce
 }
 
@@ -140,10 +156,11 @@ func (m Model) chipIdxSignal() int {
 
 // walkthroughState holds the live tour. Zero value = inactive.
 type walkthroughState struct {
-	active   bool
-	steps    []tourStep
-	cursor   int
-	baseline walkthroughBaseline
+	active    bool
+	steps     []tourStep
+	cursor    int
+	baseline  walkthroughBaseline
+	satisfied bool
 }
 
 // captureBaseline snapshots the current model for the active step's
@@ -154,15 +171,21 @@ func captureBaseline(m Model) walkthroughBaseline {
 		sel = m.selected
 	}
 	return walkthroughBaseline{
-		tab:         m.tab(),
-		selectedOrg: sel,
-		zen:         m.zenMode,
-		overflowSet: m.overflowSet,
-		subtabIdx:   m.currentSubtabIdx(),
-		chipIdx:     m.chipIdxSignal(),
-		sidebarOpen: m.leftOpen,
-		sorted:      m.sortActive(),
-		colSig:      m.columnSignal(),
+		tab:                     m.tab(),
+		selectedOrg:             sel,
+		zen:                     m.zenMode,
+		overflowSet:             m.overflowSet,
+		subtabIdx:               m.currentSubtabIdx(),
+		chipIdx:                 m.chipIdxSignal(),
+		rightSidebarOpen:        m.sidebarOpen,
+		sorted:                  m.sortActive(),
+		colSig:                  m.columnSignal(),
+		homeRecentSalesforce:    m.homeRecentSourceIsSalesforce(),
+		recordsSourceSalesforce: m.recordsSourceIsSalesforce(),
+		soqlRunGen:              m.soqlRunGen,
+		usersSubtab:             m.usersSubtab(),
+		permsSubtab:             m.permsDashboardSubtab(),
+		systemSubtab:            m.systemSubtab(),
 	}
 }
 
@@ -170,6 +193,26 @@ func captureBaseline(m Model) walkthroughBaseline {
 // against the demo org, where every step has data. Ordered
 // simplest-first so momentum builds.
 func tourSteps() []tourStep {
+	return tourStepsForDemo(Demo)
+}
+
+func tourStepsForDemo(demo bool) []tourStep {
+	soqlInstruction := "Open the 'soql' tab. Press " + firstPretty(Keys.SOQLEdit) + " to edit the seeded query, then Enter to run it. Results stay in the terminal; Enter on a result drills into that record. This tour only asks you to read — it never changes org data."
+	soqlDone := func(m Model, prev walkthroughBaseline) bool {
+		return m.tab() == TabSOQL &&
+			m.soqlRunGen > prev.soqlRunGen &&
+			!m.soqlRunning &&
+			m.soqlErr == nil
+	}
+	if demo {
+		// Demo mode deliberately blocks live sf CLI calls. Still introduce
+		// the core workspace without asking for an action that cannot work.
+		soqlInstruction = "Open the 'soql' tab and look around the Editor, Saved and History subtabs. Demo mode does not run live queries; with a connected org, press " + firstPretty(Keys.SOQLEdit) + " to edit the seeded read-only query and Enter to run it."
+		soqlDone = func(m Model, _ walkthroughBaseline) bool {
+			return m.tab() == TabSOQL
+		}
+	}
+
 	return []tourStep{
 		{
 			// Teaches: org navigation + that MULTIPLE keys do the same
@@ -186,10 +229,20 @@ func tourSteps() []tourStep {
 			},
 		},
 		{
+			// Safety is core context, but changing it is deliberately not
+			// a tour task. The walkthrough must be harmless on a real org.
+			Title:       "Know your safety level",
+			Instruction: "The header shows the active org's safety level: READ blocks every write; REC allows record changes; META adds metadata changes and deploys; FULL adds anonymous Apex and destructive operations. Salesforce permissions still apply too. Leave the level as-is for this tour.",
+			Keys: []tourKey{
+				{firstPretty(Keys.Help), "open Help on home for the safety guide"},
+				{firstPretty(Keys.CommandPalette), "search “Edit safety level”"},
+			},
+		},
+		{
 			// Teaches: the numbered tab bar + the 0/9 overflow mechanic,
-			// in one step. This is the headline navigation model.
+			// plus the small set of controls that also accept the mouse.
 			Title:       "Switch tabs — and reach the rest",
-			Instruction: "Tabs across the top are numbered — press 1–8 to jump. Not all fit: press 0 for the 'More…' picker; whatever you pick lands in slot 9, so 9 jumps back to it.",
+			Instruction: "Tabs across the top are numbered — press 1–8 to jump. Press 0 for the 'More…' picker; whatever you pick lands in slot 9, so 9 jumps back to it. You can also click tabs, subtabs, views and rail buttons; the wheel scrolls lists.",
 			Done: func(m Model, prev walkthroughBaseline) bool {
 				// Either a plain tab change OR activating an overflow tab.
 				return m.tab() != prev.tab || (m.overflowSet && !prev.overflowSet)
@@ -198,17 +251,7 @@ func tourSteps() []tourStep {
 				{"1–8", "jump to a tab"},
 				{"0", "more… (overflow picker)"},
 				{"9", "the tab you picked from overflow"},
-			},
-		},
-		{
-			// Teaches: the mouse works for some things. Info step —
-			// sf-deck is keyboard-first, but tabs/views/nav are clickable
-			// and the wheel scrolls, which some people reach for.
-			Title:       "The mouse works too (for some things)",
-			Instruction: "sf-deck is keyboard-first, but you can also click: tabs, subtabs, the view chips, and the left-rail buttons (orgs, tags, dev-projects). The scroll wheel moves through long lists. Everything else stays on the keyboard.",
-			Keys: []tourKey{
 				{"click", "tabs · subtabs · views · rail buttons"},
-				{"wheel", "scroll a list"},
 			},
 		},
 		// --- Home: the org-at-a-glance subtabs ---
@@ -229,10 +272,23 @@ func tourSteps() []tourStep {
 			Title:       "Two sources for 'Recently Viewed'",
 			Instruction: "On home's 'Recently Viewed' subtab, press " + firstPretty(Keys.LensModeToggle) + " to switch source: sf-deck's own visit log ↔ Salesforce's RecentlyViewed. Same " + firstPretty(Keys.LensModeToggle) + " that switches source on records lists.",
 			Done: func(m Model, prev walkthroughBaseline) bool {
-				return m.homeRecentSourceIsSalesforce()
+				return m.homeRecentSourceIsSalesforce() != prev.homeRecentSalesforce
 			},
 			Keys: []tourKey{
 				{firstPretty(Keys.LensModeToggle), "toggle visit-log ↔ Salesforce recent"},
+			},
+		},
+		{
+			// SOQL is a default workspace and one of sf-deck's core
+			// workflows. Connected orgs run the seeded read-only query;
+			// demo mode introduces the workspace without a live CLI call.
+			Title:       "Run a read-only SOQL query",
+			Instruction: soqlInstruction,
+			Done:        soqlDone,
+			Keys: []tourKey{
+				{firstPretty(Keys.SOQLEdit), "edit the query"},
+				{"enter", "run it / drill into a result"},
+				{"ctrl+c", "cancel a running query"},
 			},
 		},
 		// --- Flows: explore + views (everyone has flows) ---
@@ -287,11 +343,14 @@ func tourSteps() []tourStep {
 		},
 		{
 			// Teaches: the view overflow picker (M) and the view manager
-			// (V). Explain-only — opening these puts a modal up, which
-			// suspends the tour's key handling, and the point is to SEE
-			// them, not perform a mutation (esp. not add a view mid-tour).
-			Title:       "More views & the view manager",
-			Instruction: "Only a few views fit under the tabs. Press " + firstPretty(Keys.OpenChipOverflow) + " for the overflow picker (all views for this surface), or " + firstPretty(Keys.OpenLensManager) + " for the view manager — where you can browse, add, edit and delete your own views. Have a look, then continue.",
+			// (V), including where Salesforce list views can be imported.
+			// Explain-only: the tour never asks the user to persist a view.
+			Title:       "Manage and pin views",
+			Instruction: "Only a few views fit under the tabs. Press " + firstPretty(Keys.OpenChipOverflow) + " for the overflow picker, or " + firstPretty(Keys.OpenLensManager) + " for the view manager. There you can add or edit your own views and import a Salesforce List View to pin its query as a reusable sf-deck view. You don't need to save anything now.",
+			Keys: []tourKey{
+				{firstPretty(Keys.OpenChipOverflow), "all views for this surface"},
+				{firstPretty(Keys.OpenLensManager), "manage or import views"},
+			},
 		},
 		// --- Working a list: sort, search, columns ---
 		{
@@ -308,9 +367,10 @@ func tourSteps() []tourStep {
 			},
 		},
 		{
-			// Teaches: inline search (/) — filter the current list by text.
-			Title:       "Search within a list",
-			Instruction: "Press " + firstPretty(Keys.SearchStart) + " to search this list inline — type and the rows filter live. Press Enter to keep the filter applied while you navigate.",
+			// Teaches: inline search plus both clearing paths. Completion is
+			// latched, so the ✓ remains after the user clears the filter.
+			Title:       "Search and clear a list filter",
+			Instruction: "Press " + firstPretty(Keys.SearchStart) + " and type to filter this list live. Enter keeps the filter while you navigate. Esc cancels while typing or clears an applied filter; " + firstPretty(Keys.SearchClear) + " also clears an applied filter from any depth.",
 			Done: func(m Model, prev walkthroughBaseline) bool {
 				// Reaching the search input is the completion signal.
 				return m.listSearchActive()
@@ -318,14 +378,6 @@ func tourSteps() []tourStep {
 			Keys: []tourKey{
 				{firstPretty(Keys.SearchStart), "start an inline search"},
 				{"enter", "keep the filter applied"},
-				{"esc", "cancel (while typing)"},
-			},
-		},
-		{
-			// Teaches: clearing inline search, which differs by state.
-			Title:       "Clearing a search",
-			Instruction: "Two cases: while you're still typing, Esc cancels the search outright. Once a filter is applied (after Enter), Esc clears it — and " + firstPretty(Keys.SearchClear) + " clears an applied filter from anywhere, even after you've drilled in.",
-			Keys: []tourKey{
 				{"esc", "cancel while typing / clear when applied"},
 				{firstPretty(Keys.SearchClear), "clear an applied filter, at any depth"},
 			},
@@ -380,26 +432,30 @@ func tourSteps() []tourStep {
 			},
 		},
 		{
+			// Teaches: a record list is not a dead end. The detail view is
+			// deliberately read-only for the tour even when the org's safety
+			// level would permit edits.
+			Title:       "Open a record's detail",
+			Instruction: "With the object's 'records' subtab open, highlight a row and press Enter. The record detail shows every field and the contextual actions available for that record. Press Esc when you're ready to return to the list.",
+			Done: func(m Model, prev walkthroughBaseline) bool {
+				return m.tab() == TabRecordDetail
+			},
+			Keys: []tourKey{
+				{"enter", "open the highlighted record"},
+				{"esc", "return to the records list"},
+			},
+		},
+		{
 			// Teaches: L toggles the records view source between sf-deck's
 			// own views and the org's real Salesforce List Views. Action
 			// step — the mode flip is detectable.
 			Title:       "Switch view source (L)",
-			Instruction: "On a records list, press " + firstPretty(Keys.LensModeToggle) + " to switch the view source: sf-deck's own views ↔ the org's actual Salesforce List Views. Try it — the view strip changes to show the org's list views.",
+			Instruction: "Press Esc to return to the records list if needed, then press " + firstPretty(Keys.LensModeToggle) + " to switch the view source: sf-deck's own views ↔ the org's actual Salesforce List Views. The view strip changes with the source.",
 			Done: func(m Model, prev walkthroughBaseline) bool {
-				return m.recordsSourceIsSalesforce()
+				return m.recordsSourceIsSalesforce() != prev.recordsSourceSalesforce
 			},
 			Keys: []tourKey{
 				{firstPretty(Keys.LensModeToggle), "toggle sf-deck ↔ Salesforce list views"},
-			},
-		},
-		{
-			// Teaches: importing/pinning a Salesforce list view via the
-			// view manager. Explain-only per design — DON'T make them
-			// import; just point at where it lives.
-			Title:       "Pin a Salesforce list view",
-			Instruction: "Like one of the org's list views? Open the view manager (" + firstPretty(Keys.OpenLensManager) + ") — from there you can import a Salesforce list view, which pins it as a reusable sf-deck view (it fetches the underlying query). You don't need to do this now — just know it's there.",
-			Keys: []tourKey{
-				{firstPretty(Keys.OpenLensManager), "view manager → import a list view"},
 			},
 		},
 		// --- Reading code + reports ---
@@ -421,13 +477,53 @@ func tourSteps() []tourStep {
 				{"enter", "preview the report"},
 			},
 		},
+		{
+			// Core admin discovery without requiring a User row or asking
+			// the user to run any of the detail view's mutating actions.
+			Title:       "Browse users and active sessions",
+			Instruction: "Open the 'users' tab, then use tab / shift+tab to browse Recent logins, All users and Active sessions. Enter opens a user when rows are available; this tour does not ask you to run any user-management action.",
+			Done: func(m Model, prev walkthroughBaseline) bool {
+				return m.tab() == TabUsers && m.usersSubtab() != prev.usersSubtab
+			},
+			Keys: []tourKey{
+				{"tab / shift+tab", "Recent · All · Active"},
+				{"enter", "inspect a user or active session"},
+			},
+		},
+		{
+			// The permissions workspace is a default tab, but editing is a
+			// higher-risk workflow and stays outside the core tour.
+			Title:       "Browse permissions",
+			Instruction: "Open the 'perms' tab and step through Permission Sets, Permission Set Groups, Profiles, Queues and Public Groups with tab / shift+tab. Enter drills into a row; permission editing is intentionally outside this tour.",
+			Done: func(m Model, prev walkthroughBaseline) bool {
+				return m.tab() == TabPerms && m.permsDashboardSubtab() != prev.permsSubtab
+			},
+			Keys: []tourKey{
+				{"tab / shift+tab", "move between permission surfaces"},
+				{"enter", "inspect the highlighted item"},
+			},
+		},
+		{
+			// System is the operational home for understanding what ran or
+			// failed. Browsing subtabs is safe even when their lists are
+			// empty or the org denies access to a resource.
+			Title:       "See what happened in System",
+			Instruction: "Open the 'system' tab and step through Logs, Deploys, Audit Trail, Flow Interviews, Async Jobs, Scheduled Jobs and API usage. These read-only surfaces are where you investigate activity and failures.",
+			Done: func(m Model, prev walkthroughBaseline) bool {
+				return m.tab() == TabSystem && m.systemSubtab() != prev.systemSubtab
+			},
+			Keys: []tourKey{
+				{"tab / shift+tab", "move through system surfaces"},
+				{"enter", "drill when a row has more detail"},
+			},
+		},
 		// --- Workspace: sidebar, global search, refresh ---
 		{
 			// Teaches: the right sidebar — toggle + reposition.
 			Title:       "Show, hide & move the sidebar",
 			Instruction: firstPretty(Keys.ToggleSidebar) + " toggles the right sidebar (context for the selected row). " + firstPretty(Keys.ToggleSidebarStacked) + " moves it: beside the main pane vs stacked below. Try toggling it.",
 			Done: func(m Model, prev walkthroughBaseline) bool {
-				return m.leftOpen != prev.sidebarOpen
+				return m.sidebarOpen != prev.rightSidebarOpen
 			},
 		},
 		{
@@ -444,18 +540,17 @@ func tourSteps() []tourStep {
 			Title:       "Refreshing data",
 			Instruction: "sf-deck caches org data so it's instant. Press " + firstPretty(Keys.Refresh) + " to refresh the current view, or " + firstPretty(Keys.GlobalRefresh) + " to refresh everything loaded for the active org — do this when you've changed something in Salesforce and want the latest.",
 		},
-		// --- Explain-only: dev projects, tags ---
+		// --- Explain-only: dev projects + tags ---
 		{
-			// Teaches: the dev-project / collect / bundle pipeline.
-			// Explain-only per design — it's a whole workflow, not a
-			// single gesture.
-			Title:       "Dev projects, collecting & bundles",
-			Instruction: "sf-deck can group work: load a Dev Project, then " + firstPretty(Keys.CollectItem) + " collects the cursored item into it (" + firstPretty(Keys.CollectItemPick) + " picks a project). A project can be bundled — exported as a deployable sfdx package. Explore /dev-projects when you're ready.",
-		},
-		{
-			// Teaches: tags. Explain-only; tagging is an action on a row.
-			Title:       "Tags",
-			Instruction: "Tag any row to group things your own way across orgs. The /tags tab manages them; the " + firstPretty(Keys.TagColumn) + " column (from earlier) shows each row's tags. Great for tracking a migration or a review.",
+			// Both are organisational concepts. Creating projects, building
+			// bundles and deploying remain power-user workflows.
+			Title:       "Organise work with projects and tags",
+			Instruction: "Tags group items your own way across orgs; the /tags tab manages them. Dev Projects are working sets: load one, then " + firstPretty(Keys.CollectItem) + " collects the cursored item (" + firstPretty(Keys.CollectItemPick) + " lets you pick a project). Projects can later become deployable sfdx bundles, but building and deploying is outside this core tour.",
+			Keys: []tourKey{
+				{firstPretty(Keys.Tag), "tag the highlighted item"},
+				{firstPretty(Keys.CollectItem), "collect into the loaded project"},
+				{firstPretty(Keys.CollectItemPick), "choose a project"},
+			},
 		},
 		{
 			// Teaches: zen — declutter. Also a "multiple ways" note (z or
@@ -489,8 +584,8 @@ func (m *Model) startWalkthrough() {
 }
 
 // advanceWalkthrough moves to the next step (or ends the tour after the
-// last) and re-captures the baseline for the new step. Shared by both
-// auto-advance (step Done) and manual skip.
+// last) and re-captures the baseline for the new step. Every advance is
+// manual: w moves on whether or not the current predicate was satisfied.
 func (m *Model) advanceWalkthrough() {
 	if !m.walkthrough.active {
 		return
@@ -502,6 +597,7 @@ func (m *Model) advanceWalkthrough() {
 		return
 	}
 	m.walkthrough.baseline = captureBaseline(*m)
+	m.walkthrough.satisfied = false
 }
 
 // exitWalkthrough ends the tour immediately.
@@ -513,13 +609,31 @@ func (m *Model) exitWalkthrough() {
 	m.flash("Walkthrough exited.")
 }
 
-// stepSatisfied reports whether the active step's predicate is currently
-// met — used only to render a ✓ so the user knows they did the action
-// right. The tour never auto-advances on this; the user presses w. A
-// step with no predicate (pure info) is never "satisfied" and shows no ✓.
+// observeWalkthrough latches a completed action step. Predicates often
+// describe transient state: global search and help are modals, search can
+// be cleared, and zen can be toggled back off. Remembering completion means
+// the ✓ remains visible after the user returns to the main surface.
+func (m *Model) observeWalkthrough() {
+	if !m.walkthrough.active || m.walkthrough.satisfied ||
+		m.walkthrough.cursor >= len(m.walkthrough.steps) {
+		return
+	}
+	step := m.walkthrough.steps[m.walkthrough.cursor]
+	if step.Done != nil && step.Done(*m, m.walkthrough.baseline) {
+		m.walkthrough.satisfied = true
+	}
+}
+
+// stepSatisfied reports whether the active step's predicate has ever been
+// met, or is currently met before the next Update has had a chance to latch
+// it. This is used only to render a ✓; the user still presses w to advance.
+// A step with no predicate (pure info) never shows a ✓.
 func (m Model) stepSatisfied() bool {
 	if !m.walkthrough.active || m.walkthrough.cursor >= len(m.walkthrough.steps) {
 		return false
+	}
+	if m.walkthrough.satisfied {
+		return true
 	}
 	step := m.walkthrough.steps[m.walkthrough.cursor]
 	return step.Done != nil && step.Done(m, m.walkthrough.baseline)

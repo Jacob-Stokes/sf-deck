@@ -55,7 +55,8 @@ type modelTransient struct {
 	// walkthrough is the guided first-launch tour. Zero value =
 	// inactive. Unlike the modals above it's non-blocking: a small
 	// corner panel that lets the user navigate while it watches model
-	// state to auto-advance. See walkthrough.go.
+	// state to confirm each task. Advancement remains manual. See
+	// walkthrough.go.
 	walkthrough walkthroughState
 
 	// commandPalette is the global fuzzy-find modal — bound to ;
