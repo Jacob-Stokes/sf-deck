@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
 </p>
 
-<img src="docs/landing/assets/hero.gif" alt="sf-deck demo showing org switching, schema browsing, SOQL, global search, safety levels, and dev projects" width="920">
+<img src="docs/landing/assets/hero.gif" alt="Launching the fictional sf-deck demo and touring its main Salesforce workspaces" width="920">
 
 <p>
   <a href="#install-and-try-it">Install</a> ·

@@ -38,13 +38,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	key := msg.String()
 
-	// Leader key: q in normal-nav mode enters chord mode. AFTER the input
-	// guard above, so a q typed into a search box / editor is a literal
-	// character and never reaches here.
-	if key == "q" {
-		return m.enterChordMode()
-	}
-
 	// /compare inventory side-panel preview keys (n/N hunk nav, f fetch a
 	// dropped body). Intercepted before the main switch so they win on the
 	// Result subtab when the preview is showing.
@@ -75,6 +68,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.onOrgChanged()
 		}
 		// Fall through — normal dispatch handles this key.
+	}
+
+	// Leader key: q in normal-nav mode enters chord mode. This must run
+	// AFTER org quick-jump gets first refusal: q is also the advertised
+	// shortcut for the first org while that one-key overlay is armed.
+	// It still runs after the input guard above, so q typed into a search
+	// box / editor remains literal text.
+	if key == "q" {
+		return m.enterChordMode()
 	}
 
 	if next, cmd, handled := m.handlePreGlobalTabKey(key); handled {
