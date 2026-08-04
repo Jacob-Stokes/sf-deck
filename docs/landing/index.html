@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sf-deck — a keyboard-first Salesforce workspace</title>
+  <meta name="description" content="Explore Salesforce orgs, schema, records, code, permissions, deploys, and working sets from one keyboard-first terminal workspace.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1b1d2b">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'none'">
+  <link rel="canonical" href="https://sfdeck.dev/">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sfdeck.dev/">
+  <meta property="og:title" content="sf-deck — every Salesforce org, one keystroke away">
+  <meta property="og:description" content="A keyboard-first Salesforce workspace that uses your existing sf CLI sessions and keeps working state local.">
+  <meta property="og:image" content="https://sfdeck.dev/assets/social-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="sf-deck — every Salesforce org, one keystroke away">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="sf-deck — every Salesforce org, one keystroke away">
+  <meta name="twitter:description" content="A keyboard-first Salesforce workspace for your terminal.">
+  <meta name="twitter:image" content="https://sfdeck.dev/assets/social-card.png">
+
+  <link rel="stylesheet" href="style.css?v=20260723-capabilities">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="mesh" aria-hidden="true">
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
+  </div>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#main-content" aria-label="sf-deck home">
+        <span class="brand-mark">sf</span><span class="brand-rest">-deck</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#stories">See it work</a>
+        <a href="#roadmap">Coming soon</a>
+        <a href="#install">Install</a>
+        <a class="nav-gh" href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero">
+      <div class="hero-copy reveal">
+        <div class="pill"><span class="dot"></span> Available now · macOS &amp; Linux · Apache-2.0</div>
+        <p class="kicker">Salesforce, without the tab maze</p>
+        <h1>Every Salesforce org,<br><span class="grad">one keystroke away.</span></h1>
+        <p class="lede">
+          Explore schema, records, code, users, deploys, and org health from one
+          keyboard-first terminal workspace. sf-deck uses your existing Salesforce
+          CLI sessions and keeps its working state local.
+        </p>
+        <ul class="hero-proof-list" aria-label="Product highlights">
+          <li>Uses existing <code>sf</code> sessions</li>
+          <li>No package or connected app</li>
+          <li>No application telemetry</li>
+        </ul>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#install">Install sf-deck</a>
+          <a class="btn btn-ghost" href="#demo">Try the fictional demo</a>
+        </div>
+      </div>
+
+      <div class="hero-media reveal">
+        <div class="term">
+          <div class="term-bar">
+            <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+            <span class="term-title">sf-deck — northwind-dev · DEMO</span>
+            <span class="term-proof">fictional data</span>
+          </div>
+          <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="assets/hero-poster.png?v=20260723-reel">
+            <img src="assets/hero.gif?v=20260723-reel" alt="Launching the fictional sf-deck demo, then touring SOQL, objects, flows, Apex, components, users, deploys, and dev projects." width="1320" height="760" loading="eager" decoding="async" fetchpriority="high">
+          </picture>
+        </div>
+      </div>
+
+      <div class="hero-below reveal">
+        <div class="hero-command-stack">
+          <div class="command">
+            <code>brew install --cask Jacob-Stokes/tap/sf-deck</code>
+            <button type="button" class="copy" data-copy="brew install --cask Jacob-Stokes/tap/sf-deck" data-copy-label="Homebrew install command" aria-label="Copy Homebrew install command">Copy</button>
+          </div>
+          <div class="command" id="demo">
+            <code>sf-deck --demo</code>
+            <button type="button" class="copy" data-copy="sf-deck --demo" data-copy-label="demo command" aria-label="Copy demo command">Copy</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stories" class="section stories">
+      <div class="section-head reveal">
+        <span class="eyebrow">See the workflow</span>
+        <h2>Built for the work between orgs</h2>
+        <p>Four workflows, recorded against fictional Northwind orgs.</p>
+      </div>
+
+      <article class="story reveal">
+        <div class="story-copy">
+          <div class="story-number">01</div>
+          <div>
+            <span class="eyebrow">Multi-org by design</span>
+            <h3>Switch orgs. Each keeps its place.</h3>
+            <p>Move from development to UAT to production without rebuilding your workspace. Each org remembers its own context.</p>
+            <a class="text-link" href="https://sfdeck.dev/docs/tasks/cross-org-workflow/">Follow the cross-org workflow →</a>
+          </div>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">three fictional Northwind orgs</span><span class="term-proof">DEMO</span></div>
+          <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="assets/orgs-poster.png?v=20260723-reel">
+            <img src="assets/orgs.gif?v=20260723-reel" alt="Switching between fictional Northwind development, UAT, and production orgs, then returning to the preserved Shipment__c schema context." width="1320" height="760" loading="lazy" decoding="async">
+          </picture>
+        </div>
+      </article>
+
+      <article class="story reveal">
+        <div class="story-copy">
+          <div class="story-number">02</div>
+          <div>
+            <span class="eyebrow">One object, the whole picture</span>
+            <h3>Stop opening six Setup pages.</h3>
+            <p>Drill into an object once, then move through its fields, records, validation rules, record types, triggers, and field-level security. The object stays anchored while the question changes.</p>
+            <a class="text-link" href="https://sfdeck.dev/docs/getting-started/first-launch/">Explore objects and records →</a>
+          </div>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">Shipment__c — schema, records, permissions</span><span class="term-proof">DEMO</span></div>
+          <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="assets/object-workspace-poster.png?v=20260723-reel">
+            <img src="assets/object-workspace.gif?v=20260723-reel" alt="Moving through Shipment__c details, schema, records, and editable field-level security in the fictional Northwind demo." width="1320" height="760" loading="lazy" decoding="async">
+          </picture>
+        </div>
+      </article>
+
+      <article class="story reveal">
+        <div class="story-copy">
+          <div class="story-number">03</div>
+          <div>
+            <span class="eyebrow">Search across the workspace</span>
+            <h3>Find it before you remember where Salesforce put it.</h3>
+            <p>Press <code>Ctrl+F</code> to search objects, fields, flows, Apex, users, and other loaded metadata from one place. Open the result directly and keep working.</p>
+            <a class="text-link" href="https://sfdeck.dev/docs/getting-started/keyboard-basics/">Learn the keyboard workflow →</a>
+          </div>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">global search — fictional metadata</span><span class="term-proof">Ctrl+F</span></div>
+          <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="assets/search-poster.png?v=20260723-reel">
+            <img src="assets/search.gif?v=20260723-reel" alt="Using sf-deck global search to find Shipment-related metadata and open Shipment__c in the fictional Northwind demo." width="1320" height="760" loading="lazy" decoding="async">
+          </picture>
+        </div>
+      </article>
+
+      <article class="story reveal">
+        <div class="story-copy">
+          <div class="story-number">04</div>
+          <div>
+            <span class="eyebrow">From investigation to working set</span>
+            <h3>Turn discoveries into a project.</h3>
+            <p>Collect objects, fields, flows, Apex, records, and saved queries into a dev project as you investigate. Review the working set, tag it, and create an SFDX bundle when it is ready to move.</p>
+            <a class="text-link" href="https://sfdeck.dev/docs/tasks/collect-into-project/">Collect work into a project →</a>
+          </div>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="term-title">Carrier consolidation — local project</span><span class="term-proof">10 items</span></div>
+          <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="assets/projects-poster.png?v=20260723-reel">
+            <img src="assets/projects.gif?v=20260723-reel" alt="Adding a fictional Northwind flow to the Carrier consolidation project and opening its mixed working set." width="1320" height="760" loading="lazy" decoding="async">
+          </picture>
+        </div>
+      </article>
+    </section>
+
+    <section id="features" class="section capabilities">
+      <div class="section-head reveal">
+        <span class="eyebrow">Also built in</span>
+        <h2>The rest is a keystroke away.</h2>
+      </div>
+      <ul class="capability-list reveal">
+        <li>
+          <span class="capability-icon icon-query" aria-hidden="true">&gt;_</span>
+          <div class="capability-copy">
+            <h3>SOQL, records, and reports</h3>
+            <p>Write queries with org-aware completion, reuse saved work, inspect records, and export CSV, XLSX, or JSON.</p>
+          </div>
+        </li>
+        <li>
+          <span class="capability-icon icon-code" aria-hidden="true">{…}</span>
+          <div class="capability-copy">
+            <h3>Code and automation</h3>
+            <p>Move through Apex, triggers, Flows, Lightning components, tests, and debug logs without changing tools.</p>
+          </div>
+        </li>
+        <li>
+          <span class="capability-icon icon-admin" aria-hidden="true">◎</span>
+          <div class="capability-copy">
+            <h3>Users, permissions, and org health</h3>
+            <p>Review access, login activity, packages, limits, jobs, audit history, and system health from one workspace.</p>
+          </div>
+        </li>
+        <li>
+          <span class="capability-icon icon-ship" aria-hidden="true">⇧</span>
+          <div class="capability-copy">
+            <h3>Projects and deploys <span class="feature-status">beta</span></h3>
+            <p>Collect discoveries into tagged dev projects and SFDX bundles, then retrieve, validate, deploy, and follow the result.</p>
+          </div>
+        </li>
+        <li>
+          <span class="capability-icon icon-open" aria-hidden="true">↗</span>
+          <div class="capability-copy">
+            <h3>Open the full canvas</h3>
+            <p>Press <code>o</code> to jump straight to Lightning, Setup, Flow Builder, or your editor. Use <code>Ctrl+O</code> to choose another destination.</p>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section id="roadmap" class="section roadmap">
+      <div class="roadmap-card reveal">
+        <div class="roadmap-copy">
+          <span class="eyebrow">Coming soon · beta in progress</span>
+          <h2>Compare orgs before you ship.</h2>
+          <p>A focused org-to-org diff for Apex, flows, and selected metadata—currently an unfinished beta, not part of the initial launch promise.</p>
+        </div>
+        <div class="diff-motif" aria-hidden="true">
+          <div class="diff-head"><span>northwind-dev</span><b>↔</b><span>northwind-uat</span></div>
+          <div class="diff-summary"><span>12 same</span><span>3 changed</span><span>1 source only</span></div>
+          <div class="diff-file"><span>ShipmentTriggerHandler.cls</span><small>preview</small></div>
+          <div class="diff-line muted">  public with sharing class ShipmentTriggerHandler {</div>
+          <div class="diff-line minus">-   Integer batchSize = 100;</div>
+          <div class="diff-line plus">+   Integer batchSize = 200;</div>
+          <div class="diff-line muted">  }</div>
+          <div class="coming-stamp">COMING SOON</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" class="section install">
+      <div class="install-cta reveal">
+        <span class="eyebrow">Ready?</span>
+        <h2>Install sf-deck.</h2>
+        <p>Homebrew for macOS and Linux, or download a pre-built release.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://sfdeck.dev/docs/getting-started/install/">Installation guide</a>
+          <a class="btn btn-ghost" href="https://github.com/Jacob-Stokes/sf-deck/releases" target="_blank" rel="noopener">Pre-built binaries ↗</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="brand"><span class="brand-mark">sf</span><span class="brand-rest">-deck</span></span>
+        <p>A keyboard-first Salesforce workspace for your terminal.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="https://github.com/Jacob-Stokes/sf-deck" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://sfdeck.dev/docs/">Docs</a>
+        <a href="https://github.com/Jacob-Stokes/sf-deck/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">User agreement</a>
+        <a href="https://github.com/Jacob-Stokes/sf-deck/blob/main/.github/SECURITY.md" target="_blank" rel="noopener">Security</a>
+        <a href="https://github.com/Jacob-Stokes/sf-deck/blob/main/LICENSE" target="_blank" rel="noopener">Apache-2.0</a>
+      </nav>
+    </div>
+    <p class="footer-legal">“Salesforce” is a registered trademark of Salesforce, Inc. This project is not affiliated with, endorsed by, or sponsored by Salesforce, Inc.</p>
+  </footer>
+
+  <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+  <script src="main.js?v=20260723"></script>
+</body>
+</html>

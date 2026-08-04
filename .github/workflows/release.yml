@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  tap-smoke-test:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Homebrew tap access
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured"
+            exit 1
+          fi
+          can_push="$(gh api repos/Jacob-Stokes/homebrew-tap --jq '.permissions.push')"
+          if [ "$can_push" != "true" ]; then
+            echo "::error::The token cannot write to Jacob-Stokes/homebrew-tap"
+            exit 1
+          fi
+          echo "Homebrew tap token has write access."
+
+  goreleaser:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # goreleaser needs the full git history for changelogs
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.5"
+          check-latest: true
+      - name: Check release prerequisites
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_GITHUB_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured"
+            exit 1
+          fi
+          release_notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -s "$release_notes" ]; then
+            echo "::error::Missing or empty release notes: $release_notes"
+            exit 1
+          fi
+      - name: Run goreleaser
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: "v2.17.0"
+          args: release --clean --release-notes .github/release-notes/${{ github.ref_name }}.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Publish and verify release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          gh release edit "$GITHUB_REF_NAME" --notes-file "$release_notes"
+          published_length="$(gh release view "$GITHUB_REF_NAME" --json body --jq '.body | length')"
+          if [ "$published_length" -eq 0 ]; then
+            echo "::error::Published release notes are empty"
+            exit 1
+          fi
+      - name: Verify release archive notices
+        run: ./.github/scripts/check-release-archives.sh
