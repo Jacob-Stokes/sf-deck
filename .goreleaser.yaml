@@ -1,0 +1,105 @@
+version: 2
+
+# Builds: macOS arm64 + amd64, Linux amd64 + arm64. Windows skipped
+# until the settings file-lock + IPC socket paths get a windows
+# variant — see TODO in internal/settings/settings.go.
+
+project_name: sf-deck
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: sf-deck
+    main: ./cmd/sf-deck
+    binary: sf-deck
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - id: tarball
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - docs/third_party_licenses/**
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  # Releases use curated notes from .github/release-notes/<tag>.md.
+  # The workflow requires, publishes, and verifies the matching file.
+  disable: true
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+# Auto-publish a Homebrew cask to Jacob-Stokes/homebrew-tap on
+# every tagged release. Users then:
+#
+#     brew tap Jacob-Stokes/tap
+#     brew install --cask sf-deck
+#
+# Needs a fine-grained PAT limited to Jacob-Stokes/homebrew-tap with
+# Contents read/write access, set in the sf-deck repo as the
+# HOMEBREW_TAP_GITHUB_TOKEN secret. The default GITHUB_TOKEN cannot push
+# to a different repository, hence the dedicated token.
+
+# GoReleaser v2.16 deprecated precompiled-binary formulas in favour of
+# Homebrew Casks, including for CLI binaries. The cask stages the complete
+# archive (including third-party notices) and links sf-deck into Homebrew's
+# bin directory.
+homebrew_casks:
+  - name: sf-deck
+    ids:
+      - tarball
+    binaries:
+      - sf-deck
+    repository:
+      owner: Jacob-Stokes
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Casks
+    homepage: "https://github.com/Jacob-Stokes/sf-deck"
+    description: "Keyboard-first Salesforce workspace across multiple orgs"
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sf-deck"] if OS.mac?
+
+release:
+  github:
+    owner: Jacob-Stokes
+    name: sf-deck
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} {{.Version}}"
