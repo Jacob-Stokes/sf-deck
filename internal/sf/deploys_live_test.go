@@ -1,3 +1,5 @@
+//go:build live
+
 package sf
 
 import (
@@ -5,8 +7,9 @@ import (
 	"testing"
 )
 
-// TestLiveRefreshDeploys is a manual diagnostic — only runs when
-// SF_DECK_LIVE_ORG is set. Not part of the suite.
+// TestLiveRefreshDeploys is a manual diagnostic. It requires both the
+// live build tag and SF_DECK_LIVE_ORG, so ordinary test runs cannot
+// contact a Salesforce org.
 func TestLiveRefreshDeploys(t *testing.T) {
 	org := os.Getenv("SF_DECK_LIVE_ORG")
 	if org == "" {

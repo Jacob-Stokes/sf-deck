@@ -46,6 +46,6 @@ sf-deck is at **v0.1** — built and used daily against real orgs, but
 solo-maintained and young. Most surfaces are stable; a few are **beta**
 (Compare, Reports export, Deploys/metadata writes, Dev projects &
 bundles) and will hit rough edges. See the
-[maturity table in the README](https://github.com/Jacob-Stokes/sf-deck#status--maturity)
+[maturity table in the README](https://github.com/Jacob-Stokes/sf-deck#platform-support-and-maturity)
 for the per-area breakdown. Issues and PRs welcome on
 [GitHub](https://github.com/Jacob-Stokes/sf-deck).
