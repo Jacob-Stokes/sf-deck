@@ -1,9 +1,6 @@
 package ui
 
-// Pins the sidebar text plumbing after the 2026-06-13 field report:
-// multi-line blocks were collapsing to one truncated line because
-// sideDim ansi.Truncate'd the whole string as a single line, and
-// wrap() byte-sliced mid-rune with no word awareness.
+// Covers multiline wrapping, truncation, and UTF-8 boundaries.
 
 import (
 	"strings"

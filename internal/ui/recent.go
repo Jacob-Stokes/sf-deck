@@ -9,8 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/recent"
 )
 
-// --- Aliases (preserve legacy ui-package names) --------------------------
-
 // RecentEntry aliases recent.Entry so the dozens of existing call
 // sites (chip predicates, list renderers, merged-stream wiring)
 // don't need to change.

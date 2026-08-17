@@ -1,11 +1,6 @@
 package devproject
 
-// migrateFromOrgProjects test — covers the legacy → flattened layout
-// transformation. Builds a fresh DB with the OLD schema (dev_projects
-// + org_projects + org_project_items), inserts a small dataset, runs
-// migrateFromOrgProjects, then asserts items moved across with the
-// right (DevProjectID, OrgUser) tuples and the legacy tables got
-// renamed (not deleted).
+// Covers migration from the legacy nested project schema to the flat layout.
 
 import (
 	"database/sql"

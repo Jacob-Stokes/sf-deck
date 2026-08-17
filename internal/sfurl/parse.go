@@ -1,5 +1,4 @@
-// Package sfurl parses Salesforce-shaped URLs and bare Ids into a
-// kind/ref tuple sf-deck can route on. Used by:
+// Package sfurl parses Salesforce URLs and bare IDs into routable references.
 package sfurl
 
 import (

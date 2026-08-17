@@ -1,8 +1,6 @@
 package ui
 
-// /dev-projects detail · Items list surface. Replaces the legacy
-// hand-rolled hierarchical-nest renderer with a proper sortable
-// list table that handles all 19 ItemKinds uniformly.
+// /dev-projects detail item list surface.
 
 import (
 	"fmt"

@@ -1,7 +1,4 @@
-// Package soqlfmt is a small text-pass SOQL formatter — turns
-// "select id,name from account where industry='Tech' order by
-// name limit 50" into the clause-per-line shape every SOQL author
-// already writes by hand:
+// Package soqlfmt formats SOQL into a clause-per-line layout.
 package soqlfmt
 
 import (

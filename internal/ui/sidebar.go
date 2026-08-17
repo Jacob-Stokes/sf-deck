@@ -403,29 +403,6 @@ func sortStrings(xs []string) {
 	}
 }
 
-// If we have a cached describe for this one, show the deeper
-// caps split into individual rows (the "QCUD" mnemonic is opaque
-// without context). Each cap also implies what actions are safe
-// to wire up on this sObject.
-
-// Character count (body minus comments), not lines — see the
-// Apex SIZE column note in list_column_schemas.go.
-
-// sidebarField is the full "everything about this field" detail view.
-// Structured as Object-Manager-style sections (IDENTITY · CONSTRAINTS ·
-// REFERENCE · PICKLIST · FORMULA · SECURITY · SOQL) so admins don't
-// have to scan a single flat kv dump.
-//
-// Each section is optional — reference-less fields omit REFERENCE,
-// non-picklists omit PICKLIST, and so on.
-
-// A describe that ERRORED never sets FetchedAt, so without the
-// Err check this sidebar spins "loading describe…" forever while
-// the main pane already shows the failure (the inaccessible
-// managed-object NOT_FOUND case). Surface it instead of hanging.
-
-// --- SECURITY / BEHAVIOR ---
-
 func reflowLinesToBudget(lines []string, inner, budget int) (out []string, reflowed bool) {
 	if budget <= 0 || len(lines) <= budget {
 		return lines, false

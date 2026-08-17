@@ -19,8 +19,6 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// SafetyLevel + WriteKind + safety lookup ladder live in safety.go.
-
 // Settings is the full on-disk config. All maps/keys default to zero
 // which means "no override" — callers fall back to Defaults.
 type Settings struct {
@@ -32,11 +30,7 @@ type Settings struct {
 	loadedDigest string
 }
 
-// UIConfig captures UI-level user preferences (theme, future:
-// per-tab refresh intervals, dashboard state, …). Kept intentionally
-// thin — the same "empty string means fall back to hardcoded default"
-// rule as SafetyLevel defaults applies, so adding a new field never
-// breaks existing config files.
+// UIConfig contains persisted interface preferences.
 type UIConfig struct {
 	Theme           string           `toml:"theme"` // e.g. "tokyo-night", "catppuccin"
 	ThemeFavourites []string         `toml:"theme_favourites,omitempty"`
@@ -434,9 +428,6 @@ func (s *Settings) SetAutomaticUpdateChecks(enabled bool) {
 	s.UI.Updates.AutomaticSet = true
 }
 
-// StartupSidebarOpen / etc. resolve each tri-state bool. def is the
-// built-in default the caller (model.go) would otherwise use.
-
 // LimitsConfigSection holds the default row counts for server fetches.
 // Each 0 falls back to the matching package default; negatives clamp
 // to 1.
@@ -471,9 +462,6 @@ func clampLimit(v, fallback int) int {
 	}
 	return v
 }
-
-// LimitGlobalSearch resolves the SOSL result cap, additionally clamped
-// to Salesforce's hard max of 50.
 
 // LayoutConfigSection holds pane + modal sizing knobs. 0 falls back to
 // the package default; negatives clamp to the documented minimum.
@@ -1334,9 +1322,6 @@ func (s *Settings) SetBrowser(name string) {
 	s.UI.Extensions.Browser = name
 }
 
-// ObjectFilters / FlowFilters / Lenses — legacy accessors kept for one
-// release while the UI migrates to the unified Chips list.
-
 func (s *Settings) FlowFilters() []FilterConfig {
 	if s == nil {
 		return nil
@@ -1362,23 +1347,6 @@ func (s *Settings) DeleteFlowFilter(id string) {
 	}
 	s.UI.FlowFilters = out
 }
-
-// ClearLegacyChips drops all three legacy slices. Called by the UI
-// migrator after entries have been converted into ChipConfig so the
-// next Save() drops the old sections from disk.
-
-// SetChips replaces the entire unified slice. Callers own Save().
-// Each entry is normalised so any legacy OrgUser is rewritten into Share
-// — keeps the on-disk shape uniform after a bulk replace.
-
-// UpsertChip adds-or-replaces by ID. Domain is part of the identity
-// key (records.recent ≠ objects.recent), so we match on both. Legacy
-// OrgUser is migrated to Share before write so freshly-saved chips
-// never carry both shapes.
-
-// Build into a FRESH slice — reusing s.UI.Chips[:0] would mutate the
-// shared backing array a concurrent reader / Save snapshot may still
-// be looking at.
 
 // ReportExportTransforms returns the post-processor list for the given
 // report id, falling back to the user's default. Empty slice means
@@ -1670,30 +1638,6 @@ type OrgGroupConfig struct {
 	Members   []string `toml:"members,omitempty"`
 }
 
-// OrgGroupForUsername returns the id of the group that owns the
-// given org username, or "" when the org is in no group (renders
-// under "Ungrouped"). First match wins — schema invariant is one
-// group per org but we don't trust the file blindly.
-
-// PruneOrgGroupMembers drops any usernames from group members that
-// aren't in the supplied authed-orgs set. Returns true when something
-// was removed (caller saves on true). The set is "what `sf` knows
-// about right now" — orgs the user has logged out of via the CLI
-// while sf-deck wasn't running.
-//
-// SAFETY: an EMPTY authed set is treated as "we don't currently know
-// which orgs exist" — NOT "every org is logged out". Pruning on an
-// empty set would wipe every group's membership, which happens during
-// transient states (cache clear, startup before the org list lands, a
-// failed `sf org list`). We refuse to prune in that case: losing the
-// real signal momentarily must never destroy persisted assignments.
-// Without this guard, clearing the cache wiped all group memberships.
-
-// Per-group removal flag — a removal in an earlier group must
-// not cause a later (unchanged) group to be rewritten. The
-// previous shared flag aliased g.Members[:0] writes across
-// groups, corrupting membership of groups that lost nothing.
-
 func cloneOrgGroup(g OrgGroupConfig) OrgGroupConfig {
 	out := OrgGroupConfig{
 		ID:        g.ID,
@@ -1733,18 +1677,9 @@ type CompareConfig struct {
 // tripping Salesforce's per-org concurrent-request limit.
 const defaultCompareConcurrency = 6
 
-// CompareConcurrency returns the configured parallel-retrieve cap,
-// clamped to a sane range, falling back to the default when unset.
-
 const defaultCompareBodyCapKB = 256
 
 const defaultCompareRetainCeilingMB = 150
-
-// CompareBodyCapBytes returns the per-component retain cap in BYTES,
-// clamped, falling back to the default when unset.
-
-// CompareRetainCeilingBytes returns the total retained-body ceiling in
-// BYTES, clamped, falling back to the default when unset.
 
 // CompareDef is one reusable comparison: a name, source/target org
 // usernames, and the metadata-type scope (provider TypeLabels like
@@ -1943,22 +1878,12 @@ const DefaultWheelQuietGapMs = 80
 // per frame; with pagination + the row cache it's overkill.
 const DefaultWheelMinIntervalMs = 12
 
-// WheelQuietGapMs returns the wheel-throttle idle window. Defaults
-// to DefaultWheelQuietGapMs when unset; clamps negatives to 1.
-
-// WheelMinIntervalMs returns the minimum gap between accepted ticks.
-// Defaults to DefaultWheelMinIntervalMs when unset; clamps negatives
-// to 1.
-
 // DefaultWheelMaxStep caps the per-accepted-tick cursor delta. 20
 // rows ≈ one screenful in a typical 60-row terminal — so even a
 // flick producing 200 events advances ~10 frames, which reads as
 // "scrolled fast" rather than "teleported." Lower = chunkier but
 // more readable; higher = matches finger speed more aggressively.
 const DefaultWheelMaxStep = 20
-
-// WheelMaxStep returns the cap on cursor delta per accepted wheel.
-// Defaults to DefaultWheelMaxStep when unset; clamps negatives to 1.
 
 // DefaultRecentMaxEntries is the per-org local visit log cap when
 // the user hasn't configured one.
@@ -2066,12 +1991,6 @@ func (s *Settings) SetRecentBoostDecayHours(n int) {
 // DefaultHomeBannerIntervalMs is the cloud-banner animation tick
 // when the user hasn't configured one.
 const DefaultHomeBannerIntervalMs = 400
-
-// HomeBannerIntervalMs returns the banner-animation tick interval
-// in ms. 0 falls back to the default; values below 50ms clamp up
-// (faster than that wastes CPU). When DisableHomeBanner is true
-// the caller skips animation entirely; this getter still returns a
-// value to keep the type contract simple.
 
 // DefaultListViewPreviewLimit is the row count we fetch when
 // /records is driven by a Salesforce List View chip and the user
@@ -2331,8 +2250,3 @@ func (s *Settings) SetDemoOrgImported(v bool) {
 	}
 	s.UI.DemoOrgImported = v
 }
-
-// SetOrg upserts the per-org safety override keyed by username.
-// Pass "" for the level to clear the override (org falls back to
-// kind default).
-// SetOrg + OrgKind + Resolve live in safety.go.

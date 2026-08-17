@@ -1,6 +1,4 @@
-// Package app holds the shared startup + lifecycle context for every
-// sf-deck entry point — the TUI today, and the headless CLI / agent
-// API surfaces planned in docs/headless-mode-plan.md.
+// Package app owns shared startup and lifecycle state for TUI and headless entry points.
 package app
 
 import (

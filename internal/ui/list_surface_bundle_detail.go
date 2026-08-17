@@ -1,8 +1,6 @@
 package ui
 
-// /bundle drill list surface. Replaces the static text dump in
-// tab_bundle_detail.go's body with a sortable list table over the
-// preview's components.
+// /bundle component-preview list surface.
 
 import (
 	"charm.land/lipgloss/v2"

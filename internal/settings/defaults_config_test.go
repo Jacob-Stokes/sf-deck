@@ -2,10 +2,7 @@ package settings
 
 import "testing"
 
-// These cover the new [ui.startup] / [ui.limits] / [ui.layout] / [ui.api]
-// accessors: nil-safety, the zero-value fallback rule, overrides,
-// negative clamping, the tri-state startup booleans, and the
-// global-search SF-50 hard clamp.
+// Covers configuration fallbacks, clamping, and tri-state booleans.
 
 func TestStartupBools_TriState(t *testing.T) {
 	var nilS *Settings

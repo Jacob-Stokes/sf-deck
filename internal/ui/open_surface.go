@@ -1,8 +1,6 @@
 package ui
 
-// Open surface registry — second migration step on the path to a
-// declarative TabSpec. Companion to chipSurface (chip_surface.go)
-// and listSurface (list_surface.go).
+// Registry-backed open and drill behaviour for tab surfaces.
 
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
@@ -617,11 +615,9 @@ func drillToFirstOpenTarget(m *Model) (tea.Cmd, bool) {
 	return m.openInBrowserCmd(o, targets[0]), true
 }
 
-// ---- surfaces migrated from cursorOpenable's legacy tab switch ----
-//
-// Same init() indirection as above (see the file header comment):
-// these closures reach Model methods that transitively touch the
-// registry, so direct var initializers would cycle.
+// These surfaces use init indirection because their closures reach
+// Model methods that transitively touch the registry; direct variable
+// initializers would cycle.
 
 var (
 	homeFallbackOpenSurface      openSurface

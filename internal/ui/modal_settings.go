@@ -1,9 +1,6 @@
 package ui
 
-// Settings modal — the "=" entry point. Today it's a single theme
-// picker; the structure is intentionally wider than it needs to be
-// so new setting categories (per-tab refresh cadence, dashboard
-// defaults, …) slot in as additional choiceModal options here.
+// Settings modal and category dispatch.
 
 import (
 	"fmt"

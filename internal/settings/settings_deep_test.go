@@ -166,8 +166,6 @@ func TestSaveUpdatesDigestForSameProcessSaves(t *testing.T) {
 	}
 }
 
-// --- ObjectFilters / FlowFilters / Lenses (legacy chip cousins) ---------
-
 func TestUpsertObjectFilter_AddAndReplace(t *testing.T) {
 	s := &Settings{}
 	s.UpsertObjectFilter(FilterConfig{ID: "f1", Label: "Foo"})

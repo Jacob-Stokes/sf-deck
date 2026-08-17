@@ -1,6 +1,6 @@
 package ui
 
-// /users — top-level Users tab. Two subtabs:
+// /users exposes user lists and detail navigation.
 
 import (
 	"fmt"

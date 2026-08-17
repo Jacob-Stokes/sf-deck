@@ -12,8 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// ======== Object permission invariants ====================================
-
 type objPermState struct {
 	Read, Create, Edit, Delete, ViewAllRecords, ModifyAllRecords bool
 }

@@ -6,9 +6,6 @@ import (
 	"strings"
 )
 
-// ======================================================================
-// SSOT: every "open in browser" target, per domain type.
-
 // OpenTarget is one named destination: a human label, a Lightning path
 // relative to the instance URL, and a short ID used for display / future
 // keybinding hooks.

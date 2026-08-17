@@ -890,8 +890,6 @@ func translateDeployOpts(testsFlag string, classes []string) (sf.DeployOpts, err
 	return opts, nil
 }
 
-// ----- soql / apex / record / metadata / object / tag / safety Backend impls --------
-
 func (s *ControlState) resolveTargetForIPC(alias, user string) (target, username string, err error) {
 	if s.resolveOrg == nil {
 		return "", "", errors.New("org resolver unavailable")

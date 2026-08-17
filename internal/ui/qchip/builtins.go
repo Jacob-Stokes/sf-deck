@@ -376,38 +376,7 @@ var PublicGroupBuiltins = []Chip{
 	},
 }
 
-// FlowBuiltins ships /flows' built-in chips.
-//
-// Strip favourites:
-//
-//	All, Active, Inactive, Modified by me, Created by me.
-//
-// Overflow (Favourite: false):
-//
-//	Draft, Screen, Auto, Unmanaged, Managed, Process Builder, Workflow.
-//
-// The synthetic Project + Recently viewed chips prepend to this
-// strip at render time (see stripRows), so the user sees
-// "📁 Project · Recently viewed · All · Active · …" when a project
-// is loaded.
-//
-// Process Builder + Workflow are obsolete tech (Salesforce has
-// deprecated both in favour of Flow) — typically zero or a handful
-// of grandfathered entries in modern orgs. Keeping them on the
-// strip wastes space; users debugging legacy automation can reach
-// them via the overflow modal.
-//
-// Screen / Auto / Draft / Unmanaged / Managed were favourites in
-// the original cut but were demoted to overflow once the
-// personal-lens chips (Modified by me, Created by me) joined —
-// they're cheap to reach via the overflow modal when needed and
-// the daily-driver workflow is much more often "what have I
-// touched lately" than "what flavour of flow is this."
-//
-// Inactive replaces the older "Obsolete" chip: same OR-predicate
-// (Status = Obsolete OR Status = Inactive) under a clearer label —
-// "Inactive" reads as "anything that isn't running," which is what
-// the chip actually filters to.
+// FlowBuiltins defines the default and overflow filters for /flows.
 var FlowBuiltins = []Chip{
 	{
 		ID: "all", Label: "All", Scope: "*", Origin: OriginBuiltIn,
@@ -600,22 +569,7 @@ var SOQLHistoryBuiltins = []Chip{
 	},
 }
 
-// RecentBuiltins ships /home → Recent + /recent's built-in chips.
-//
-// Layout: All as the locked default, then one chip per common kind
-// (records, reports, flows, apex, components), then a "Misc" bucket
-// catching the long tail of less-frequent kinds (users, deploys,
-// packages, queues, etc.) so the strip stays compact at narrow
-// widths.
-//
-// Filter contract: chips match against RecentEntry.Kind via the
-// query.Row interface (see RecentEntry.Field). Kind is the stable
-// identifier — the human KIND column label (renderer-side) is a
-// pretty-print on top.
-//
-// The synthetic "loaded project" chip is prepended at render time
-// when an org has a project loaded — handled by stripRows + the
-// recentChipSurface's ApplyProjectChip closure, NOT here.
+// RecentBuiltins defines kind filters for the combined recent-activity views.
 var RecentBuiltins = []Chip{
 	{
 		// "All" shows every row from the active source (sf-deck local

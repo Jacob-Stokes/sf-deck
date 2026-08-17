@@ -13,58 +13,9 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// TabSpec captures the data-lifecycle + cursor-management +
-// surface-behavior of a Tab. Hooks are called from the central
-// dispatchers with the live Model; TabSpec instances are pure
-// values so a registry can safely share them across Models.
-//
-// The ENTIRE set of per-tab behavior lives here — uniform surfaces
-// register chip/open/list pointers; bespoke surfaces register
-// hand-rolled closures in the same fields. Either way the
-// dispatcher walks one registry. Nothing per-tab should live in a
-// `case Tab...` switch outside this file once migration is complete.
-//
-// Adding a new tab — contributor checklist
-// ----------------------------------------
-// Walk the fields below in order and decide which apply. Most tabs
-// only need a handful; nil fields are fine and mean "this gesture
-// doesn't apply here."
-//
-//	Identity       — does the user need to tag / collect / yank the
-//	                 cursored item? Wire one closure here and the
-//	                 tag picker, openable lookup, and (future) collect
-//	                 target all work for free.
-//
-//	Sidebar        — do you have a right-pane context panel? If no,
-//	                 the sidebar is empty.
-//
-//	Renderer       — required. Main-pane content.
-//
-//	Chips/Open/List — only if the tab has a uniform list-shape
-//	                 surface that fits the registry pattern. Bespoke
-//	                 surfaces leave these nil and use the per-hook
-//	                 closures (SearchPtr / MoveCursor / Activate / …).
-//
-//	Breadcrumb     — does the header path need to show context (parent
-//	                 object, subtab, cursored row)? Optional.
-//
-//	BusyLabel      — does the tab have a network resource whose load
-//	                 state should appear in the header's activity zone?
-//	                 Optional but recommended for any tab that can take
-//	                 >100ms to populate.
-//
-//	ErrorLabel     — paired with BusyLabel; surfaces a fetch error.
-//
-//	ListTable      — does the tab have a sortable / column-mode-aware
-//	                 list-table view? Only set when the column spec is
-//	                 dynamic (not registered via the listSurface).
-//
-//	EnsureData /
-//	RefreshData    — wire the tab's primary resource lifecycle. Drives
-//	                 auto-fetch on tab entry + manual r refresh.
-//
-//	Subtabs        — only if the tab branches by subtab. Each SubtabSpec
-//	                 can override every behavioral hook above.
+// TabSpec defines rendering, navigation, and data hooks for one tab.
+// Nil hooks mean that behaviour is unsupported; subtabs may override
+// the parent tab's hooks.
 type TabSpec struct {
 	Tab  Tab
 	Stem Tab

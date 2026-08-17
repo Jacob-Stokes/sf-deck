@@ -1,8 +1,6 @@
 package ui
 
-// list_surface_spec.go — generic builder that collapses the
-// repeated BuildRenderModel boilerplate every static list surface
-// was writing by hand.
+// Generic builder for static list surfaces.
 
 import (
 	"charm.land/lipgloss/v2"

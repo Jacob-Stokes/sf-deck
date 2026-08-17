@@ -1,10 +1,6 @@
 package sf
 
-// Table-driven tests for the error-classification layer — the June
-// review's biggest flagged coverage gap. Every branch of error
-// classification is user-facing (it decides whether the UI says
-// "fix your input" / "you lack permission" / "re-auth" / "retry"),
-// so misclassification is a UX bug even when nothing crashes.
+// Error classification controls the recovery guidance shown to users.
 
 import (
 	"errors"

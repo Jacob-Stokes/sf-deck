@@ -1,6 +1,6 @@
 package ui
 
-// /meta — the metadata long tail. Hybrid layout (2026-06-12):
+// /meta browses less common metadata types.
 
 import (
 	"strings"

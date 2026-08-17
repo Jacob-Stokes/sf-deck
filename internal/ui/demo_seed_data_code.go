@@ -1,14 +1,7 @@
 package ui
 
-// Fixture source code for the demo's code drill-downs — see
-// demo_seed.go for the seeder, demo_seed_data.go for the class /
-// trigger / bundle lists, and demo_seed_data_extra.go for the
-// operational surfaces. This file generates the bodies behind those
-// lists: a plausible, syntactically-valid Apex body for every seeded
-// class and trigger, and full file sets (.js / .html / .css /
-// .js-meta.xml, .cmp / controller / helper) for every seeded LWC and
-// Aura bundle. Template-generated from the same name grids as the
-// lists, so a class row and its body can't drift apart.
+// Demo source fixtures are generated from the same name grids as their
+// catalog rows so code bodies and lists stay aligned.
 
 import (
 	"fmt"

@@ -359,13 +359,6 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 
 	projection := recordsProjectionFor(d, sobj, chipID, list, visible, search)
 
-	// Build the listRenderModel and hand off to the shared renderer.
-	// Records is the last list-table that was rendering bespoke; this
-	// migration gives it pagination, snap-to-content via the standard
-	// path, and behavioural parity with every other list. The per-
-	// (sobject, chip) state + search pointers are resolved up-front
-	// here in the orchestrator — renderListModel just sees the same
-	// (state, search, cursor) shape every other surface produces.
 	tableState := d.RecordsTableStatePtr(sobj, chipID)
 	sortDataKey := recordsVisibleSortDataKey(d, sobj)
 	rowAdapter := tableRowAdapter{

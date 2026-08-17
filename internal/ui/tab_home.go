@@ -74,22 +74,12 @@ func (m Model) renderHome(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// Legacy renderHomeOrgCard removed — the ORG identity block now
-// lives in sidebarHome (sidebar.go) alongside the rotating cloud
-// banner. Contributors who want to update the ORG card should
-// edit sidebarHome.
-
-// renderHomeNotifications — bell-stream rows as a list-table.
 // renderHomeLanding draws the SF-DECK logo at the top, then a
 // "LIGHTNING DESTINATIONS" grid below — categorised admin/data/
 // users/code links that open in the user's browser. The sidebar
 // carries the org identity + limits + deploys; the main pane is
-// the launchpad.
-//
-// budget is the available content height. The logo is fixed-height;
-// the destinations grid takes whatever's left and may overflow
-// (no scrolling yet — the catalog is bounded at ~38 entries which
-// fits comfortably in two columns on standard 24-row terminals).
+// the launchpad. The destinations grid uses the space below the
+// fixed-height logo.
 func (m Model) renderHomeLanding(inner, budget int) []string {
 	logoLines := strings.Split(strings.TrimRight(homeLandingLogo, "\n"), "\n")
 	for len(logoLines) > 0 && strings.TrimSpace(logoLines[len(logoLines)-1]) == "" {

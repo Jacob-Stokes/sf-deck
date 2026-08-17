@@ -1,5 +1,4 @@
-// Command sf-deck-docs regenerates the auto-generated reference
-// pages of the docs site from the verb + keymap registries:
+// Command sf-deck-docs regenerates reference pages from the verb and keymap registries.
 package main
 
 import (

@@ -130,10 +130,6 @@ func noteChord() chordSpec {
 	}
 }
 
-// ----------------------------------------------------------------------
-// Sidebar NOTE box rendering
-// ----------------------------------------------------------------------
-
 // Minimum space before the note box renders. Below these the sidebar
 // is too cramped to split — the note stays reachable via q-n.
 const (

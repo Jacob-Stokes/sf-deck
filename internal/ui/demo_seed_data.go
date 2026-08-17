@@ -356,10 +356,6 @@ func demoBaselineFor(o sf.SObject) *sf.CustomObjectBaseline {
 	return b
 }
 
-// ---------------------------------------------------------------
-// Permission sets + FLS
-// ---------------------------------------------------------------
-
 // demoPermsetPicker backs the FLS subtab's parent strip: three
 // profiles and five standalone permission sets.
 func demoPermsetPicker() []sf.FLSPickerEntry {
