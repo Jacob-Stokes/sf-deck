@@ -5,7 +5,7 @@
 
 # sf-deck
 
-**A keyboard-first Salesforce workspace for admins, developers, architects, and consultants working across multiple orgs.**
+**A keyboard-first Salesforce workspace for admins, developers, and architects working across multiple orgs.**
 
 <p>
   <a href="https://github.com/Jacob-Stokes/sf-deck/actions/workflows/ci.yml"><img src="https://github.com/Jacob-Stokes/sf-deck/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -25,10 +25,9 @@
 
 </div>
 
-sf-deck puts every Salesforce org you work with in one terminal. Switch orgs
-without losing your place, investigate metadata and permissions, query records,
-inspect code and automation, and jump directly into Lightning, Setup, Flow
-Builder, or your editor when you need the full interface.
+sf-deck puts every Salesforce org you work with in one terminal and remembers
+where you were in each one. Switch orgs, find what you need, and jump directly
+into Lightning, Setup, Flow Builder, or your editor without rebuilding context.
 
 It uses the orgs already authenticated with Salesforce CLI. No managed package,
 connected app, Setup changes, or extra credentials. If `sf org list` works,
@@ -84,24 +83,17 @@ The mouse also works. See the [complete keymap](https://sfdeck.dev/docs/referenc
 
 - **Move between orgs without losing your place.** Each org keeps its own
   workspace, filters, selection, and navigation state.
-- **Find anything quickly.** Search objects, fields, records, Flows, Apex,
-  components, and other loaded metadata from anywhere with `Ctrl+F`.
-- **Jump into the right Salesforce tool.** Press `o` to open the selected item
-  in Lightning, Setup, Flow Builder, or your editor. `Ctrl+O` shows every
-  available destination; `y` copies its URL and `Ctrl+Y` copies the relevant
-  ID, API name, or query.
-- **Investigate an object end to end.** Browse fields, record types, validation
-  rules, permissions, field-level security, records, automation, and related
-  source without crossing a maze of Setup pages.
+- **Find anything and open the right tool.** Search objects, fields, records,
+  Flows, Apex, components, and other loaded metadata with `Ctrl+F`. Press `o`
+  to open the selected item in Lightning, Setup, Flow Builder, or your editor.
+- **Investigate an org end to end.** Browse schema, records, permissions,
+  field-level security, validation rules, users, automation, and org health
+  without crossing a maze of Setup pages.
 - **Query and work with data.** Write SOQL with metadata completion, reuse saved
   queries and history, inspect or edit records, and export CSV, XLSX, or JSON.
-- **Inspect code and automation.** Explore Flows, Apex, triggers, Lightning
-  components, tests, debug logs, and deployments from the same workspace.
-- **Administer and diagnose orgs.** Review users, permission assignments, login
-  activity, packages, limits, jobs, audit history, and system health.
-- **Turn discoveries into deployable work.** Collect mixed metadata into tagged
-  dev projects and sfdx bundles, then retrieve, validate, deploy, and follow the
-  result. These workflows remain beta.
+- **Follow work from code to deployment.** Explore Flows, Apex, triggers,
+  Lightning components, tests, debug logs, and deployments. Collect discoveries
+  into tagged dev projects and SFDX bundles when they are ready to move.
 
 <p align="center">
   <img src="docs/landing/assets/capabilities.png" alt="sf-deck capabilities: SOQL and records, code and automation, users and org health, projects and deploys, and direct links into Salesforce" width="920">
@@ -156,7 +148,8 @@ sf-deck v0.1 is young, solo-maintained, and used daily against real orgs.
 | Status | Areas |
 | --- | --- |
 | **Stable** | Home, objects/schema, records, users, permissions, SOQL, metadata browsing, packages, tags, system diagnostics |
-| **Beta** | Reports, deploys and metadata writes, dev projects/bundles, cross-org compare, find-in-another-org |
+| **Beta** | Reports, deploys and metadata writes, dev projects/bundles, find-in-another-org |
+| **Coming soon** | Cross-org comparison for Apex, Flows, and selected metadata |
 | **Partial / planned** | System API-usage detail, dashboard viewing, native Windows support |
 
 Release builds support macOS and Linux on arm64 and amd64. Windows users can
@@ -177,15 +170,12 @@ run the Linux build and Salesforce CLI together inside WSL2.
 
 ## Privacy, security, and safety
 
-sf-deck uses existing Salesforce CLI sessions and keeps its working state
-local. It has no telemetry, hosted backend, or sf-deck account; Salesforce
-record and query results are not written to its persistent cache. Production
-orgs start read-only, with explicit per-org safety levels for writes.
-
-Before connecting a real org, read the [user agreement](USER_AGREEMENT.md),
-[privacy notice](PRIVACY.md), [safety model](https://sfdeck.dev/docs/concepts/safety/),
-[on-disk layout](https://sfdeck.dev/docs/reference/on-disk-layout/), and
-[security policy](.github/SECURITY.md).
+sf-deck uses existing Salesforce CLI sessions. It has no telemetry or hosted
+backend, and Salesforce data goes only to Salesforce. Working state stays
+local, record and query results are not cached, and production orgs start
+read-only. See the [privacy notice](PRIVACY.md),
+[security policy](.github/SECURITY.md), and
+[safety model](https://sfdeck.dev/docs/concepts/safety/) for details.
 
 ## Contributing
 
