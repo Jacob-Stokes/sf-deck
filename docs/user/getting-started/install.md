@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- [Go 1.26.5+](https://go.dev/dl/)
+- [Go 1.26.6+](https://go.dev/dl/)
 - [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
   (`sf`), with at least one authenticated org (`sf org login web`)
 

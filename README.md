@@ -55,7 +55,7 @@ sf-deck --demo
 
 Download a macOS or Linux archive from the
 [release page](https://github.com/Jacob-Stokes/sf-deck/releases),
-or build from source with [Go 1.26.5+](https://go.dev/dl/):
+or build from source with [Go 1.26.6+](https://go.dev/dl/):
 
 ```sh
 git clone https://github.com/Jacob-Stokes/sf-deck
