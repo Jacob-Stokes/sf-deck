@@ -4,11 +4,6 @@ package exporters
 // follow the Headers order (Go's json package preserves struct field
 // order but maps don't, so we use json.Encoder + a manual buffered
 // writer to keep header order stable).
-//
-// Why arrays-of-objects and not arrays-of-arrays: scripts consuming
-// the export almost always want named fields ("the URL column" not
-// "column 4"). The few extra bytes per row for repeated keys are
-// dwarfed by gzip / network overhead in real-world use.
 
 import (
 	"encoding/json"
@@ -17,10 +12,6 @@ import (
 )
 
 func writeJSON(w io.Writer, headers []string, rows []ExportRow) error {
-	// Hand-build the JSON so we can preserve column order across the
-	// file. encoding/json sorts map keys alphabetically, which would
-	// reorder our headers; building strings + json.Encoder for value
-	// escaping gives us order + correctness in one pass.
 	var b strings.Builder
 	b.WriteString("[")
 	enc := json.NewEncoder(&b)
@@ -34,9 +25,6 @@ func writeJSON(w io.Writer, headers []string, rows []ExportRow) error {
 			if j > 0 {
 				b.WriteString(",")
 			}
-			// Encode the key + value separately so escaping is
-			// handled by encoding/json without us having to roll
-			// our own.
 			keyJSON, _ := json.Marshal(h)
 			valJSON, _ := json.Marshal(r.Get(h))
 			b.Write(keyJSON)

@@ -10,15 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// activateExecRun handles Enter on the /exec tab. On the Editor
-// subtab it submits the textarea body for execution; on Saved /
-// History it loads the cursored row into the editor and flips back
-// to the Editor subtab. The Output subtab is read-only so Enter
-// no-ops there.
-//
-// On production orgs the run is gated by a confirmation modal —
-// anonymous Apex can DELETE records, fire flows, hit triggers, etc.
-// SBX runs straight through (no gate).
 func (m *Model) activateExecRun() tea.Cmd {
 	switch m.currentSubtab() {
 	case SubtabExecSaved:
@@ -54,10 +45,6 @@ func (m *Model) activateExecRun() tea.Cmd {
 	return m.runExecConfirmed(o, body)
 }
 
-// runExecConfirmed is the actual launch path — sets the running
-// flag, clears prior result, fires runExecCmd. Split out so the
-// prod-gate's confirm callback can invoke it without going back
-// through activateExecRun (which would re-trigger the gate).
 func (m *Model) runExecConfirmed(o sf.Org, body string) tea.Cmd {
 	m.execRunning = true
 	m.execErr = nil
@@ -69,24 +56,14 @@ func (m *Model) runExecConfirmed(o sf.Org, body string) tea.Cmd {
 	return m.runExecCmd(o, body, m.execCaptureLog, userID)
 }
 
-// isProductionOrg reports whether o is NOT a sandbox / scratch /
-// dev-hub. We treat anything-not-sandbox as prod for the gate
-// purpose: false-positives prompt an extra confirmation, false-
-// negatives skip the prompt — only the second is dangerous.
 func isProductionOrg(o sf.Org) bool {
 	return !o.IsSandbox
 }
 
-// loadCursoredExecSavedEntry + loadCursoredExecHistoryEntry are
-// declared in tab_exec_library.go (the Real variants). These thin
-// wrappers preserve the original name activateExecRun calls into.
 func (m *Model) loadCursoredExecSavedEntry()   { m.loadCursoredExecSavedEntryReal() }
 func (m *Model) loadCursoredExecHistoryEntry() { m.loadCursoredExecHistoryEntryReal() }
 
 func (m *Model) activateSOQLResult() tea.Cmd {
-	// Library subtabs: Enter loads the cursored query into the
-	// editor and flips back to the Editor subtab so the user lands
-	// ready to tweak / run.
 	switch m.currentSubtab() {
 	case SubtabSOQLSaved:
 		m.loadCursoredSavedEntry()
@@ -113,11 +90,6 @@ func (m *Model) activateSOQLResult() tea.Cmd {
 	}
 	sobject, _ := recordSObject(rec)
 	if sobject == "" {
-		// SF includes attributes.type on every record fetched via
-		// REST, so missing here is unusual — most likely an
-		// aggregated row or a relationship-traversed sub-row that
-		// got promoted to the top. Surface rather than silent
-		// no-op so debugging is faster.
 		m.flash("can't drill — row has no sObject type")
 		return nil
 	}

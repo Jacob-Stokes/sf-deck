@@ -1,14 +1,5 @@
 package ui
 
-// /dev-projects + drill-in renderers.
-//
-// /dev-projects        list of every DevProject. Each row shows
-//                      aggregate counts (items, distinct orgs).
-// /dev-project (detail) the items in one DevProject, filtered to
-//                      the active org by default. Tab toggles the
-//                      "all orgs" view so users can see the project's
-//                      full reach across every org that contributed.
-
 import (
 	"fmt"
 	"strings"
@@ -20,7 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderDevProjects draws the cross-org dev-projects list.
 func (m Model) renderDevProjects(w, innerH int) string {
 	inner := w - 4
 	if m.devProjects == nil {
@@ -101,9 +91,6 @@ func (m Model) renderDevProjects(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderDevProjectsAllBundles renders the top-level /dev-projects →
-// Bundles subtab. Lists every bundle across every DevProject with
-// the parent project's name shown per row.
 func (m Model) renderDevProjectsAllBundles(inner, body int) []string {
 	bundles, err := m.devProjects.ListAllBundles()
 	if err != nil {
@@ -133,7 +120,6 @@ func (m Model) renderDevProjectsAllBundles(inner, body int) []string {
 		cursor = 0
 	}
 
-	// Build a project-name lookup so each bundle row can label its parent.
 	projects, _ := m.devProjects.ListDevProjects()
 	nameByID := map[string]string{}
 	for _, p := range projects {
@@ -157,24 +143,6 @@ func (m Model) renderDevProjectsAllBundles(inner, body int) []string {
 	return lines
 }
 
-// renderDevProjectDetail draws the items in one dev project. Items
-// are filtered to the active org by default; Tab toggles between
-// "this org" and "all orgs" so the user can see the project's full
-// cross-org reach when they want.
-//
-// Items group by parent sObject when one is in scope. So if the
-// project contains "Account" + "Account.Phone" + "Account.IsActive
-// validation rule", they collapse under one Account header that the
-// user can expand/collapse. Items without a parent (records, flows,
-// permsets, profiles, reports, orphan fields whose sObject isn't
-// itself collected) sit in flat per-kind groups underneath. In "all
-// orgs" mode, parents are keyed by (org, sObject) so the same
-// sObject collected from two different orgs appears as two
-// independent folders.
-//
-// Cursor walks every selectable row. Right / l / enter on a parent
-// toggles expand. Left / h on a child jumps cursor up to its parent.
-// d removes the cursored row's item from the project.
 func (m Model) renderDevProjectDetail(w, innerH int) string {
 	inner := w - 4
 	if m.devProjects == nil {
@@ -216,8 +184,6 @@ func (m Model) renderDevProjectDetail(w, innerH int) string {
 	}
 }
 
-// renderDevProjectDetailItems renders the Items subtab: the per-project flat
-// tree of collected sObjects, fields, flows, and related items.
 func (m Model) renderDevProjectDetailItems(dp devproject.DevProject, inner, body int) []string {
 	var lines []string
 
@@ -226,8 +192,6 @@ func (m Model) renderDevProjectDetailItems(dp devproject.DevProject, inner, body
 		return lines
 	}
 
-	// Apply the active kind-chip filter via the ListView Extra hook so
-	// the unified list engine sees a single canonical set of rows.
 	if m.devProjectKindChip != "" {
 		active := m.devProjectKindChip
 		d.DevProjectItems.SetExtra(func(it devproject.Item) bool {
@@ -237,11 +201,6 @@ func (m Model) renderDevProjectDetailItems(dp devproject.DevProject, inner, body
 		d.DevProjectItems.SetExtra(nil)
 	}
 
-	// Kind-filter chip strip. Built from the FULL item set so the
-	// strip is stable across the active filter — switching from
-	// "Flows" to "All" mustn't reset which chips exist. The strip
-	// only renders when there's >1 distinct kind, since a single-
-	// kind project doesn't need filtering.
 	chips, chipSel := m.devProjectKindChips()
 	if len(chips) > 2 {
 		if strip := renderChipStrip(chips, chipSel, inner, ""); strip != "" {
@@ -282,9 +241,6 @@ func (m Model) renderDevProjectDetailItems(dp devproject.DevProject, inner, body
 		return lines
 	}
 
-	// Delegate the actual table render to the shared listSurface
-	// machinery — sort, scroll, search, persisted widths, everything
-	// the other surfaces get.
 	model, ok := devProjectItemsListSurface.BuildRenderModel(m, d)
 	if !ok {
 		return lines
@@ -297,8 +253,6 @@ func (m Model) renderDevProjectDetailItems(dp devproject.DevProject, inner, body
 	hint := "  ↵ open · " + firstPretty(Keys.DeleteProject) + " remove · " +
 		firstPretty(Keys.ExportProject) + " bundle · " + viewKeys + " filter · " +
 		firstPretty(Keys.ToggleSidebar) + " toggle scope · esc back"
-	// Surface a one-time hint about the managed badge when any item
-	// in view has one.
 	for _, it := range d.DevProjectItems.Items() {
 		if it.Managed() {
 			hint = "  ↵ open · " + firstPretty(Keys.DeleteProject) + " remove · " +
@@ -313,10 +267,6 @@ func (m Model) renderDevProjectDetailItems(dp devproject.DevProject, inner, body
 	return lines
 }
 
-// devProjectKindChipOrder is the fixed display order for the Items
-// subtab's kind-filter chips. Items the project DOESN'T contain are
-// dropped at chip-build time; this order just pins what's where when
-// they ARE present, so the strip doesn't reorder on add/remove.
 var devProjectKindChipOrder = []struct {
 	Kind  devproject.ItemKind
 	Label string
@@ -341,13 +291,6 @@ var devProjectKindChipOrder = []struct {
 	{devproject.KindApexSnippet, "Apex snippets"},
 }
 
-// devProjectKindChips builds the Items-subtab chip strip from the
-// currently-loaded m.devProjectItems. Returns the chip rows + the
-// cursor index to render. Kinds with zero items are omitted so the
-// cursor space is dense; "All" is always at index 0.
-//
-// When m.devProjectKindChip has fallen off the strip (e.g. all items
-// of that kind were just removed), the returned cursor snaps to 0.
 func (m Model) devProjectKindChips() ([]chipRow, int) {
 	items := m.devProjectItemsView()
 	if len(items) == 0 {
@@ -376,11 +319,6 @@ func (m Model) devProjectKindChips() ([]chipRow, int) {
 	return chips, cursor
 }
 
-// cycleDevProjectKindChip moves the kind-filter chip cursor on the
-// Items subtab by delta and applies the resulting kind as the active
-// filter. Wraps at both ends (matches the qchip cycler convention).
-// Resets the item cursor so we land on a real row after the filter
-// shrinks (or grows) the visible set.
 func (m Model) cycleDevProjectKindChip(delta int) (Model, tea.Cmd) {
 	chips, cur := m.devProjectKindChips()
 	if len(chips) == 0 {
@@ -400,10 +338,6 @@ func (m Model) cycleDevProjectKindChip(delta int) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// resetDevProjectItemCursor drops the item cursor for the active
-// project back to 0. Called whenever the visible row set changes
-// shape (kind-chip cycle, scope toggle, item removal) so the cursor
-// doesn't point past the end.
 func (m *Model) resetDevProjectItemCursor() {
 	if len(m.orgs) == 0 || m.devProjectCur == "" {
 		return
@@ -415,10 +349,6 @@ func (m *Model) resetDevProjectItemCursor() {
 	d.Cursors.Set(cursorKindDevProjectItem, 0, 0, m.devProjectCur)
 }
 
-// devProjectKindChipFromIdx maps a chip-strip index back to the
-// ItemKind that index represents. Index 0 → "" (All); higher indices
-// look up the same chip list devProjectKindChips emitted. Returns
-// ("", false) when idx is out of range.
 func (m Model) devProjectKindChipFromIdx(idx int) (devproject.ItemKind, bool) {
 	chips, _ := m.devProjectKindChips()
 	if idx < 0 || idx >= len(chips) {
@@ -430,9 +360,6 @@ func (m Model) devProjectKindChipFromIdx(idx int) (devproject.ItemKind, bool) {
 	return devproject.ItemKind(chips[idx].ID), true
 }
 
-// renderDevProjectDetailBundles renders the Bundles subtab — sfdx
-// project directories linked to this DevProject. Reuses the
-// /bundles list rendering by pulling the same bundle slice.
 func (m Model) renderDevProjectDetailBundles(dp devproject.DevProject, inner, body int) []string {
 	bundles, err := m.devProjects.ListBundlesFor(dp.ID)
 	if err != nil {
@@ -474,7 +401,6 @@ func (m Model) renderDevProjectDetailBundles(dp devproject.DevProject, inner, bo
 	return lines
 }
 
-// devProjectRowKind discriminates the row types in the items tree.
 type devProjectRowKind int
 
 const (
@@ -485,7 +411,6 @@ const (
 	rowKindOrgHeader                              // "all orgs" mode only — section header per org
 )
 
-// devProjectRow is one row in the flattened items tree.
 type devProjectRow struct {
 	Kind     devProjectRowKind
 	Item     devproject.Item // for leaves & children; the parent's own item for parent rows; empty for org headers
@@ -495,12 +420,6 @@ type devProjectRow struct {
 	OrgUser  string          // populated on org-header rows in all-orgs mode
 }
 
-// expandCursoredDevProjectRow / collapseCursoredDevProjectRow are
-// retained as stubs so update_keys.go's → / ← dispatch can keep
-// calling them — both return handled=false which lets the default
-// arrow-cursor handler take over. The previous hierarchical tree
-// had per-parent expand state; the flat list-table view doesn't
-// need it.
 func (m Model) expandCursoredDevProjectRow() (Model, bool) {
 	return m, false
 }

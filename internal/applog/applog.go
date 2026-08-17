@@ -1,22 +1,5 @@
 package applog
 
-// Per-session structured log.
-//
-// One file per session at ~/.sf-deck/log/<timestamp>-<pid>.log. Always
-// on (no env var gate) — the value of having a record of what happened
-// is high and the cost is microscopic. Older sessions stay on disk so
-// post-mortem debugging is possible after sf-deck has exited.
-//
-// Two surfaces:
-//   - Info / Warn / Error / Debug for operations.
-//   - Dump for binary blobs (HTML responses, xlsx that didn't parse,
-//     etc.) — written to a sibling file under ~/.sf-deck/log/dumps/
-//     so log greps stay readable.
-//
-// Logging is fire-and-forget: a write failure (disk full, permissions)
-// shouldn't break the operation that triggered it. Errors from inside
-// the logger are silently dropped.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -77,11 +60,6 @@ func Init() string {
 	// applog.Init runs early in startup, so this is the natural choke
 	// point. Best-effort: a chmod failure shouldn't stop the logger.
 	_ = os.Chmod(base, 0o700)
-	// Prune older session logs + dumps so the directory doesn't grow
-	// unbounded. We keep the most recent N of each so post-mortem
-	// debugging still works for any recent session; older entries
-	// drop. Errors here are silently ignored — the logger's job is
-	// to start logging, not to enforce hygiene.
 	pruneOldFiles(dir, "*.log", logKeep)
 	pruneOldFiles(dumpDir, "*", dumpKeep)
 
@@ -92,17 +70,11 @@ func Init() string {
 		return ""
 	}
 	file = f
-	// Header so each session's start is greppable.
 	fmt.Fprintf(file, "[%s] [INFO] session_start pid=%d\n",
 		time.Now().Format(time.RFC3339Nano), os.Getpid())
 	return logPath
 }
 
-// Keep the last logKeep session logs and the last dumpKeep dump
-// files. Constants rather than settings hooks: the user's not going
-// to want a knob for this and adding one is just more surface.
-// Numbers chosen to leave ample room for post-mortem ("when did I
-// last open sf-deck and what happened?") without growing unbounded.
 const (
 	logKeep  = 50
 	dumpKeep = 100
@@ -220,7 +192,6 @@ func Dump(tags []string, ext string, body []byte) string {
 	label := "dump"
 	if len(tags) > 0 {
 		label = strings.Join(tags, "-")
-		// Sanitise — file names mustn't carry surprising chars.
 		label = sanitiseLabel(label)
 	}
 	ts := time.Now().Format("20060102-150405.000")
@@ -233,9 +204,6 @@ func Dump(tags []string, ext string, body []byte) string {
 	return path
 }
 
-// formatValue renders one field value for the log line. Strings get
-// quoted only when they contain spaces or quotes; everything else uses
-// JSON marshalling so structured values stay machine-readable.
 func formatValue(v any) string {
 	switch t := v.(type) {
 	case nil:

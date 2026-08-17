@@ -3,15 +3,6 @@ package sf
 // auth.go — orchestration helpers for `sf` auth lifecycle commands.
 // We don't reimplement OAuth; we shell out to the canonical sf CLI
 // and surface the result.
-//
-// LoginWeb is intentionally omitted from this file because it's an
-// interactive command (opens a browser, blocks until the user
-// completes the flow). The UI layer drives that via tea.Exec rather
-// than runSF, which captures stdout — for an interactive command we
-// want the user's terminal to receive the sf CLI output directly.
-//
-// The non-interactive helpers (Logout, SetAlias, SetDefault) all
-// shell out via runSF with the default 30s timeout.
 
 import (
 	"context"

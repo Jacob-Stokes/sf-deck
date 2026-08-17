@@ -156,7 +156,6 @@ func (s *Settings) PinDefault(username string) bool {
 		s.Orgs = map[string]OrgConfig{}
 	}
 	changed := false
-	// Clear every existing pin that isn't the new target.
 	for k, cfg := range s.Orgs {
 		if k != username && cfg.Default {
 			cfg.Default = false

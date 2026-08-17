@@ -51,8 +51,6 @@ func TestLogAndDumpFilesArePrivate(t *testing.T) {
 func TestPruneOldFiles_KeepsMostRecent(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create 12 files with mtimes spaced 1 second apart so sorting is
-	// deterministic. Older files get earlier indices.
 	now := time.Now()
 	for i := 0; i < 12; i++ {
 		p := filepath.Join(dir, fmt.Sprintf("%02d.log", i))
@@ -67,7 +65,6 @@ func TestPruneOldFiles_KeepsMostRecent(t *testing.T) {
 
 	pruneOldFiles(dir, "*.log", 5)
 
-	// Five most-recent files (08..11) should survive; the rest are gone.
 	for i := 0; i < 12; i++ {
 		path := filepath.Join(dir, fmt.Sprintf("%02d.log", i))
 		_, err := os.Stat(path)
@@ -84,7 +81,6 @@ func TestPruneOldFiles_KeepsMostRecent(t *testing.T) {
 
 func TestPruneOldFiles_KeepUnderThreshold(t *testing.T) {
 	dir := t.TempDir()
-	// Only 3 files, keep 100 — should be a no-op.
 	for i := 0; i < 3; i++ {
 		p := filepath.Join(dir, fmt.Sprintf("%02d.log", i))
 		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
@@ -109,7 +105,6 @@ func TestPruneOldFiles_HandlesMissingDir(t *testing.T) {
 
 func TestPruneOldFiles_SkipsDirectories(t *testing.T) {
 	dir := t.TempDir()
-	// Two regular files + one nested directory matching the glob.
 	if err := os.MkdirAll(filepath.Join(dir, "subdir.log"), 0o755); err != nil {
 		t.Fatal(err)
 	}

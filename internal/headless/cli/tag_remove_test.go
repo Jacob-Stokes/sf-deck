@@ -4,9 +4,6 @@ import (
 	"testing"
 )
 
-// tag remove needs a valid --id + --kind + --ref. The validation
-// path is reachable without a real org or any tag fixtures.
-
 func TestTagRemove_MissingArgs(t *testing.T) {
 	a := newTestAppWithStore(t)
 	cases := [][]string{

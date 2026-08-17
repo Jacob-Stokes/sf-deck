@@ -53,13 +53,11 @@ func TestJoinNoteBesideGeometry(t *testing.T) {
 	if len(out) != innerH {
 		t.Fatalf("composed %d rows, want %d", len(out), innerH)
 	}
-	// Row 0 (panel title) and last row (footer) carry no box border.
 	for _, i := range []int{0, innerH - 1} {
 		if strings.ContainsAny(ansi.Strip(out[i]), "╭╰│╮╯") {
 			t.Errorf("row %d must stay box-free: %q", i, ansi.Strip(out[i]))
 		}
 	}
-	// Rows 1..innerH-2 all carry the box; total width == contentW+2+boxW.
 	want := contentW + 2 + 14
 	for i := 1; i < innerH-1; i++ {
 		if !strings.ContainsAny(ansi.Strip(out[i]), "╭╰│╮╯") {
@@ -265,7 +263,6 @@ func measureBoxAround(frame, marker string) int {
 	return -1
 }
 
-// runeIndex returns the rune-column of needle inside haystack, or -1.
 func runeIndex(haystack, needle []rune) int {
 	for i := 0; i+len(needle) <= len(haystack); i++ {
 		match := true

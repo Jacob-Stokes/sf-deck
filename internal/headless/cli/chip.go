@@ -14,10 +14,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// dispatchChip routes `sf-deck chip <verb> ...`. Each verb owns its
-// own FlagSet so the help text + flag set is local to the command —
-// matches how cobra-shaped CLIs feel even though we hand-roll the
-// parser.
 func dispatchChip(a *app.App, args Args, stdout io.Writer, mode headless.WriteMode) int {
 	verb := args.Verb
 	if verb == "" {
@@ -45,9 +41,6 @@ func dispatchChip(a *app.App, args Args, stdout io.Writer, mode headless.WriteMo
 	return headless.ExitCodeFor(r)
 }
 
-// chipDataPath returns the settings.toml absolute path for inclusion
-// in the response. Empty on lookup failure — falling back to omitting
-// the field is fine since callers can derive it themselves.
 func chipDataPath() string {
 	p, err := settings.Path()
 	if err != nil {
@@ -152,8 +145,6 @@ func chipUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.Write
 			errors.New("--domain and --id are required"), stdout, mode)
 	}
 	in := chips.UpdateInput{}
-	// Partial-update semantics: only flags the user actually passed
-	// take effect. flag.Visit walks just the touched flags.
 	visited := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { visited[f.Name] = true })
 	if visited["label"] {
@@ -311,9 +302,6 @@ func chipColumns(a *app.App, rest []string, stdout io.Writer, mode headless.Writ
 	return headless.ExitCodeFor(r)
 }
 
-// writeChipErr maps chip service errors → typed headless errors. Each
-// service-error shape gets its own headless error code so script
-// consumers can branch on .error.code instead of substring-matching.
 func writeChipErr(command string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	var notFound chips.ErrNotFound
 	if errors.As(err, &notFound) {
@@ -324,8 +312,6 @@ func writeChipErr(command string, err error, stdout io.Writer, mode headless.Wri
 	}
 	var dup chips.ErrAlreadyExists
 	if errors.As(err, &dup) {
-		// Already-exists is a caller mistake (used create instead of
-		// update). Maps to invalid_argument so scripts exit 2.
 		r := headless.Fail(command, "", headless.ErrInvalidArgument, err.Error(),
 			map[string]any{"domain": dup.Domain, "id": dup.ID})
 		_ = r.Write(stdout, mode)

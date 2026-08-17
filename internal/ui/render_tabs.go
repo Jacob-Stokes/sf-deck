@@ -1,13 +1,5 @@
 package ui
 
-// Top-level tab bar rendering.
-//
-// The strip sits between renderHeader (logo + org pill + breadcrumb)
-// and the body panes, replacing the old bottom-status-bar tab
-// switcher. Each tab renders as a bordered pill with its nav number
-// baked into the label ("1 home", "2 soql", …) so the 1-9 key
-// contract is self-documenting without a separate legend row.
-
 import (
 	"strings"
 
@@ -60,7 +52,6 @@ func (m Model) buildTabBarPills() (pills []renderedPill, activeIdx int, tabBySlo
 	}
 	activeStem := m.stemForTab(m.tab())
 	activeIdx = -1
-	// Slot 1-8: the user's pinned tabs.
 	for i, v := range views {
 		if i >= 8 || i >= len(viewKeys) {
 			break
@@ -130,25 +121,13 @@ func (m Model) renderTabBar(width int) (string, []*lipgloss.Layer) {
 	return fitTabRowWithRightLayers(pills, activeIdx, rightPill, rightLayers, width)
 }
 
-// renderRightNavPills builds the right-aligned cluster of nav pills.
-// Order (left-to-right within the cluster): loaded-project pill (if a
-// project is loaded), Dev Projects pill, settings pill. The settings
-// pill stays right-most since it's always-present and matches the
-// historic visual landmark.
 func (m Model) renderRightNavPills() (string, []*lipgloss.Layer) {
 	var pills []renderedPill
 
-	// Active-stem highlight: when the user IS on the corresponding tab
-	// the pill renders with the same active style as a numbered pill.
 	activeStem := m.stemForTab(m.tab())
 
-	// `_ <project-name>` pill — only when a project is loaded AND
-	// the user has at least one org (no scope without an org).
 	if scope := m.activeScope(); scope.Loaded() {
 		label := firstPretty(Keys.LoadOrgProject) + " " + scope.ProjectName
-		// Active when on the dev-project detail tab AND the drilled-in
-		// project matches the loaded one (most common case — opening
-		// via the pill drills exactly that).
 		active := false
 		if m.tab() == TabDevProjectDetail {
 			if d := m.activeOrgData(); d != nil && d.LoadedDevProjectID == m.devProjectCur {
@@ -161,7 +140,6 @@ func (m Model) renderRightNavPills() (string, []*lipgloss.Layer) {
 		})
 	}
 
-	// `- Dev Projects` pill — always present.
 	devLabel := firstPretty(Keys.OpenDevProjects) + " Dev Projects"
 	devActive := activeStem == TabDevProjects
 	pills = append(pills, renderedPill{
@@ -169,7 +147,6 @@ func (m Model) renderRightNavPills() (string, []*lipgloss.Layer) {
 		id:   zoneNavDevProjects,
 	})
 
-	// `# Tags` pill — always present. Opens the tag manager.
 	tagsLabel := firstPretty(Keys.OpenTags) + " Tags"
 	tagsActive := activeStem == TabTags
 	pills = append(pills, renderedPill{
@@ -213,10 +190,6 @@ func (m Model) renderLeftTabBar(width int) (string, []*lipgloss.Layer) {
 	return fitTabRowLayers(pills, activeIdx, width)
 }
 
-// joinPillsHorizontal lays the pills out side-by-side with no gap so
-// they read as one block. Each pill is multi-line (rounded border)
-// and lipgloss handles the alignment. Returns "" for empty input so
-// fitTabRowWithRight's "no right pill" path fires cleanly.
 func joinPillsHorizontal(pills []string) string {
 	if len(pills) == 0 {
 		return ""
@@ -242,9 +215,6 @@ func joinPillsHorizontalLayers(pills []renderedPill) (string, []*lipgloss.Layer)
 	return joinPillsHorizontal(texts), layers
 }
 
-// renderTabPill draws one tab cell. All pills use a full rounded
-// border; the active tab pops via BorderHi + bold bright text, while
-// inactive tabs use muted border + muted foreground.
 func renderTabPill(label string, active bool) string {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -296,17 +266,12 @@ func (m Model) visiblePinnedTabs() map[Tab]bool {
 	// edge gutters and the optional left rail, so strip and More agree.
 	width := m.mainTabBarWidth()
 	if width <= 0 {
-		// No width yet (very first frame); assume everything fits.
 		out := map[Tab]bool{}
 		for _, v := range TabsForNumbers() {
 			out[v] = true
 		}
 		return out
 	}
-	// Build the EXACT pill list the renderer fits, and apply the SAME
-	// right-cluster budget rule as fitTabRowWithRightLayers — so a tab
-	// this reports as hidden is exactly a tab renderTabBar dropped, and
-	// the 0 More… picker offers it.
 	pills, activeIdx, tabBySlot := m.buildTabBarPills()
 	rightPill, _ := m.renderRightNavPills()
 	budget := tabRowLeftBudget(width, lipgloss.Width(rightPill))
@@ -396,7 +361,6 @@ func fitTabRowLayers(pills []renderedPill, activeIdx, width int) (string, []*lip
 	// row reads left-to-right as authored: pinned slots first, then
 	// the overflow cluster on the right.
 	keep := tabRowKeep(pills, activeIdx, width)
-	// Collect in original order.
 	kept := pills[:0:0]
 	for i, p := range pills {
 		if keep[i] {
@@ -415,7 +379,6 @@ func fitTabRowLayers(pills []renderedPill, activeIdx, width int) (string, []*lip
 		x += lipgloss.Width(pill.text)
 	}
 	joined := lipgloss.JoinHorizontal(lipgloss.Top, keptTexts...)
-	// Pad each line to exactly `width`.
 	lines := strings.Split(joined, "\n")
 	for i, ln := range lines {
 		w := lipgloss.Width(ln)
@@ -440,20 +403,15 @@ func fitTabRowWithRightLayers(
 	}
 	rightW := lipgloss.Width(rightPill)
 	if rightW >= width {
-		// Degenerate: right pill alone fills the row. Drop it.
 		return fitTabRowLayers(pills, activeIdx, width)
 	}
 	leftWidth := width - rightW
 	leftBlock, layers := fitTabRowLayers(pills, activeIdx, leftWidth)
 	if leftBlock == "" {
-		// No numbered pills fit; pad blanks on the left.
 		leftBlock = strings.Repeat(" ", leftWidth)
 	}
-	// Join line-by-line so multi-row borders line up.
 	leftLines := strings.Split(leftBlock, "\n")
 	rightLines := strings.Split(rightPill, "\n")
-	// Pad the shorter side vertically with blank lines of the right
-	// visual width so JoinHorizontal lays out cleanly.
 	for len(rightLines) < len(leftLines) {
 		rightLines = append(rightLines, strings.Repeat(" ", rightW))
 	}
@@ -463,7 +421,6 @@ func fitTabRowWithRightLayers(
 	out := make([]string, len(leftLines))
 	for i := range leftLines {
 		lw := lipgloss.Width(leftLines[i])
-		// Pad left line to exactly leftWidth then append the right pill line.
 		if lw < leftWidth {
 			leftLines[i] += strings.Repeat(" ", leftWidth-lw)
 		} else if lw > leftWidth {

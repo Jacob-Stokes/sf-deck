@@ -1,20 +1,5 @@
 package ui
 
-// Status bar in-flight export indicator.
-//
-// While at least one export is in flight, the left side of the status
-// bar shows a compact progress sentence the user can read across tab
-// switches. Examples:
-//
-//   · downloading "Freight Audit Report"… 14s
-//   · post-processing "Freight Audit Report"… 32s
-//   · 2 exports in progress…
-//
-// The animated ellipsis cycles through ".", "..", "..." so the user
-// has visual confirmation that the TUI hasn't hung. The exportActivity
-// frame counter (incremented by exportActivityTickMsg every 500ms)
-// drives the animation.
-
 import (
 	"fmt"
 	"github.com/charmbracelet/x/ansi"
@@ -25,9 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderExportActivity returns the left-side activity badge for the
-// status bar, or "" when nothing is running. Designed to fit in
-// roughly half the status bar; longer report names get truncated.
 func (m Model) renderExportActivity() string {
 	if m.exports == nil {
 		return ""
@@ -53,19 +35,11 @@ func (m Model) renderExportActivity() string {
 	return decorateActivity(body, m.width/2)
 }
 
-// decorateActivity wraps the activity text in a yellow dot + theme
-// styling, then truncates to budget. The leading "· " mirrors how the
-// rest of the bar uses dots as soft separators.
 func decorateActivity(body string, budget int) string {
 	dot := lipgloss.NewStyle().Foreground(theme.Yellow).Background(theme.Panel).Render("· ")
 	text := lipgloss.NewStyle().Foreground(theme.Fg).Background(theme.Panel).Render(body)
 	out := dot + text
-	// Truncate naively if the body is wider than allowed. ansi.Truncate
-	// could be used for stricter handling; this is good enough for the
-	// short strings the badge produces.
 	if budget > 0 && lipgloss.Width(out) > budget {
-		// Strip styling for the fallback measurement; the recompose is
-		// "· " + truncated text.
 		max := budget - 2
 		if max < 1 {
 			max = 1
@@ -79,8 +53,6 @@ func decorateActivity(body string, budget int) string {
 	return out
 }
 
-// exportActivityDots cycles 0→".", 1→"..", 2→"...", 3→"" so the
-// trailing ellipsis appears to chase itself.
 func exportActivityDots(frame int) string {
 	switch frame % 4 {
 	case 0:
@@ -93,9 +65,6 @@ func exportActivityDots(frame int) string {
 	return ""
 }
 
-// exportElapsed renders how long an export has been running. Sub-
-// second is "0s" so the cell width stays stable; minutes use "m:ss"
-// shape so a 2-minute export reads "2m05s" not the awkward "125s".
 func exportElapsed(start time.Time) string {
 	d := time.Since(start)
 	if d < time.Second {
@@ -109,8 +78,6 @@ func exportElapsed(start time.Time) string {
 	return fmt.Sprintf("%dm%02ds", mins, secs)
 }
 
-// exportPhaseLabel returns the user-facing label for a phase. Used by
-// the modal + /home subtab; status bar uses j.Phase directly.
 func exportPhaseLabel(p exportPhase) string {
 	switch p {
 	case exportPhaseQueued:
@@ -133,8 +100,6 @@ func exportPhaseLabel(p exportPhase) string {
 	return string(p)
 }
 
-// formatExportDuration renders started→finished as a human duration.
-// Used in history rows ("2m04s") and tooltip-style hints.
 func formatExportDuration(j *exportJob) string {
 	end := j.FinishedAt
 	if end.IsZero() {
@@ -152,7 +117,6 @@ func formatExportDuration(j *exportJob) string {
 	return fmt.Sprintf("%dm%02ds", mins, secs)
 }
 
-// exportSize renders bytes as a short human string ("1.4 MB").
 func exportSize(n int64) string {
 	if n <= 0 {
 		return "—"

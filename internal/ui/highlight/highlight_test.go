@@ -26,8 +26,6 @@ func TestHighlightApex(t *testing.T) {
 	if !strings.Contains(combined, "\x1b[") {
 		t.Fatalf("expected ANSI escape sequences in highlighted output, got plain text")
 	}
-	// Sanity: source content is preserved (escapes added, characters
-	// not lost). Strip ANSI then compare.
 	stripped := stripANSI(combined)
 	if !strings.Contains(stripped, "trigger MyTrigger on Account") {
 		t.Fatalf("source text lost during highlighting; stripped output:\n%s", stripped)
@@ -84,16 +82,11 @@ func TestHighlightCaches(t *testing.T) {
 	if len(a) != len(b) {
 		t.Fatalf("cached output mismatch: %d vs %d", len(a), len(b))
 	}
-	// The cached slice is shared — &a[0] should equal &b[0]. If the
-	// cache ever stops working, the slices will be re-allocated and
-	// the addresses differ.
 	if &a[0] != &b[0] {
 		t.Fatalf("cache miss on repeat call — got fresh slice each time")
 	}
 }
 
-// stripANSI is a tiny helper for tests; not exported. Removes all
-// CSI sequences (escape + bracket + … + final byte in @-~).
 func stripANSI(s string) string {
 	var out strings.Builder
 	out.Grow(len(s))
@@ -103,7 +96,6 @@ func stripANSI(s string) string {
 			i++
 			continue
 		}
-		// Skip until final byte (0x40-0x7E).
 		j := i + 2
 		for j < len(s) {
 			b := s[j]

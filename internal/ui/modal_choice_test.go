@@ -27,7 +27,6 @@ func TestChoiceModalCursorSkipsHeadings(t *testing.T) {
 	if cm.Cursor != 0 {
 		t.Fatalf("up over heading: cursor = %d, want 0", cm.Cursor)
 	}
-	// Heading at the top edge: skip bounces downward.
 	cm2 := &choiceModalState{
 		Options: []choiceOption{
 			{Label: "── pinned ──", Heading: true},

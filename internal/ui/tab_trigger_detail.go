@@ -1,14 +1,5 @@
 package ui
 
-// TabTriggerDetail — full-pane view of a single ApexTrigger. Drill
-// from the Triggers subtab's list (enter on a row).
-//
-// Main pane: a navigable STATUS row (toggle) + the scrollable Apex
-// BODY + a DANGER ZONE delete row. Tab swaps the row cursor ↔ the body
-// scroll. The right sidebar is INFO-ONLY. The Body is rendered with
-// light line numbers + chroma syntax highlighting (Java lexer — Apex
-// is ~95% Java syntactically and chroma ships no dedicated Apex lexer).
-
 import (
 	"fmt"
 	"strings"
@@ -33,9 +24,6 @@ func (m *Model) triggerDetailDrill(sobject, id string, returnTab Tab) tea.Cmd {
 	d.DescribeCur = sobject
 	d.Triggers.DrillID = id
 	m.triggerActionCur = 0
-	// Start with the row cursor active (not the body scroll) so the
-	// status / edit / delete rows are immediately navigable. Tab swaps
-	// to body-scroll for reading the Apex source.
 	m.bodyFocus = false
 	if returnTab != TabTriggerDetail {
 		m.triggerDetailReturnTab = returnTab
@@ -54,20 +42,12 @@ func (m Model) triggerDetailBackTab() Tab {
 	return TabObjectDetail
 }
 
-// Trigger action indices — track triggerActionsFor's order.
 const (
 	trgActToggleStatus = 0
 	trgActEditBody     = 1
 	trgActDelete       = 2
 )
 
-// renderTriggerDetail is the main-pane renderer for TabTriggerDetail.
-//
-// Layout (top → bottom): a navigable STATUS row (toggle), a navigable
-// "edit body" affordance, the scrollable Apex BODY, then a DANGER ZONE
-// delete row. The three action rows take the cursor when bodyFocus is
-// false; when bodyFocus is true the arrows scroll the BODY instead
-// (Tab swaps). The right sidebar is INFO-ONLY.
 func (m Model) renderTriggerDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -91,9 +71,6 @@ func (m Model) renderTriggerDetail(w, innerH int) string {
 	}
 	det := r.Value()
 
-	// Navigable action rows live in a small detailRow set; the BODY +
-	// header render between them. We track which navigable index the
-	// cursor is on (only meaningful when !bodyFocus).
 	curNav := m.triggerActionCur
 	navCount := 3 // status, edit body, delete
 	if curNav < 0 {
@@ -124,7 +101,6 @@ func (m Model) renderTriggerDetail(w, innerH int) string {
 		lines = append(lines, "")
 	}
 
-	// STATUS row (navigable index 0).
 	statusRow := detailRow{
 		Text: kvLine("status", statusTxt, inner), Navigable: true,
 		ActionIdx: trgActToggleStatus,
@@ -132,7 +108,6 @@ func (m Model) renderTriggerDetail(w, innerH int) string {
 	lines = append(lines, renderDetailLine(statusRow, rowActive && curNav == 0, rowActive, inner))
 	lines = append(lines, "")
 
-	// BODY header + the "edit body" affordance (navigable index 1).
 	bodyHint := "  (tab to scroll · ↵ edit · / find)"
 	if m.bodyFocus {
 		bodyHint = "  (focused — tab to actions · ↵ edit · / find)"
@@ -143,7 +118,6 @@ func (m Model) renderTriggerDetail(w, innerH int) string {
 	}
 	lines = append(lines, renderDetailLine(editBodyRow, rowActive && curNav == 1, rowActive, inner))
 
-	// Reserve space for the danger row (blank + title + row = 3 lines).
 	bodyHeight := innerH - len(lines) - 3
 	if bodyHeight < 1 {
 		bodyHeight = 1
@@ -158,7 +132,6 @@ func (m Model) renderTriggerDetail(w, innerH int) string {
 	})
 	lines = append(lines, bodyView...)
 
-	// DANGER ZONE delete (navigable index 2).
 	lines = append(lines, "")
 	lines = append(lines, redLine("DANGER ZONE"))
 	deleteRow := detailRow{
@@ -170,8 +143,6 @@ func (m Model) renderTriggerDetail(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// triggerNavActionForCursor maps the trigger row cursor (0..2) to its
-// action index. All three navigable rows map 1:1 to actions.
 func triggerNavActionForCursor(cur int) (int, bool) {
 	switch cur {
 	case 0:
@@ -201,9 +172,6 @@ func lineCount(s string) int {
 	return strings.Count(s, "\n") + 1
 }
 
-// sidebarTriggerActions renders the TabTriggerDetail right-side panel
-// — a context panel for the cursored row (or the body, when the body
-// scroll is focused).
 func (m Model) sidebarTriggerActions(inner int) string {
 	ctx := m.triggerRowContext()
 	ctx.Hints = append([]string{firstPretty(Keys.NextSubtab) + " body/rows"}, detailNavHints(true)...)
@@ -214,7 +182,6 @@ func (m Model) triggerRowContext() rowContext {
 	rows := RegistryRows(m, triggerRegistry)
 	det, haveDet := m.currentTriggerDetail()
 
-	// Body focused — describe scrolling + the edit affordance.
 	if m.bodyFocus {
 		ctx := rowContext{
 			Heading: "Apex body",

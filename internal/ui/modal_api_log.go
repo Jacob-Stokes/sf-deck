@@ -4,10 +4,6 @@ package ui
 // the TUI has fired in this session, newest at the top. Diagnostic
 // aid for "why is my API counter going up" questions; the ring buffer
 // lives in-memory on the usage tracker (NOT persisted).
-//
-// The existing infoModal is reused verbatim: packs every call into a
-// row, renders on top of the current screen. infoModal dismisses on
-// any key so the panel is inherently read-only.
 
 import (
 	"fmt"
@@ -15,7 +11,6 @@ import (
 	"time"
 )
 
-// openAPILogModal builds + shows the recent-calls info modal.
 func (m *Model) openAPILogModal() {
 	state := infoModalState{
 		Title: apiLogTitle(),
@@ -60,8 +55,6 @@ func (m *Model) openAPILogModal() {
 	m.showInfoModal(state)
 }
 
-// apiLogTitle pulls today's totals into the title so the user doesn't
-// have to cross-reference with the header.
 func apiLogTitle() string {
 	if Usage == nil {
 		return "API Call Log"
@@ -69,9 +62,6 @@ func apiLogTitle() string {
 	return fmt.Sprintf("API Call Log  ·  today: %d", Usage.Today())
 }
 
-// formatAgo renders "just now" / "3s ago" / "2m ago" / "14:32" so the
-// left column of the modal reads naturally. Over 1h old falls back to
-// a clock time since relative numbers stop being useful.
 func formatAgo(now, t time.Time) string {
 	d := now.Sub(t)
 	switch {
@@ -85,13 +75,6 @@ func formatAgo(now, t time.Time) string {
 	return t.Format("15:04:05")
 }
 
-// formatCall renders the call's argv + outcome on one line. REST calls
-// (OK/err from doOnce) arrive as ["GET", "/path"] or ["POST", "/path"];
-// CLI calls arrive as the raw sf argv. Both read well as "cmd arg1…".
-//
-// When a Caller attribution tag is present it leads the row in square
-// brackets ("[sf.fetchHome] …") so the API audit reads as "which
-// fetcher caused this" at a glance.
 func formatCall(c UsageCall) string {
 	var b strings.Builder
 	if !c.OK {

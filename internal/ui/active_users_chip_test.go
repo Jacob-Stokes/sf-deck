@@ -33,7 +33,6 @@ func TestActiveUsersChipPredicates(t *testing.T) {
 	if match("api", sf.ActiveUserRow{IsAPI: false}) {
 		t.Error("api should not match a UI row")
 	}
-	// "all" has an empty Where — matches everything.
 	if !match("all", sf.ActiveUserRow{}) {
 		t.Error("all should match any row")
 	}

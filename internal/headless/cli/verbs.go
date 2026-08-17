@@ -61,9 +61,6 @@ func verbsList(rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	return headless.ExitCodeFor(r)
 }
 
-// verbsToJSON projects Specs into a JSON-friendly shape. Bindings
-// become nested objects when non-nil, omitted when nil — so JSON
-// consumers can ask "is X on IPC?" by checking for key presence.
 func verbsToJSON(specs []verbs.Spec) []map[string]any {
 	out := make([]map[string]any, 0, len(specs))
 	for _, s := range specs {

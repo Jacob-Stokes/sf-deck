@@ -1,28 +1,5 @@
 package ui
 
-// community_login.go — UI glue that turns "this is a Contact row + the
-// org has Live Experience Cloud sites" into a single ^O menu entry
-// ("Log in to community as user", shortcut `c`) that opens a
-// searchable network picker. Picking a network builds the
-// /servlet/servlet.su URL and routes through the same open-in-browser
-// path as the rest of the open menu.
-//
-// Two queries gate the menu entry:
-//
-//   1. Is there an active community User for this Contact?
-//      (cheap one-row SOQL, memoised on d.CommunityUserByContact.
-//      Runs synchronously the first time a contact appears in the
-//      open menu so the entry shows up immediately.)
-//   2. Which Live networks (Experience sites) exist?
-//      (cached on d.Networks; fetched synchronously on first contact-
-//      ^O of the session so the picker has rows on first invocation.)
-//
-// Membership of the user in each Network isn't checked up-front —
-// that would mean a NetworkMember query per render. Show all Live
-// networks, let servlet.su return SF's "not a member" page if the
-// user picks the wrong one. Upgrade to strict filtering if it proves
-// annoying in practice.
-
 import (
 	"strings"
 
@@ -69,22 +46,14 @@ func (m Model) contactCommunityLoginTargets(rec map[string]any, o sf.Org) []sf.O
 	if d == nil {
 		return nil
 	}
-	// Resolve the ContactId to look up the community user against.
-	//   - Contact row:        the row id IS the contact id.
-	//   - Person Account row: the community User links to the account's
-	//     implicit PersonContactId, so resolve that first. This is what
-	//     makes login-as work in person-account orgs, not just Contacts.
 	contactID := ""
 	switch sobj {
 	case "Contact":
 		contactID = id
 	case "Account":
-		// Prefer a PersonContactId already on the record; else look up.
 		if pc, ok := rec["PersonContactId"].(string); ok && pc != "" {
 			contactID = pc
 		} else if pc, known := d.CommunityUserByContact["acct:"+id]; known {
-			// Cached account→personContact resolution (empty = not a
-			// person account / no person contact).
 			contactID = pc
 		} else {
 			pc, err := sf.PersonContactID(targetArg(o), id)
@@ -116,9 +85,6 @@ func (m Model) contactCommunityLoginTargets(rec map[string]any, o sf.Org) []sf.O
 		return nil
 	}
 	if d.Networks.FetchedAt().IsZero() {
-		// First Contact-^O of the session: do the network SOQL
-		// synchronously so the menu has the entry on first paint.
-		// ~200ms one-shot; cached for the rest of the session.
 		nets, err := sf.ListNetworks(targetArg(o))
 		if err != nil {
 			return nil
@@ -135,8 +101,6 @@ func (m Model) contactCommunityLoginTargets(rec map[string]any, o sf.Org) []sf.O
 		ID:       communityLoginPickerTargetID,
 		Label:    "Log in to community as user",
 		Shortcut: "c",
-		// No Path / AbsoluteURL — fireMenuTarget intercepts this ID
-		// before either is consulted.
 	}}
 }
 
@@ -158,9 +122,6 @@ func (m *Model) openCommunityLoginPicker(o sf.Org, rec map[string]any) tea.Cmd {
 	if d == nil {
 		return nil
 	}
-	// Resolve the ContactId (Person Account → PersonContactId), mirroring
-	// contactCommunityLoginTargets. The values were memoised there when
-	// the menu entry was offered, so these are O(1) hits.
 	contactID := ""
 	switch sobj {
 	case "Contact":
@@ -246,8 +207,6 @@ func (m *Model) openCommunityLoginPicker(o sf.Org, rec map[string]any) tea.Cmd {
 	})
 }
 
-// contactDisplayName picks a sensible label for a contact row.
-// Prefers Name, falls back to the Id.
 func contactDisplayName(rec map[string]any) string {
 	if s, ok := rec["Name"].(string); ok && s != "" {
 		return s

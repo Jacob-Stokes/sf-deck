@@ -66,8 +66,6 @@ func (m Model) renderCodeView(d *orgData, spec codeViewSpec) []string {
 	total := len(lines)
 	gutterW := len(fmt.Sprintf("%d", total))
 
-	// Record what this paint shows so the find / hscroll key handlers
-	// act on exactly the on-screen body (gated by tab+subtab match).
 	var findState *codeFindState
 	var findMatches []codeMatch
 	if spec.BodyID != "" {
@@ -81,7 +79,6 @@ func (m Model) renderCodeView(d *orgData, spec codeViewSpec) []string {
 	findVisible := findState != nil && (findState.Active || findState.Buffer != "")
 	findBar := ""
 	if findVisible {
-		// The bar consumes the first row of the body budget.
 		findBar = renderCodeFindBar(findState, len(findMatches), spec.Inner)
 		spec.Height--
 		if spec.Height <= 0 {
@@ -93,8 +90,6 @@ func (m Model) renderCodeView(d *orgData, spec codeViewSpec) []string {
 		hscroll = d.BodyHScroll[spec.BodyID]
 	}
 
-	// Resolve cursor + scroll. Body-cursor steers the highlight ring
-	// AND drives auto-scroll (cursor stays inside the visible window).
 	cursor, scroll := 0, 0
 	if spec.BodyID != "" {
 		if c, ok := d.BodyCursor[spec.BodyID]; ok {
@@ -126,8 +121,6 @@ func (m Model) renderCodeView(d *orgData, spec codeViewSpec) []string {
 	if scroll < 0 {
 		scroll = 0
 	}
-	// Persist resolved values so a no-key paint still self-corrects
-	// the stored state (e.g. if the body shrank under our feet).
 	if spec.BodyID != "" {
 		if d.BodyCursor == nil {
 			d.BodyCursor = map[string]int{}
@@ -143,8 +136,6 @@ func (m Model) renderCodeView(d *orgData, spec codeViewSpec) []string {
 	cursorBg := theme.BorderHi
 	cursorLineBg := theme.Panel
 	if !spec.Focused {
-		// Body doesn't own focus — render a quieter cursor so it's
-		// clear j / k will steer the action sidebar instead.
 		cursorBg = theme.Border
 		cursorLineBg = theme.BgAlt
 	}
@@ -183,8 +174,6 @@ func (m Model) renderCodeView(d *orgData, spec codeViewSpec) []string {
 			}
 		}
 		if hscroll > 0 {
-			// Shift only the body — the gutter stays put. The "…"
-			// prefix marks a horizontally scrolled view.
 			body = ansi.TruncateLeft(body, hscroll, "…")
 		}
 		if i == cursor && !lineHasMatch {

@@ -12,27 +12,8 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// Chip strip for the /records / Object-drill Records subtab.
-//
-// Two modes coexist on the same surface (toggled by the chip-mode
-// switch keybinding):
-//
-//   ChipModeLocal      chips come from the unified qchip registry —
-//                      built-in chips + user-saved ones in settings.
-//   ChipModeSalesforce chips are the org's own ListView records,
-//                      fetched via /sobjects/<X>/listviews and
-//                      cached in d.ListViewsPerSObject.
-//
-// Chip IDs:
-//   ChipModeLocal       a qchip.Chip.ID, e.g. "recent" / "today"
-//   ChipModeSalesforce  a Salesforce ListView Id, e.g. "00BDM00000TEST1"
-
-// syntheticRecentID is the canonical "always-shipped" chip id. Kept
-// as a constant for places that need to special-case the default.
 const syntheticRecentID = "recent"
 
-// currentChipMode returns the active mode for sobject, defaulting to
-// ChipModeLocal so first-visit users see sf-deck chips.
 func currentChipMode(d *orgData, sobject string) ChipMode {
 	if d == nil {
 		return ChipModeLocal
@@ -40,9 +21,6 @@ func currentChipMode(d *orgData, sobject string) ChipMode {
 	return d.ChipMode[sobject]
 }
 
-// setChipMode persists the mode for sobject + clears the chip
-// selection so a stale id from the other mode doesn't survive the
-// switch.
 func setChipMode(d *orgData, sobject string, mode ChipMode) {
 	if d == nil {
 		return
@@ -84,10 +62,6 @@ func (m Model) activeRecordsSObject() (*orgData, string) {
 //
 // No-op on tabs that don't participate.
 func (m Model) toggleChipMode() (Model, tea.Cmd) {
-	// /home → Recent: flips d.HomeRecentMode between sf-deck local
-	// log and Salesforce RecentlyViewed.  Kicks the SF fetch when
-	// flipping into Salesforce mode so the list isn't empty on
-	// first switch.
 	if m.tab() == TabHome && m.currentSubtab() == SubtabHomeRecent {
 		d := m.activeOrgData()
 		if d == nil {
@@ -96,10 +70,6 @@ func (m Model) toggleChipMode() (Model, tea.Cmd) {
 		if d.HomeRecentMode == ChipModeLocal {
 			d.HomeRecentMode = ChipModeSalesforce
 			m.flash("source: Salesforce RecentlyViewed")
-			// Re-apply chip predicate to the newly-active list so the
-			// "All" chip's listview filter actually fires on the SF
-			// list.  Without this, switching modes leaves the SF list
-			// with no Extra set and the user sees raw unfiltered rows.
 			m.applySelectedChipMatcher(d)
 			return m, d.RecentlyViewed.Ensure(m.cache)
 		}
@@ -122,8 +92,6 @@ func (m Model) toggleChipMode() (Model, tea.Cmd) {
 	return m, m.onTabChanged()
 }
 
-// recordsChips builds the chip strip for the active mode. Local pulls
-// from the unified registry; Salesforce pulls from cached SF list views.
 func recordsChips(m Model, d *orgData, sobject string) []chipRow {
 	if currentChipMode(d, sobject) == ChipModeSalesforce {
 		return salesforceListViewChips(d, sobject)
@@ -190,24 +158,11 @@ func salesforceListViewChips(d *orgData, sobject string) []chipRow {
 // /sobjects/<X>/listviews/<id>/results.
 const sfRecentlyViewedChipID = "__sf_recent__"
 
-// selectedRecordsChip returns the currently-selected chip's id for
-// the given sObject + active mode. Falls back to the first chip in
-// the active mode's list — the registry default ("recent") for
-// local, the first Salesforce list-view id for Salesforce mode.
-//
-// Returns "" when Salesforce mode is active but the list-view
-// catalog hasn't loaded yet — the renderer treats that as "loading…".
 func selectedRecordsChip(d *orgData, sobject string) string {
 	if id, ok := d.ListViewCur[sobject]; ok && id != "" {
 		return id
 	}
 	if currentChipMode(d, sobject) == ChipModeSalesforce {
-		// Default to the synthetic Recently Viewed chip — works for
-		// every sObject (standard or custom) by querying the
-		// RecentlyViewed system table directly rather than relying on
-		// SF auto-creating a per-sObject "RecentlyViewed<X>" list
-		// view (which doesn't exist for custom objects).  Matches the
-		// local-mode default of recentlyViewedChipID.
 		return sfRecentlyViewedChipID
 	}
 	// Default on first visit: Recently viewed.  Matches the chip
@@ -222,8 +177,6 @@ func selectedRecordsChip(d *orgData, sobject string) string {
 	return recentlyViewedChipID
 }
 
-// findChipIndex returns the index of the chip with the given ID, or 0
-// if not found (fallback to first chip).
 func findChipIndex(chips []chipRow, id string) int {
 	for i, c := range chips {
 		if c.ID == id {
@@ -233,8 +186,6 @@ func findChipIndex(chips []chipRow, id string) int {
 	return 0
 }
 
-// findListView returns the ListView metadata row for a given ID in the
-// cached list, if present.
 func findListView(d *orgData, sobject, id string) (sf.ListView, bool) {
 	r, ok := d.ListViewsPerSObject[sobject]
 	if !ok || r.FetchedAt().IsZero() {
@@ -261,12 +212,6 @@ func currentRecordsResource(d *orgData, sobject string) *Resource[sf.RecordsList
 	}
 	selected := selectedRecordsChip(d, sobject)
 	if currentChipMode(d, sobject) == ChipModeSalesforce {
-		// SF mode normally routes through d.ListViewResults (rendered
-		// by renderListViewResult).  The synthetic SF Recently Viewed
-		// chip is an exception — it produces records via
-		// EnsureChipRecords (SOQL `Id IN (visited-ids)`) which lands
-		// in d.ChipRecords, same as local-mode chips.  So look it up
-		// there before falling back to nil.
 		if selected == sfRecentlyViewedChipID {
 			if r, ok := d.ChipRecords[sobject+":"+selected]; ok {
 				return r
@@ -285,10 +230,6 @@ func currentRecordsResource(d *orgData, sobject string) *Resource[sf.RecordsList
 	return nil
 }
 
-// activeChipBusy reports whether the resource currently driving the
-// on-screen records is fetching. Mirrors activeChipRefreshCmd's
-// resolution rules so the header label tracks what `r` actually
-// triggers.
 func activeChipBusy(d *orgData, sobject string) bool {
 	if d == nil || sobject == "" {
 		return false
@@ -296,8 +237,6 @@ func activeChipBusy(d *orgData, sobject string) bool {
 	if currentChipMode(d, sobject) == ChipModeSalesforce {
 		selected := selectedRecordsChip(d, sobject)
 		if selected == sfRecentlyViewedChipID {
-			// Synthetic chip routes through d.ChipRecords (see
-			// currentRecordsResource for the same branch).
 			if rv := d.RecentlyViewedPerSObject[sobject]; rv != nil && rv.Busy() {
 				return true
 			}
@@ -318,14 +257,6 @@ func activeChipBusy(d *orgData, sobject string) bool {
 	return false
 }
 
-// activeChipRefreshCmd returns the refresh command for whichever
-// resource is currently driving the on-screen records — the chip's
-// records list (local mode) or the SF list-view result (SF mode).
-// Returns nil when nothing's been wired up yet (first paint, etc).
-//
-// Used by `r` so refresh re-pulls *only* what's on screen — no piggy-
-// backed sObject-list or describe re-fetches that have nothing to do
-// with the data the user is staring at.
 func (m Model) activeChipRefreshCmd(d *orgData, sobject string) tea.Cmd {
 	if d == nil || sobject == "" {
 		return nil
@@ -352,12 +283,6 @@ func (m Model) activeChipRefreshCmd(d *orgData, sobject string) tea.Cmd {
 	return nil
 }
 
-// currentRecordRowCount returns the number of rows the currently-
-// selected chip would show *after the user's search filter* — used by
-// moveCursor + cursorOpenable so they bound the cursor to the rows
-// actually on screen. Salesforce-mode list views aren't searched
-// client-side yet (their filtering lives in the SF list-view def);
-// only sf-deck-chip mode honours the search buffer here.
 func currentRecordRowCount(d *orgData, sobject string) int {
 	visible, _ := visibleRecordsAndIdx(d, sobject)
 	return len(visible)
@@ -404,11 +329,6 @@ type recordsVisibleEntry struct {
 // and entries are cheap (two slice headers + two ints per entry).
 type visibleRecordsCache map[string]*recordsVisibleEntry
 
-// visibleRecordsAndIdx returns the current visible record set plus the
-// parallel slice of unfiltered indices. Single source of truth for
-// "what's on screen for this (sobject, chip)" — used by the renderer,
-// cursor maths, and openable resolution. Returns (nil, nil) when
-// data isn't loaded yet.
 func visibleRecordsAndIdx(d *orgData, sobject string) ([]map[string]any, []int) {
 	if currentChipMode(d, sobject) == ChipModeSalesforce {
 		chipID := selectedRecordsChip(d, sobject)
@@ -424,12 +344,6 @@ func visibleRecordsAndIdx(d *orgData, sobject string) ([]map[string]any, []int) 
 		}
 		if r, ok := d.ListViewResults[key]; ok {
 			recs := r.Value().Records
-			// Same memo path for SF list-view chips. cols is "" since
-			// list-view results don't go through the column-aware
-			// search filter; we still use the slice pointer + len
-			// pair as the identity key. Recency reorder doesn't
-			// apply on SF list-view chips — those rows are whatever
-			// the user's saved view returned.
 			return memoVisibleRecords(d, key, recs, nil, "", false, false)
 		}
 		return nil, nil
@@ -441,10 +355,6 @@ func visibleRecordsAndIdx(d *orgData, sobject string) ([]map[string]any, []int) 
 	v := r.Value()
 	chipID := selectedRecordsChip(d, sobject)
 	s := d.RecordsSearchPtr(sobject, chipID)
-	// Recency reorder kicks in when the synthetic Recently Viewed chip
-	// is active AND there's no column sort overriding it.  Mirrors the
-	// chipSurface-based surfaces' defaultOrder semantics: column sort
-	// always wins, recency fills in when none is set.
 	recencyOn := chipID == recentlyViewedChipID &&
 		d.RecordsTableStatePtr(sobject, chipID).SortColumn == ""
 	return memoVisibleRecords(d, sobject+":"+chipID, v.Records, recordListFields(v), s.Effective(), s.EffectiveApplied(), recencyOn)
@@ -488,18 +398,6 @@ func recordsVisibleSortDataKey(d *orgData, sobject string) string {
 	return b.String()
 }
 
-// memoVisibleRecords is the cache shim around the
-// "build (visible, visibleIdx) for these inputs" computation. Per-
-// (sobject, chipID) entry; cache hit returns the previously-built
-// pair untouched. On miss, runs filterRecords (search applied) or
-// builds an identity-index pair (no search) and stores both for
-// next call.
-//
-// The CRITICAL property: a steady-state wheel-scroll burst —
-// where the user is moving cursor through a stable record set
-// without typing or refetching — produces only cache hits. That's
-// what closes the perf gap with /objects (whose Filtered() memo
-// gives the same property).
 func memoVisibleRecords(
 	d *orgData,
 	cacheKey string,
@@ -517,11 +415,6 @@ func memoVisibleRecords(
 	}
 	rowsPtr := slicePtrAny(rows)
 	colsPtr := slicePtrStr(cols)
-	// recencyGen tracks d.recentGen at compute time so a visit (which
-	// bumps recentGen via rememberRecent / RecentlyViewed.Apply) cache-
-	// misses and triggers a re-sort.  When recencyOn is false the gen
-	// field carries 0 — value doesn't matter, the recencyOn flag handles
-	// hit/miss alone.
 	curGen := uint64(0)
 	if recencyOn {
 		curGen = d.recentGen
@@ -539,21 +432,12 @@ func memoVisibleRecords(
 	var visible []map[string]any
 	var visibleIdx []int
 	if !searchApplied {
-		// Copy rows into a fresh slice when no search is active.  Earlier
-		// versions aliased `visible = rows` which made an in-place sort
-		// (e.g. recency reorder below) mutate the resource's underlying
-		// SF result. Always own our own slice from here on.
 		visible = append([]map[string]any(nil), rows...)
 		visibleIdx = identityIdx(len(rows))
 	} else {
 		visible, visibleIdx = filterRecords(rows, cols, searchBuf)
 	}
 	if recencyOn && len(visible) > 1 {
-		// Derive the rank map from the union of local + SF recent
-		// streams — that's the user's "what have I touched recently
-		// for this sObject" intent.  Compute happens on cache miss
-		// only; subsequent reads of the cache entry are O(1) and
-		// don't touch this code.
 		rank := rankRecordsFromStream(recentUnionStream(d), sobjectFromCacheKey(cacheKey))
 		if len(rank) > 0 {
 			perm := recencyPermutation(visible, rank)
@@ -573,10 +457,6 @@ func memoVisibleRecords(
 	return visible, visibleIdx
 }
 
-// sobjectFromCacheKey extracts the sObject API name from the
-// "<sobject>:<chipID>" cacheKey shape used by memoVisibleRecords.
-// Returns the full key when no ':' is present (defensive — the SF
-// list-view branch uses the same shape).
 func sobjectFromCacheKey(cacheKey string) string {
 	for i := 0; i < len(cacheKey); i++ {
 		if cacheKey[i] == ':' {
@@ -586,10 +466,6 @@ func sobjectFromCacheKey(cacheKey string) string {
 	return cacheKey
 }
 
-// recencyPermutation returns the display→source index permutation
-// that sorts `rows` by recency rank (rank 0 = most recent at top).
-// Rows not present in `rank` sort to the end, preserving their
-// natural order among themselves (stable sort).
 func recencyPermutation(rows []map[string]any, rank map[string]int) []int {
 	const unranked = 1 << 30
 	perm := make([]int, len(rows))
@@ -637,12 +513,6 @@ func applyRecordsPerm(rows []map[string]any, idx []int, perm []int) ([]map[strin
 	return outRows, outIdx
 }
 
-// slicePtrAny / slicePtrStr return the underlying slice-header
-// pointer for cache identity. Same trick as gutter_cache.go:
-// reflect.ValueOf(slice).Pointer() is the address of slice header
-// element 0; changes whenever Set() / append-grow / refetch
-// produces a fresh backing array. Cheap O(1) compare in the cache
-// hit path.
 func slicePtrAny(s []map[string]any) uintptr {
 	if len(s) == 0 {
 		return 0
@@ -686,8 +556,6 @@ func recordsRowAdapter(d *orgData, sobject string, visible []map[string]any, vis
 		Cell:         cell,
 		VisibleToRaw: visibleIdx,
 		DataKey:      recordsVisibleSortDataKey(d, sobject),
-		// The cursor store persists plain ints; these closures are the
-		// sanctioned raw<->stored conversion seam.
 		RawCursor: func() RawRow {
 			if d == nil {
 				return 0
@@ -702,10 +570,6 @@ func recordsRowAdapter(d *orgData, sobject string, visible []map[string]any, vis
 	}
 }
 
-// recordsMoveCursor advances the cursor by delta in *display* space,
-// then translates the new visible row back to its unfiltered index
-// and saves that. So filter changes preserve cursor identity instead
-// of resetting to top.
 func recordsMoveCursor(d *orgData, sobject string, delta int) {
 	visible, visibleIdx := visibleRecordsAndIdx(d, sobject)
 	if len(visibleIdx) == 0 {
@@ -760,9 +624,6 @@ func recordsSortContext(d *orgData, sobject string, visible []map[string]any) ([
 	return projection.cols, projection.cell, state, true
 }
 
-// recordsFetchedAt / recordDetailFetchedAt resolve the /records and
-// /record drills' primary freshness stamps (extracted in the
-// registry-purity pass — see tab_registry_purity_test.go).
 func recordsFetchedAt(m Model, d *orgData) time.Time {
 	if d.RecordsSObjectCur != "" {
 		if r, ok := d.Records[d.RecordsSObjectCur]; ok {

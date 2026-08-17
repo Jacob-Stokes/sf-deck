@@ -23,14 +23,8 @@ type wheelRuntime struct {
 	// after the burst goes quiet.
 	pending int
 
-	// --- cross-surface momentum isolation (see wheelStreamGate) ---
-
-	// streamKey fingerprints the surface that OWNS the current wheel
-	// stream (tab + subtab + org + modal/popup overlay).
 	streamKey string
-	// switchAt is when a mid-stream surface change was first seen;
-	// zero when the stream owner matches the active surface.
-	switchAt time.Time
+	switchAt  time.Time
 	// gapHist is a ring of the most recent inter-event gaps,
 	// maintained on EVERY wheel event (accepted, deferred, or
 	// swallowed). Trackpad inertia decays monotonically — gaps only
@@ -44,20 +38,12 @@ type wheelRuntime struct {
 	gapIdx   int
 }
 
-// Tunables for the cross-surface gate. Derived from the 2026-06-12
-// trace session, not theory — see the wheel saga memory for the two
-// failed designs that preceded this one.
 const (
 	// wheelGateHardCap releases the gate unconditionally — longer
 	// than any observed coast (max 2.4s) so it only catches
 	// pathologies, never real input.
-	wheelGateHardCap = 2500 * time.Millisecond
-	// wheelReaccelFraction: a gap under this fraction of the rolling
-	// median (coast tail: 20-70ms) means re-acceleration.
-	wheelReaccelFraction = 0.4
-	// wheelReaccelMinMedian disables re-accel detection while the
-	// coast is still violent (median gaps under ~12ms) — user events
-	// are statistically invisible inside that firehose anyway.
+	wheelGateHardCap      = 2500 * time.Millisecond
+	wheelReaccelFraction  = 0.4
 	wheelReaccelMinMedian = 12 * time.Millisecond
 	// wheelGateAdoptQuiet is the silence required before a FOREIGN
 	// stream's next event counts as fresh deliberate input. Coast
@@ -81,8 +67,6 @@ func (w *wheelRuntime) recordGap(g time.Duration) {
 	}
 }
 
-// gapMedian returns the median of the recorded gaps (0 when fewer
-// than 3 samples — not enough signal to judge).
 func (w *wheelRuntime) gapMedian() time.Duration {
 	if w.gapCount < 3 {
 		return 0
@@ -93,10 +77,6 @@ func (w *wheelRuntime) gapMedian() time.Duration {
 	return tmp[len(tmp)/2]
 }
 
-// wheelTimings reads the per-call throttle values from settings, falling
-// back to the package defaults (80ms quiet gap, 12ms min interval).
-// Reading per-call is fine — this runs once per accepted wheel tick at
-// most, dwarfed by the actual scroll work.
 func (m Model) wheelTimings() (quietGap, minInterval time.Duration) {
 	if m.settings == nil {
 		return 80 * time.Millisecond, 12 * time.Millisecond
@@ -105,9 +85,6 @@ func (m Model) wheelTimings() (quietGap, minInterval time.Duration) {
 		time.Duration(m.settings.WheelMinIntervalMs()) * time.Millisecond
 }
 
-// wheelSurfaceKey fingerprints the surface a wheel event would
-// scroll: active tab + subtab + org + whether a modal / the SOQL
-// autocomplete popup currently owns the wheel.
 func (m Model) wheelSurfaceKey() string {
 	key := m.tab().String() + "|" + string(m.currentSubtab())
 	if len(m.orgs) > 0 && m.selected < len(m.orgs) {
@@ -194,27 +171,11 @@ func (m *Model) wheelStreamGate(now time.Time, quietGap time.Duration, button te
 	return true, ""
 }
 
-// wheelStep handles one incoming wheel event and returns the cursor
-// delta that should be applied on this tick (0 means "skip render,
-// no cursor move"). Replaces the older boolean-drop API: instead of
-// dropping excess events, every event contributes +1 (or -1 for up)
-// to a pending accumulator, and an accepted tick drains it.
-//
-// The result: a fast trackpad flick that produces 100 events in
-// 200ms still results in 100 cursor steps total — but distributed
-// across maybe 8 actual renders (one per minInterval). Each render
-// moves the cursor by `pending`, not by 1, so visible scroll speed
-// matches finger speed.
-//
-// Sign convention: positive = down, negative = up.
 func (m Model) wheelStep(msg tea.MouseWheelMsg) int {
 	_, minInterval := m.wheelTimings()
 	return m.wheelStepWithCap(msg, m.wheelMaxStep(), int(minInterval/time.Millisecond))
 }
 
-// wheelMaxStep reads the per-tick cursor-delta cap for continuous
-// mode from settings. Reading per-call is fine — only fires once
-// per accepted wheel.
 func (m Model) wheelMaxStep() int {
 	if m.settings == nil {
 		return 20
@@ -222,13 +183,6 @@ func (m Model) wheelMaxStep() int {
 	return m.settings.WheelMaxStep()
 }
 
-// wheelStepWithCap is wheelStep with parameterised cap and
-// per-mode min-interval override. Continuous mode passes the
-// continuous cap (~20) and the standard min-interval (24ms);
-// paginated mode passes the paged cap (~2) and a min-interval of 0
-// (no throttle, every event accepted) — pagination's row cache
-// makes per-frame cost tiny enough that display-rate updates feel
-// smooth instead of choppy.
 func (m Model) wheelStepWithCap(msg tea.MouseWheelMsg, cap, minIntervalMs int) int {
 	if m.wheel == nil {
 		return 0
@@ -284,10 +238,6 @@ func (m Model) wheelStepWithCap(msg tea.MouseWheelMsg, cap, minIntervalMs int) i
 		m.wheel.lastButton = button
 		return delta
 	}
-	// minInterval == 0 → no throttle gate. Every event accepted;
-	// the renderer's own per-vsync coalescing rate-limits us
-	// naturally. This is the paginated-mode default, justified
-	// by the row cache making per-frame cost ~0.13ms.
 	if minInterval > 0 && now.Sub(m.wheel.lastAccepted) < minInterval {
 		m.traceWheel(button, true, "deferred_min_interval", sinceSeen, sinceAccepted, quietGap, minInterval)
 		return 0
@@ -331,10 +281,6 @@ func drainPending(w *wheelRuntime, cap int) int {
 	return p
 }
 
-// handleWheelContinuous is the default-mode wheel handler. Each
-// accepted tick drains the accumulator (capped by WheelMaxStep) so
-// a fast flick scrolls many rows. The org quick-jump overlay
-// dismisses on first wheel; focus snaps to body.
 func (m Model) handleWheelContinuous(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	step := m.wheelStep(msg)
 	if step == 0 {
@@ -370,11 +316,6 @@ func (m Model) handleWheelPaginated(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	return m.moveCursor(step)
 }
 
-// wheelStepSimple is the paginated-mode state machine. Plain
-// throttle: one accepted event per minInterval, returns +1/-1/0.
-// No accumulator (each event is one row, period — bulk traversal
-// is keyboard's job). No gesture budget. Inertial events get
-// throttle-dropped naturally.
 func (m Model) wheelStepSimple(msg tea.MouseWheelMsg) int {
 	if m.wheel == nil {
 		return 0

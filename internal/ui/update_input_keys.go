@@ -8,10 +8,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/soqlfmt"
 )
 
-// handleSOQLKey is the key handler while the SOQL editor is active.
-// Mode-internal keys (enter/esc/ctrl+c) stay hardcoded; everything
-// else forwards to the bubbles/textinput widget so the user gets
-// cursor nav, word jumps, home/end, etc.
 func (m Model) handleSOQLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	mm := m
 	return (&mm).handleSOQLSessionEditKey(msg, &mm.soqlSession, soqlSessionTab)
@@ -23,15 +19,7 @@ func (m *Model) handleSOQLSessionEditKey(msg tea.KeyMsg, s *soqlSession, target 
 	}
 	key := msg.String()
 
-	// Autocomplete popup gets first crack at navigation keys.
-	// Tab accepts the highlighted suggestion; up/down cycle; esc
-	// dismisses the popup (without exiting edit mode). When the
-	// popup consumes the key we return early so the textinput
-	// doesn't also process it.
 	if consumed, cmd := m.autocompleteKey(s, key); consumed {
-		// Tab inserted text — refresh suggestions for the new
-		// cursor position. up/down/esc don't change the buffer
-		// but refresh is cheap (memo-skipped on no change).
 		m.autocompleteRefresh(s)
 		return *m, tea.Batch(cmd, m.drainAutocompleteCmds())
 	}
@@ -70,10 +58,6 @@ func (m *Model) handleSOQLSessionEditKey(msg tea.KeyMsg, s *soqlSession, target 
 			s.autocomplete.Items = nil
 		}
 		o := m.orgs[m.selected]
-		// Build the cancellable context now so the closure has
-		// access AND so the dispatcher can call m.soqlCancel from
-		// the ctrl+c handler.  Bump the run generation so any
-		// late-arriving result from a previous run gets dropped.
 		ctx, cancel := context.WithCancel(context.Background())
 		s.soqlCancel = cancel
 		s.soqlRunGen++
@@ -81,18 +65,10 @@ func (m *Model) handleSOQLSessionEditKey(msg tea.KeyMsg, s *soqlSession, target 
 	}
 	newInput, cmd := s.soqlInput.Update(msg)
 	s.soqlInput = newInput
-	// Recompute suggestions for the post-keystroke buffer + drain
-	// any describe-ensure cmds the engine queued (relationship
-	// hop touched an uncached sObject).
 	m.autocompleteRefresh(s)
 	return *m, tea.Batch(cmd, m.drainAutocompleteCmds())
 }
 
-// handleRecordEditKey routes keystrokes to the active field
-// editor while the user is in /record inline-edit mode. esc /
-// enter / tab / ctrl+s have global meaning here (cancel the
-// edit, commit, advance to next field, save batch); everything
-// else passes through to the editor's HandleKey.
 func (m Model) handleRecordEditKey(msg tea.KeyMsg, session *recordEditSession) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":

@@ -2,9 +2,6 @@ package sf
 
 import "testing"
 
-// seedClient installs a fake bootstrapped client for alias at
-// instanceURL and returns a cleanup. Mirrors the describe_test pattern:
-// mark once done so the entry is treated as live.
 func seedClient(alias, instanceURL string) func() {
 	clientsMu.Lock()
 	e := &clientEntry{client: &Client{alias: alias, accessToken: "t", instanceURL: instanceURL}}

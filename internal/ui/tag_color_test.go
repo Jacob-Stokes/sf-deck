@@ -3,7 +3,6 @@ package ui
 import "testing"
 
 func TestNextRotatingTagColor(t *testing.T) {
-	// Consecutive tags get consecutive palette colours, wrapping.
 	first := nextRotatingTagColor(0)
 	second := nextRotatingTagColor(1)
 	if first == second {
@@ -12,7 +11,6 @@ func TestNextRotatingTagColor(t *testing.T) {
 	if first != tagPalette[0] {
 		t.Errorf("index 0 should be first palette colour, got %q", first)
 	}
-	// Wraps at palette length.
 	if nextRotatingTagColor(len(tagPalette)) != tagPalette[0] {
 		t.Error("should wrap to the first colour")
 	}

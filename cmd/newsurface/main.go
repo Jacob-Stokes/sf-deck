@@ -1,30 +1,5 @@
 // Command newsurface scaffolds a new list-backed org surface for
 // sf-deck, emitting the boilerplate that can't be generated at runtime.
-//
-// The generic list-resource registry (internal/ui/list_resource_registry.go)
-// already collapses the sync / routing / refresh plumbing to a single
-// registration. This tool generates the remaining per-surface pieces so
-// a new surface is a fill-in-the-blanks job rather than 15 hand edits.
-//
-// Usage:
-//
-//	go run ./cmd/newsurface \
-//	    -name CronJob \        # Go identifier stem (PascalCase)
-//	    -row CronJobRow \      # sf row type (in package sf)
-//	    -key cron_jobs_v1 \    # resource cache key
-//	    -fetch ListCronJobs \  # sf fetch func: func(alias string) ([]sf.CronJobRow, error)
-//	    -title "SCHEDULED JOBS"
-//
-// It prints, grouped by destination file:
-//   - internal/sf/<snake>.go            (new file: row + Field + fetch stub)
-//   - orgdata_groups.go   snippets      (Resource + ListView + TableState fields)
-//   - orgdata_resources.go snippet      (Resource declaration)
-//   - list_resource_registrations.go    (the one registration)
-//   - list_column_schemas_extra.go      (column schema stub)
-//   - list_surface_misc.go              (table spec + list surface)
-//
-// Nothing is written except the new sf file (with -write); everything
-// else is printed so you paste it at the right insertion point.
 package main
 
 import (
@@ -102,8 +77,6 @@ func main() {
 func section(title, body string) {
 	fmt.Printf("── %s ──\n%s\n\n", title, body)
 }
-
-// --- templates -------------------------------------------------------
 
 const sfTemplate = `package sf
 
@@ -199,8 +172,6 @@ const nextSteps = `── next steps (the parts that are genuinely per-surface) 
   5. (optional) a sidebar func for the row detail.
   6. go build ./... && go test ./internal/ui/   (drift tests confirm wiring).
 `
-
-// --- string helpers --------------------------------------------------
 
 func pascalToSnake(s string) string {
 	var b strings.Builder

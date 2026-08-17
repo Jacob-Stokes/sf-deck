@@ -5,8 +5,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/services/projects"
 )
 
-// IPC verb handlers for dev projects: CRUD + items + bundle import. Split out of control_backend.go.
-
 func (s *ControlState) ProjectImportBundle(args control.ProjectImportBundleArgs) (any, error) {
 	if err := s.ensureStore(); err != nil {
 		return nil, err

@@ -1,10 +1,5 @@
 package ui
 
-// System-permissions subtab of TabPermParentDetail.
-//
-// Displays the ~200 boolean Permissions* fields on a PermissionSet
-// as a searchable list. Toggle via Space (Phase H).
-
 import (
 	"fmt"
 	"strings"
@@ -16,7 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderPermParentSystem is the main-pane renderer for the System subtab.
 func (m Model) renderPermParentSystem(w, inner, innerH int, o sf.Org) string {
 	d := m.ensureOrgDataRef(o.Username)
 
@@ -84,7 +78,6 @@ func (m Model) renderPermParentSystem(w, inner, innerH int, o sf.Org) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Column widths.
 	nameW := inner * 35 / 100
 	if nameW < 20 {
 		nameW = 20

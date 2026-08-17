@@ -5,16 +5,6 @@ import (
 	"time"
 )
 
-// setup_audit_trail.go — reader for the SetupAuditTrail standard object.
-//
-// Salesforce records every Setup change (field edits, permset/FLS
-// changes, deploys, deactivations, login-as, …) in SetupAuditTrail and
-// keeps ~180 days. It's queryable via SOQL but almost nobody knows it —
-// the web UI only offers a CSV export buried in Setup. Surfacing it as
-// a live, sortable, searchable list answers the "what changed in this
-// org and who did it?" question with no good keyboard-driven answer
-// anywhere else.
-
 // SetupAuditRow is one Setup change event.
 type SetupAuditRow struct {
 	ID          string

@@ -17,8 +17,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// demoApexDomainObjects maps the demoApexClasses domain grid onto the
-// custom objects each domain's code works against.
 var demoApexDomainObjects = map[string]string{
 	"Shipment": "Shipment__c", "Carrier": "Carrier__c", "Route": "Route__c",
 	"Customs": "Customs_Declaration__c", "FreightInvoice": "Freight_Invoice__c",
@@ -28,8 +26,6 @@ var demoApexDomainObjects = map[string]string{
 	"Claim": "Claim__c", "Driver": "Driver__c", "Fleet": "Fleet_Vehicle__c",
 }
 
-// demoSpaceCamel inserts spaces into a CamelCase name for prose
-// ("FreightInvoice" -> "Freight Invoice").
 func demoSpaceCamel(s string) string {
 	var b strings.Builder
 	for i, r := range s {
@@ -41,14 +37,6 @@ func demoSpaceCamel(s string) string {
 	return b.String()
 }
 
-// ---------------------------------------------------------------
-// Apex class bodies
-// ---------------------------------------------------------------
-
-// demoApexClassDetails builds the apex_class:<id> payloads: one
-// ApexClassDetail per demoApexClasses row, body derived from the
-// class's name (handler / service / selector / test / batch /
-// queueable) and domain object.
 func demoApexClassDetails() map[string]sf.ApexClassDetail {
 	classes := demoApexClasses()
 	out := make(map[string]sf.ApexClassDetail, len(classes))
@@ -64,8 +52,6 @@ func demoApexClassDetails() map[string]sf.ApexClassDetail {
 	return out
 }
 
-// demoApexBody dispatches on the class-name suffix the demo grid
-// composes names from.
 func demoApexBody(name string) string {
 	switch {
 	case strings.HasSuffix(name, "Batch"):
@@ -81,13 +67,9 @@ func demoApexBody(name string) string {
 	case strings.HasSuffix(name, "Selector"):
 		return demoApexRoleBody(strings.TrimSuffix(name, "Selector"), demoApexSelectorTemplate)
 	}
-	// Unknown shape (shouldn't happen with the current grid): a stub
-	// that's still valid Apex.
 	return "public with sharing class " + name + " {\n}\n"
 }
 
-// demoApexRoleBody fills a role template. Placeholders: %[1]s domain,
-// %[2]s object API name, %[3]s human label, %[4]s lower-case label.
 func demoApexRoleBody(domain string, tmpl string) string {
 	obj := demoApexDomainObjects[domain]
 	if obj == "" {
@@ -284,8 +266,6 @@ private class %[1]sServiceTest {
 }
 `
 
-// demoAsyncApexMeta gives each async worker its object + one-line
-// purpose (used in the class-body comment) and how it gets invoked.
 var demoAsyncApexMeta = map[string]struct {
 	object, purpose, invokedBy string
 }{
@@ -369,14 +349,6 @@ public with sharing class %[1]s implements Queueable {
 `, name, m.object, m.purpose, m.invokedBy)
 }
 
-// ---------------------------------------------------------------
-// Trigger bodies
-// ---------------------------------------------------------------
-
-// demoTriggerDetails builds the triggerdetail:<id> payloads for every
-// demoTriggers row. Domain triggers with a seeded handler class
-// delegate to it (the pattern the handler bodies advertise); the rest
-// carry small inline logic, the way real orgs mix styles.
 func demoTriggerDetails() map[string]sf.TriggerDetail {
 	rows := demoTriggers()
 	out := make(map[string]sf.TriggerDetail, len(rows))
@@ -390,8 +362,6 @@ func demoTriggerDetails() map[string]sf.TriggerDetail {
 	return out
 }
 
-// demoTriggerHandlers maps trigger name -> the seeded handler class
-// it delegates to. Triggers not listed here get inline bodies.
 var demoTriggerHandlers = map[string]string{
 	"ShipmentTrigger":           "ShipmentTriggerHandler",
 	"CarrierTrigger":            "CarrierTriggerHandler",
@@ -412,9 +382,6 @@ func demoTriggerBody(t sf.TriggerRow) string {
 	return fmt.Sprintf("trigger %s on %s (%s) {\n    // no-op\n}\n", t.Name, t.Table, t.Events)
 }
 
-// demoTriggerDispatchBody writes the handler-delegation pattern,
-// guarding each dispatch with the trigger-context checks for the
-// events the row declares.
 func demoTriggerDispatchBody(t sf.TriggerRow, handler string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "trigger %s on %s (%s) {\n", t.Name, t.Table, t.Events)
@@ -434,8 +401,6 @@ func demoTriggerDispatchBody(t sf.TriggerRow, handler string) string {
 	return b.String()
 }
 
-// demoInlineTriggerBodies: hand-written bodies for the triggers with
-// no matching handler class. Small, plausible, valid.
 var demoInlineTriggerBodies = map[string]string{
 	"ShipmentLineTrigger": `trigger ShipmentLineTrigger on Shipment_Line__c (before insert, before update) {
     for (Shipment_Line__c line : Trigger.new) {
@@ -518,10 +483,6 @@ var demoInlineTriggerBodies = map[string]string{
 `,
 }
 
-// demoTriggersByTable groups the flat trigger fixture per sObject for
-// the object drill's Triggers subtab (cache key triggers:<sobject>).
-// Every catalog object gets an entry — empty for the objects with no
-// trigger — so no drill lands on a demo-mode fetch error.
 func demoTriggersByTable(objs []sf.SObject) map[string][]sf.TriggerRow {
 	out := make(map[string][]sf.TriggerRow, len(objs))
 	for _, o := range objs {
@@ -533,12 +494,6 @@ func demoTriggersByTable(objs []sf.SObject) map[string][]sf.TriggerRow {
 	return out
 }
 
-// ---------------------------------------------------------------
-// LWC bundle sources
-// ---------------------------------------------------------------
-
-// demoLWCBundleDetails builds the lwc_bundle:<id> payloads: the four
-// files of each seeded bundle with generated-but-plausible source.
 func demoLWCBundleDetails() map[string]sf.LWCBundleDetail {
 	bundles := demoLWCBundles()
 	specs := demoLWCSpecs()
@@ -709,12 +664,6 @@ func demoLWCMeta(s demoLWCSpec) string {
 `, s.exposed, s.label, s.desc, s.object)
 }
 
-// ---------------------------------------------------------------
-// Aura bundle sources
-// ---------------------------------------------------------------
-
-// demoAuraBundleDetails builds the aura_bundle:<id> payloads: .cmp +
-// controller + helper for each seeded Aura bundle.
 func demoAuraBundleDetails() map[string]sf.AuraBundleDetail {
 	bundles := demoAuraBundles()
 	specs := demoAuraSpecs()

@@ -1,20 +1,6 @@
 // Package migrate carries the one-time conversion from the
 // pre-unified settings sections (lens / object_filters / flow_filters)
 // into the unified [[ui.chips]] format.
-//
-// Carved out of qchip itself so it's deletable in one move once the
-// migration window closes — at that point the legacy fields can be
-// dropped from settings.UIConfig and this package goes with them.
-//
-// The Run function is the only public entry point. Caller flow is
-// always:
-//
-//	if migrate.Run(st) > 0 {
-//	    st.ClearLegacyChips()
-//	    _ = st.Save()
-//	}
-//
-// model.go's New() has the only call site today.
 package migrate
 
 import (
@@ -75,8 +61,6 @@ func Run(s *settings.Settings) int {
 func lensConfigToChipConfig(l settings.LensConfig) settings.ChipConfig {
 	q := query.Query{Limit: l.Limit, Columns: l.Columns}
 	if l.SOQLWhere != "" {
-		// Trick the parser by handing it a synthetic SELECT so the
-		// WHERE-only string parses through the full pipeline.
 		synthetic := "SELECT Id FROM " + nonEmpty(l.Scope, "X") + " WHERE " + l.SOQLWhere
 		if l.OrderBy != "" {
 			synthetic += " ORDER BY " + l.OrderBy
@@ -92,7 +76,6 @@ func lensConfigToChipConfig(l settings.LensConfig) settings.ChipConfig {
 			}
 		}
 	} else if l.OrderBy != "" {
-		// Just an ORDER BY, no WHERE.
 		obs, err := parseOrderBy(l.OrderBy)
 		if err == nil {
 			q.OrderBy = obs
@@ -115,9 +98,6 @@ func lensConfigToChipConfig(l settings.LensConfig) settings.ChipConfig {
 	}
 }
 
-// filterConfigToChipConfig maps the per-field FilterSpecYAML onto an
-// AND of CompareNodes. Each non-empty field becomes one comparison;
-// empty fields drop out.
 func filterConfigToChipConfig(f settings.FilterConfig, domain string) settings.ChipConfig {
 	var children []query.Node
 	add := func(field string, op query.Op, val any) {
@@ -223,8 +203,6 @@ func filterConfigToChipConfig(f settings.FilterConfig, domain string) settings.C
 	}
 }
 
-// parseOrderBy is a thin wrapper around the query package's parser
-// for the ORDER BY suffix.
 func parseOrderBy(s string) ([]query.OrderBy, error) {
 	q, _, err := query.Parse("SELECT Id FROM X ORDER BY " + s)
 	if err != nil {

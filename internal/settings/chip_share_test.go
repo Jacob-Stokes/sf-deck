@@ -2,8 +2,6 @@ package settings
 
 import "testing"
 
-// alwaysIn / neverIn are tiny group-membership stubs so the share
-// resolver can be tested without a real Settings instance.
 func alwaysIn(_, _ string) bool { return true }
 func neverIn(_, _ string) bool  { return false }
 
@@ -45,12 +43,10 @@ func TestEffectiveShareLegacyMigration(t *testing.T) {
 		t.Errorf("legacy OrgUser did not migrate to ChipShareOrg: got %+v", got)
 	}
 
-	// Built-in / pre-OrgUser chip (no OrgUser, no Share) reads as global.
 	if got := (ChipConfig{}).EffectiveShare(); got.Kind != ChipShareGlobal {
 		t.Errorf("empty chip should be global, got %+v", got)
 	}
 
-	// When Share IS populated, it takes precedence over OrgUser.
 	c2 := ChipConfig{
 		OrgUser: "legacy@org",
 		Share:   ChipShare{Kind: ChipShareGlobal},
@@ -70,7 +66,6 @@ func TestNormaliseShareCollapsesLegacyField(t *testing.T) {
 		t.Errorf("Share not populated correctly: %+v", c.Share)
 	}
 
-	// Already-modern chip is left alone.
 	modern := ChipConfig{Share: ChipShare{Kind: ChipShareGroup, Group: "g1"}}
 	modern.NormaliseShare()
 	if modern.Share.Kind != ChipShareGroup || modern.Share.Group != "g1" {

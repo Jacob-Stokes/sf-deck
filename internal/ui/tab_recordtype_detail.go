@@ -1,19 +1,10 @@
 package ui
 
-// TabRecordTypeDetail — full-pane view of a single RecordType. Drill
-// from the Record Types subtab's list (enter on a row).
-//
-// Layout parallels the other drill-detail surfaces: every editable
-// property is a navigable MAIN-pane row (active toggle, label,
-// description) + a DANGER ZONE delete. Arrow keys walk the rows; Enter
-// fires the edit / toggle / delete modal. Sidebar is INFO-ONLY.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// Record-type action indices — track recordTypeActionsFor's order.
 const (
 	rtActToggleActive = 0
 	rtActLabel        = 1
@@ -21,7 +12,6 @@ const (
 	rtActDelete       = 3
 )
 
-// recordTypeDetailRows builds the ordered row model.
 func recordTypeDetailRows(sobject, rowDev, rowLabel string, det sf.RecordTypeDetail, meta detailMeta, inner int) []detailRow {
 	b := newDetailRowBuilder(inner)
 
@@ -59,8 +49,6 @@ func recordTypeDetailRows(sobject, rowDev, rowLabel string, det sf.RecordTypeDet
 	return b.rows
 }
 
-// renderRecordTypeDetail is the main-pane renderer for
-// TabRecordTypeDetail.
 func (m Model) renderRecordTypeDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -85,7 +73,6 @@ func (m Model) renderRecordTypeDetail(w, innerH int) string {
 	return renderDetailRows(rows, m.recordTypeActionCur, m.focus == focusMain, inner, innerH)
 }
 
-// recordTypeDetailRowsFor resolves the row model for the drilled RT.
 func (m Model) recordTypeDetailRowsFor(d *orgData, inner int) []detailRow {
 	r, ok := d.RecordTypes.Details[d.RecordTypes.DrillID]
 	if !ok || r == nil || r.FetchedAt().IsZero() {
@@ -140,8 +127,6 @@ func (m Model) recordTypeDetailActionForCursor() (int, bool) {
 	return detailActionForCursor(rows, m.recordTypeActionCur)
 }
 
-// sidebarRecordTypeActions renders the TabRecordTypeDetail right
-// sidebar — a context panel for the cursored row.
 func (m Model) sidebarRecordTypeActions(inner int) string {
 	ctx := m.recordTypeRowContext()
 	ctx.Hints = detailNavHints(true)

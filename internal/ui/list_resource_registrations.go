@@ -1,18 +1,8 @@
 package ui
 
-// Registrations for every list-backed resource that uses the generic
-// apply/sync/refresh path. Adding a surface = one entry here (plus the
-// sf fetcher, column schema, sidebar, registry entry, render func).
-//
-// Surfaces with BESPOKE apply logic (deploys' completion flash, the
-// sObject catalogue's autocomplete bust via AfterSync, recently-viewed's
-// per-sObject fan-out) either use AfterSync or keep an explicit case in
-// applyResourceMsg — see the switch there.
-
 import "github.com/Jacob-Stokes/sf-deck/internal/sf"
 
 func init() {
-	// --- /system ---------------------------------------------------------
 	registerListResource(listResourceSpec[sf.ApexLogRow]{
 		Key:  "apexlogs",
 		Res:  func(d *orgData) *Resource[[]sf.ApexLogRow] { return &d.ApexLogs },
@@ -49,7 +39,6 @@ func init() {
 		List: func(d *orgData) *ListView[sf.CronTriggerRow] { return &d.ScheduledJobList },
 	})
 
-	// --- top-level tabs --------------------------------------------------
 	registerListResource(listResourceSpec[sf.InstalledPackage]{
 		Key:  "packages",
 		Res:  func(d *orgData) *Resource[[]sf.InstalledPackage] { return &d.Packages },
@@ -71,7 +60,6 @@ func init() {
 		List: func(d *orgData) *ListView[sf.DashboardRow] { return &d.DashboardList },
 	})
 
-	// --- /meta -----------------------------------------------------------
 	registerListResource(listResourceSpec[sf.MetadataTypeInfo]{
 		Key:  "metatypes_v1",
 		Res:  func(d *orgData) *Resource[[]sf.MetadataTypeInfo] { return &d.MetaTypes },
@@ -113,7 +101,6 @@ func init() {
 		List: func(d *orgData) *ListView[sf.ReportTypeRow] { return &d.ReportTypeList },
 	})
 
-	// --- /apex + /components --------------------------------------------
 	registerListResource(listResourceSpec[sf.ApexClassRow]{
 		Key:  "apex_classes_v2",
 		Res:  func(d *orgData) *Resource[[]sf.ApexClassRow] { return &d.ApexClasses },
@@ -135,7 +122,6 @@ func init() {
 		List: func(d *orgData) *ListView[sf.TriggerRow] { return &d.ApexTriggerList },
 	})
 
-	// --- /perms groups ---------------------------------------------------
 	registerListResource(listResourceSpec[sf.QueueRow]{
 		Key:  "queues_v2",
 		Res:  func(d *orgData) *Resource[[]sf.QueueRow] { return &d.Queues },

@@ -1,11 +1,5 @@
 package ui
 
-// Per-surface sidebars for /perms: the permissions dashboard and the
-// permset/PSG/profile parent-detail drill. Split out of sidebar.go.
-
-// sidebarPerms shows the cursored permset/PSG/profile's metadata on
-// the /perms top tab. Keeps the body tight — overview-shape, the full
-// drill-in view already has a dedicated overview subtab.
 func (m Model) sidebarPerms(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -63,9 +57,6 @@ func (m Model) sidebarPerms(inner int) string {
 	return sideEmpty("—")
 }
 
-// sidebarPermParent shows the current drilled-in parent's identity
-// on every TabPermParentDetail subtab. Per-subtab sidebars (e.g. the
-// cursored field on the Fields subtab) land in later phases.
 func (m Model) sidebarPermParent(inner int) string {
 	kind, id, name, ok := m.currentPermParent()
 	if !ok {

@@ -1,25 +1,5 @@
 package sf
 
-// community_login.go — "Log in to Experience as User" plumbing.
-//
-// Salesforce exposes no REST/Tooling/Apex API for community login-as;
-// the Lightning button posts a request that ultimately resolves to
-// /servlet/servlet.su with Experience-Cloud-specific params. Same
-// servlet as the internal "Log in as User" flow (see openLoginAs in
-// tab_user_actions.go) but with sunetwork* params instead of
-// suorgadminid/targetuserid:
-//
-//   /servlet/servlet.su
-//      ?oid=<OrgId>
-//      &sunetworkid=<NetworkId>          ← the Experience site
-//      &sunetworkuserid=<TargetUserId>   ← the contact's portal user
-//      &retURL=%2F<recordId or path>
-//
-// Stable for years per community posts + the kevina-code/
-// LogIntoExperienceAsUser Apex reference impl, but technically
-// undocumented — Salesforce could change it. Caller should fall back
-// gracefully if the response isn't a redirect.
-
 import (
 	"fmt"
 )

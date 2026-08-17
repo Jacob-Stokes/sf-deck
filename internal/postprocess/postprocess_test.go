@@ -10,8 +10,6 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// makeXLSX builds a minimal xlsx with one sheet + the provided rows.
-// Used to feed Run() / ToCSV() in tests.
 func makeXLSX(t *testing.T, rows [][]string) []byte {
 	t.Helper()
 	f := excelize.NewFile()
@@ -54,8 +52,6 @@ func TestToCSVNeutralizesSpreadsheetFormulas(t *testing.T) {
 	}
 }
 
-// --- All() / ByIDs() ------------------------------------------------------
-
 func TestAll_ReturnsKnownTransforms(t *testing.T) {
 	got := All()
 	if len(got) == 0 {
@@ -78,7 +74,6 @@ func TestByIDs_FiltersAndOrders(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("got %d, want 2", len(got))
 	}
-	// Order should follow the request, not the All() order.
 	if got[0].ID() != "detailsify" {
 		t.Errorf("got[0].ID() = %q, want detailsify", got[0].ID())
 	}
@@ -101,10 +96,6 @@ func TestByIDs_EmptyReturnsEmpty(t *testing.T) {
 	}
 }
 
-// --- Run() ----------------------------------------------------------------
-
-// fakeTransform is a controllable Transform for testing Run's pipeline
-// behaviour without depending on real transforms' workbook mutations.
 type fakeTransform struct {
 	id      string
 	err     error
@@ -129,8 +120,6 @@ func TestRun_ZeroTransformsRoundTrips(t *testing.T) {
 	if len(out) == 0 {
 		t.Fatal("Run with 0 transforms returned empty bytes")
 	}
-	// Round-tripped bytes won't byte-equal the original (excelize rewrites
-	// metadata), but they should re-open as a valid xlsx.
 	if _, err := excelize.OpenReader(bytes.NewReader(out)); err != nil {
 		t.Errorf("Run output isn't valid xlsx: %v", err)
 	}
@@ -178,8 +167,6 @@ func TestRun_BadXLSXReturnsError(t *testing.T) {
 	}
 }
 
-// --- ToCSV() --------------------------------------------------------------
-
 func TestToCSV_RoundTrip(t *testing.T) {
 	in := makeXLSX(t, [][]string{
 		{"Name", "Industry", "Revenue"},
@@ -199,7 +186,6 @@ func TestToCSV_RoundTrip(t *testing.T) {
 }
 
 func TestToCSV_RaggedRowsPadded(t *testing.T) {
-	// Row 2 is shorter than row 1 — the CSV writer pads to the widest.
 	in := makeXLSX(t, [][]string{
 		{"A", "B", "C"},
 		{"x"},
@@ -208,7 +194,6 @@ func TestToCSV_RaggedRowsPadded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToCSV: %v", err)
 	}
-	// Short row should pad: "x,," — two trailing empty cells.
 	if !bytes.Contains(out, []byte("x,,")) {
 		t.Errorf("ragged row not padded:\n%s", out)
 	}

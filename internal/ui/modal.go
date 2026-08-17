@@ -1,17 +1,5 @@
 package ui
 
-// Generic modal overlay primitives.
-//
-// Two modal kinds today:
-//   1. Open/yank target picker (interactive — see menu.go / openMenuState)
-//   2. Info box (static content — legends, help, per-view tips)
-//
-// Both render inside the same rounded bordered "box" primitive
-// (modalBox) so they feel like one modal system. Add a new modal by
-// picking a state shape, adding a render function that builds lines,
-// wrapping them with modalBox, and routing the escape key back to
-// `nil` on the relevant state field.
-
 import (
 	"fmt"
 	"strings"
@@ -23,28 +11,7 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// modalBox wraps `body` in the standard rounded-border panel used by
-// every modal. Width is the total pane width (including border); body
-// should already be sized to width-4 (box uses 1px padding on each
-// side + 1px border).
-//
-// No Background on the box: setting one made the modal look "ragged"
-// in any multi-fragment layout (e.g. the org manager's two-column
-// list+keys view).  Each styled fragment emits an ANSI [0m reset at
-// its end, which kills the bg between fragments — and the gaps
-// rendered with the page background rather than the panel one.  We
-// could fix that by wrapping every internal style with a matching
-// Background, but lipgloss's Bold rendering still emits [0m mid-
-// string in some cases.  Simplest correct fix: skip the bg entirely
-// and accept that the modal interior is the page background.  Other
-// modals (info, edit) read the same way and look fine — the visual
-// distinction comes from the border, not a fill.
 func modalBox(body string, width int) string {
-	// Width(width) yields a usable content width of width-4 (border 2
-	// + padding 2), which is the `inner := w - 4` every caller sizes
-	// rows against. The old Width(width-2) left content 2 cells
-	// narrower than callers assumed, so any full-width row (dividers,
-	// padded inputs) wrapped — the stray "──" stub under modal rules.
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.BorderHi).
@@ -66,7 +33,6 @@ func modalWidth(termW, minW, maxW int) int {
 	return w
 }
 
-// modalHeight mirrors modalWidth for overlays with scrollable bodies.
 func modalHeight(termH, minH, maxH int) int {
 	h := termH * 4 / 5
 	if h < minH {
@@ -78,18 +44,9 @@ func modalHeight(termH, minH, maxH int) int {
 	return h
 }
 
-// --- info modal ---------------------------------------------------------
-
-// infoModalState is the live state of a read-only info overlay. No
-// cursor, no interactions — it shows text, user presses any key (or
-// esc) to dismiss.
 type infoModalState struct {
-	Title string
-	Rows  []infoRow
-	// PreRendered, when set, is shown verbatim under the title instead
-	// of Rows — used by the generic "inspect panel" modal, which
-	// re-renders the active sidebar at full width/height. Rows is
-	// ignored when this is non-empty.
+	Title       string
+	Rows        []infoRow
 	PreRendered string
 
 	// Scroll is the first visible line offset into the body — used when
@@ -99,26 +56,18 @@ type infoModalState struct {
 	// dismisses as before.
 	Scroll int
 
-	// OnDismiss optionally reopens a parent surface. Most help/info modals
-	// leave this nil; About and update details use it to return to Settings.
 	OnDismiss func() tea.Cmd
 }
 
-// infoRow is one row of an info modal. Label is rendered bold in
-// muted tone; Body follows on the same line in the default fg. Pass
-// an empty Label to render a section divider / spacer.
 type infoRow struct {
 	Label string
 	Body  string
 }
 
-// showInfoModal stashes an info-modal state on the model. Call from
-// key handlers.
 func (m *Model) showInfoModal(state infoModalState) {
 	m.infoModal = &state
 }
 
-// renderInfoModal renders the current info modal, or "" when none.
 func (m Model) renderInfoModal() string {
 	if m.infoModal == nil {
 		return ""
@@ -131,10 +80,6 @@ func (m Model) renderInfoModal() string {
 		strings.Repeat("─", inner),
 	}
 
-	// Build the full body (unclipped), then window it to fit the
-	// terminal — scrolling when it overflows rather than truncating, so
-	// arbitrarily long content (a big JSON field value) is fully
-	// reachable.
 	var body []string
 	if m.infoModal.PreRendered != "" {
 		body = strings.Split(m.infoModal.PreRendered, "\n")
@@ -153,8 +98,6 @@ func (m Model) renderInfoModal() string {
 		}
 	}
 
-	// Height budget: terminal minus title(1) + rule(1) + footer(2) +
-	// border/pad(4). Reserve one line for a top/bottom "more" marker.
 	maxBody := m.height - 8
 	if maxBody < 4 {
 		maxBody = 4
@@ -164,7 +107,6 @@ func (m Model) renderInfoModal() string {
 
 	lines := header
 	if overflow {
-		// Reserve a marker line top+bottom; window the remaining rows.
 		windowH := maxBody - 2
 		if windowH < 1 {
 			windowH = 1
@@ -222,11 +164,6 @@ func infoModalScroll(offset, n, visible int) int {
 	return offset
 }
 
-// handleInfoModalKey scrolls the modal on nav keys (when its content
-// overflows) and dismisses on esc / enter / any other key. Content that
-// fits keeps the old "any key dismisses" feel; long content (a big field
-// value) becomes scrollable with j/k/arrows/pgup/pgdn. Routing is in
-// update_keys.go.
 func (m Model) handleInfoModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.infoModal == nil {
 		return m, nil
@@ -270,7 +207,6 @@ func (m Model) handleInfoModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.infoModal.Scroll = maxScroll
 		return m, nil
 	}
-	// esc, enter, or anything else: dismiss.
 	onDismiss := m.infoModal.OnDismiss
 	m.infoModal = nil
 	if onDismiss != nil {
@@ -279,9 +215,6 @@ func (m Model) handleInfoModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// infoModalMaxScroll returns the largest valid Scroll offset for the
-// current info modal's content and terminal height — mirrors the
-// windowing math in renderInfoModal. Zero when the content fits.
 func (m Model) infoModalMaxScroll() int {
 	if m.infoModal == nil {
 		return 0
@@ -305,8 +238,6 @@ func (m Model) infoModalMaxScroll() int {
 	return maxOffset
 }
 
-// infoModalBodyLen counts the body lines the modal will render (before
-// windowing) — PreRendered split on newlines, else one line per Row.
 func infoModalBodyLen(s *infoModalState) int {
 	if s.PreRendered != "" {
 		return strings.Count(s.PreRendered, "\n") + 1
@@ -314,36 +245,18 @@ func infoModalBodyLen(s *infoModalState) int {
 	return len(s.Rows)
 }
 
-// --- edit modal ---------------------------------------------------------
-
-// editModalState is the live state of an in-place text editor. The
-// modal is generic: it owns a Body buffer + save/cancel UX, and
-// delegates the "what does saving mean" to a per-invocation Save
-// callback. Every call site (edit a field property, edit an object
-// description, edit a validation-rule formula, …) constructs its
-// own editModalState with the right Save closure.
 type editModalState struct {
-	// Title is the bold headline — usually "<object>.<field> — <action>".
 	Title string
-	// Hint is a one-line dim subheading under the title. Optional.
-	Hint string
+	Hint  string
 	// InitialBody is the starting buffer for the editor. Pre-populate
 	// with the current value if you have it synchronously (e.g. from a
 	// cached describe). For values that require an async fetch, leave
 	// empty and set LoadCurrent — the modal shows "loading…" and
 	// populates the buffer when the fetch returns.
 	InitialBody string
-	// Multiline: enter appends a newline instead of committing; ctrl+s
-	// is the only save gesture. False = single-line; enter saves.
-	Multiline bool
-	// SuccessMsg is the flash-banner string shown after a successful
-	// save. Optional; when empty we flash nothing.
-	SuccessMsg string
+	Multiline   bool
+	SuccessMsg  string
 
-	// LoadCurrent is an optional async loader fired when the modal
-	// opens. It returns the current value + an error. On success the
-	// buffer is populated; on error the modal still opens but shows
-	// the error so the user can still type a value from scratch.
 	LoadCurrent func() (string, error)
 	// Save is the on-wire commit. It's called with the current Body
 	// value and should return nil on success or an error (ideally an
@@ -353,48 +266,23 @@ type editModalState struct {
 	// `baseline` token the preview returned — letting the Save re-use
 	// the already-fetched current state instead of round-tripping again.
 	// Plain edits (no Preview) ignore the baseline arg and pass nil.
-	Save func(val string, baseline any) error
-	// Preview is an optional pre-save hook. When set, the user's
-	// first Enter doesn't save — it fires Preview, and the modal
-	// transitions into a confirm state showing the returned diff
-	// lines. The user's second Enter commits (calling Save with the
-	// same baseline). Esc during confirm returns to editing.
-	//
-	// Intended for write paths that want the user to see exactly
-	// what will change before committing — especially Metadata API
-	// deploys where a single-field edit still ships a complete
-	// object XML.
-	Preview func(val string) (PreviewResult, error)
-	// OnSuccess is an optional tea.Cmd fired after a successful save.
-	// Typical use: refresh a Resource so the new value appears in the
-	// surrounding view without a manual r.
+	Save      func(val string, baseline any) error
+	Preview   func(val string) (PreviewResult, error)
 	OnSuccess func() tea.Cmd
 
-	// OnCancel fires when the user dismisses the modal with esc. When
-	// set, it runs INSTEAD of a bare close — used by drill-down menus
-	// (Settings → submenu → leaf edit) so esc pops back to the parent
-	// menu rather than closing the whole stack. Nil = plain close.
 	OnCancel func() tea.Cmd
 
-	// Internal live state. Not meant for callers to set.
-	Loading bool
-	Saving  bool
-	// Confirming means the user has passed through the Preview step
-	// and is now looking at the diff waiting to commit. Second Enter
-	// saves; Esc returns to editing.
-	Confirming bool
-	// Previewing means the Preview fetch is in flight.
-	Previewing bool
-	// PreviewLines is the diff to render during Confirming.
+	Loading      bool
+	Saving       bool
+	Confirming   bool
+	Previewing   bool
 	PreviewLines []PreviewLine
 	// PreviewBaseline is the opaque state token returned by Preview
 	// and handed back to Save, so the commit uses the same baseline
 	// the preview diffed against.
 	PreviewBaseline any
 	Err             string
-	// editor is the bubbles/textarea widget that owns the buffer,
-	// cursor, and key handling. Nil until openEditModal wires it up.
-	editor *textarea.Model
+	editor          *textarea.Model
 }
 
 // PreviewLine is one row of the diff shown during the Confirming
@@ -417,10 +305,6 @@ type PreviewResult struct {
 	Baseline any
 }
 
-// buildEditor constructs the textarea widget for an edit modal,
-// sized + themed + configured for single- or multi-line mode. Enter
-// handling is intercepted in handleEditModalKey so we don't need to
-// disable the default InsertNewline binding.
 func buildEditor(multiline bool, width, height int, initial string) textarea.Model {
 	ta := textarea.New()
 	ta.Prompt = ""
@@ -436,30 +320,20 @@ func buildEditor(multiline bool, width, height int, initial string) textarea.Mod
 	} else {
 		ta.SetHeight(1)
 	}
-	// Theme hook-ups — Focused styles use our palette. v2 groups the
-	// per-state styles under Styles.Focused / Styles.Blurred and
-	// cursor color under Styles.Cursor.Color; set them via a Styles
-	// struct passed to SetStyles so the widget picks everything up in
-	// one pass.
 	s := ta.Styles()
 	s.Focused.Base = lipgloss.NewStyle().Foreground(theme.Fg)
 	s.Focused.Text = lipgloss.NewStyle().Foreground(theme.Fg)
 	s.Focused.Placeholder = lipgloss.NewStyle().Foreground(theme.FgDim)
-	// Suppress cursor-line highlight — visually noisy inside a modal.
 	s.Focused.CursorLine = lipgloss.NewStyle()
 	s.Focused.CursorLineNumber = lipgloss.NewStyle()
 	s.Cursor.Color = theme.BorderHi
 	ta.SetStyles(s)
 	ta.SetValue(initial)
-	// Move to end of buffer so edits append by default.
 	ta.CursorEnd()
 	ta.Focus()
 	return ta
 }
 
-// renderEditModal renders the current edit-modal state, or "".
-// Two visual modes: editing (the textarea) and confirming (the diff
-// preview). The Confirming flag on the state decides which.
 func (m Model) renderEditModal() string {
 	if m.editModal == nil {
 		return ""
@@ -480,7 +354,6 @@ func (m Model) renderEditModal() string {
 		)
 	}
 
-	// Body area — editor vs preview.
 	switch {
 	case em.Loading:
 		lines = append(lines,
@@ -510,9 +383,6 @@ func (m Model) renderEditModal() string {
 	return modalBox(strings.Join(lines, "\n"), w)
 }
 
-// editModalKeyHint picks the right footer hint for the modal's
-// current phase. Editing/Confirming/Saving each prompt for different
-// keys.
 func editModalKeyHint(em *editModalState) string {
 	switch {
 	case em.Saving:
@@ -529,9 +399,6 @@ func editModalKeyHint(em *editModalState) string {
 	}
 }
 
-// renderPreviewBody draws the Confirming-phase body: a column of
-// "field: before → after" rows, with unchanged fields dimmed so the
-// diff is obvious at a glance.
 func renderPreviewBody(em *editModalState, inner int) string {
 	if len(em.PreviewLines) == 0 {
 		return lipgloss.NewStyle().Foreground(theme.FgDim).Italic(true).
@@ -560,9 +427,6 @@ func renderPreviewBody(em *editModalState, inner int) string {
 	return strings.Join(out, "\n")
 }
 
-// previewValDisplay formats a value for the diff row. Empty becomes
-// "—" to make empty→set edits obvious; multi-line strings collapse
-// to a single-line preview so the diff row stays readable.
 func previewValDisplay(s string) string {
 	if s == "" {
 		return "—"
@@ -573,14 +437,6 @@ func previewValDisplay(s string) string {
 	return s
 }
 
-// handleEditModalKey is the reducer for the edit modal while it's
-// visible. Returns the updated model and any command to fire (e.g.
-// the save-metadata command kicked off on ctrl+s / enter).
-//
-// We intercept a small set of keys (esc/ctrl+c cancel, ctrl+s save,
-// enter save in single-line mode) and forward everything else to the
-// underlying textarea widget so it handles cursor nav, editing,
-// clipboard, etc. on its own.
 func (m Model) handleEditModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.editModal == nil {
 		return m, nil
@@ -597,11 +453,9 @@ func (m Model) handleEditModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Confirming phase: user is looking at the diff, waiting to commit.
 	if em.Confirming {
 		switch msg.String() {
 		case "esc":
-			// Return to editing — preserve the buffer they typed.
 			em.Confirming = false
 			em.PreviewLines = nil
 			em.PreviewBaseline = nil
@@ -621,8 +475,6 @@ func (m Model) handleEditModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		onCancel := m.editModal.OnCancel
 		key := msg.String()
 		m.editModal = nil
-		// ctrl+c closes outright; esc pops one level up when a
-		// parent-reopener is wired (drill-down menus), else closes.
 		if key == "esc" && onCancel != nil {
 			return m, onCancel()
 		}
@@ -633,7 +485,6 @@ func (m Model) handleEditModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if !em.Multiline {
 			return m.submitEditModal()
 		}
-		// Multiline: fall through to textarea, which inserts newline.
 	}
 
 	if em.editor != nil {
@@ -665,10 +516,6 @@ func (m Model) submitEditModal() (Model, tea.Cmd) {
 	return m.commitEditModal()
 }
 
-// commitEditModal fires the caller's Save closure, passing whichever
-// baseline the preview handed us (nil for non-preview edits). Locks
-// the modal with Saving=true so key events ignore until the result
-// lands.
 func (m Model) commitEditModal() (Model, tea.Cmd) {
 	em := m.editModal
 	em.Saving = true
@@ -689,9 +536,6 @@ func (m Model) commitEditModal() (Model, tea.Cmd) {
 	}
 }
 
-// editModalResultMsg carries the outcome of a save. The main Update
-// loop calls applyEditModalResult which runs the modal's OnSuccess
-// callback or surfaces the error.
 type editModalResultMsg struct {
 	Err error
 }
@@ -704,31 +548,19 @@ type editModalPreviewMsg struct {
 	Err    error
 }
 
-// editModalLoadedMsg carries the outcome of a LoadCurrent call so the
-// modal can swap from "loading…" to the real buffer.
 type editModalLoadedMsg struct {
 	Value string
 	Err   error
 }
 
-// openEditModal is the canonical way to show an edit modal. It sets
-// the state, builds the textarea widget, kicks the LoadCurrent
-// closure (if any), and returns the tea.Cmd to fire. Callers
-// construct editModalState and hand it off; the open/load ordering
-// is this function's responsibility.
 func (m *Model) openEditModal(state editModalState) tea.Cmd {
 	if state.LoadCurrent != nil {
 		state.Loading = true
 	}
-	// Editor width matches what renderEditModal uses. Rebuilt on open
-	// so each modal starts with a clean widget.
 	editorW := modalWidth(m.width, 60, 100) - 6
 	if editorW < 20 {
 		editorW = 20
 	}
-	// Height: take most of the terminal for multiline (leave room for
-	// modal chrome: title, hint, save/err, keyhint). Cap so we don't
-	// scroll modal chrome off-screen on very tall terminals.
 	editorH := m.height - 10
 	if editorH > 30 {
 		editorH = 30
@@ -759,8 +591,6 @@ func helpForCurrentView(m Model) infoModalState {
 	if m.focus == focusOrgs && m.currentUtility().ID == utilityOrgs {
 		return helpSafety()
 	}
-	// Subtab-level override beats tab-level (TabObjectDetail's per-
-	// subtab help cases).
 	spec, sub := m.activeSpec()
 	if sub != nil && sub.Help != nil {
 		if state := sub.Help(m); state.Title != "" {
@@ -785,8 +615,6 @@ func helpForCurrentView(m Model) infoModalState {
 	}
 }
 
-// helpFieldDetail is shown on the field-detail page. Explains that
-// the right sidebar is an action menu + lists every key gesture.
 func helpFieldDetail() infoModalState {
 	return infoModalState{
 		Title: "Field detail · actions",
@@ -814,8 +642,6 @@ func helpFieldDetail() infoModalState {
 	}
 }
 
-// helpValidationDetail is shown on TabValidationDetail — the full
-// per-rule view with actions.
 func helpValidationDetail() infoModalState {
 	return infoModalState{
 		Title: "Validation rule · actions",
@@ -841,8 +667,6 @@ func helpValidationDetail() infoModalState {
 	}
 }
 
-// helpTriggerDetail is shown on TabTriggerDetail — the full per-
-// trigger view with actions.
 func helpTriggerDetail() infoModalState {
 	return infoModalState{
 		Title: "Trigger · actions",
@@ -867,8 +691,6 @@ func helpTriggerDetail() infoModalState {
 	}
 }
 
-// helpRecordTypeDetail is shown on TabRecordTypeDetail — the full
-// per-record-type view with actions.
 func helpRecordTypeDetail() infoModalState {
 	return infoModalState{
 		Title: "Record type · actions",
@@ -893,9 +715,6 @@ func helpRecordTypeDetail() infoModalState {
 	}
 }
 
-// helpObjectDetails is shown on the Details subtab of the object
-// drill. Mirrors helpFieldDetail but scoped to the object-level
-// action menu.
 func helpObjectDetails() infoModalState {
 	return infoModalState{
 		Title: "Object detail · actions",
@@ -921,8 +740,6 @@ func helpObjectDetails() infoModalState {
 	}
 }
 
-// helpObjectFLS is shown on TabObjectDetail → FLS subtab. Explains
-// the 2D grid model (fields × R/E) + the toggle semantics.
 func helpObjectFLS() infoModalState {
 	return infoModalState{
 		Title: "Field-Level Security · grid",
@@ -948,7 +765,6 @@ func helpObjectFLS() infoModalState {
 	}
 }
 
-// helpRecordsLenses explains the saved-views system on Records-shaped tabs.
 func helpRecordsLenses() infoModalState {
 	return infoModalState{
 		Title: "Records · views",
@@ -1000,9 +816,6 @@ func helpSafety() infoModalState {
 	}
 }
 
-// helpFieldsTable is the info modal shown when the user presses `?`
-// on the Schema subtab of an Object drill. Documents the fixed-slot
-// FLAGS column layout so users don't have to memorise it.
 func helpFieldsTable() infoModalState {
 	return infoModalState{
 		Title: "FIELDS · FLAGS column",

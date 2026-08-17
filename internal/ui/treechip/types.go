@@ -2,55 +2,6 @@
 // shaped Salesforce data. Sibling to internal/ui/qchip (filter chips)
 // — they share visual + persistence primitives but have fundamentally
 // different selection models.
-//
-// What treechip is for
-// ====================
-//
-// qchip filters: each chip is a (label, predicate). Selecting one
-// filters a flat row list. Chips have no relation to each other.
-//
-// treechip navigates: each chip is a position in a tree. Selecting a
-// chip means "I'm at this branch." The main pane changes shape based
-// on position (showing subnodes + items), not just content.
-//
-// Use treechip when:
-//   - The data has parent/child relationships (folders, account
-//     hierarchy, custom self-referential lookups, file trees, …)
-//   - The user expects to drill from outer to inner branches AND
-//     pin individual branches as favourites for one-keypress jumps.
-//
-// Use qchip when filtering a flat list with predicates.
-//
-// Public API surface
-// ==================
-//
-// Domain implementations only need to provide a TreeSource (and an
-// ItemSource for the leaf rows at each node). Everything else — path
-// management, pinning, persistence, view-state for renderers — is
-// owned by Registry.
-//
-// Adding a new tree-shaped data source:
-//
-//  1. Implement TreeSource (Roots, Children, Item) for the domain.
-//  2. Implement ItemSource[T] for the leaf items at a node.
-//  3. Build a Registry with NewRegistry(domain, src, items, settings).
-//  4. Use Registry.Path() / Drill() / Up() / JumpTo() / Reset() to
-//     move around. Read StripModel() and MainModel() to render.
-//
-// First implementation: internal/sf/report_folders.go (Reports by
-// folder). Designed to be a pattern for future trees: Account
-// hierarchy, PSG component graphs, custom self-refs.
-//
-// Why a separate package from qchip
-// ==================================
-//
-// Selection model is fundamentally different — position vs filter.
-// Trying to bolt hierarchy onto qchip would either complicate qchip's
-// existing flat-filter callers (Records / Objects / Flows) or
-// degrade treechip into "filters with parent pointers." A future
-// internal/ui/chips/ extraction will share the rendering primitives
-// (pill widget, overflow modal, favourite-store) without forcing
-// either model on the other.
 package treechip
 
 // TreeNode is one node in the tree. Identity is the ID; Label is the

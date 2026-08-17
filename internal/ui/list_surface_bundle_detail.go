@@ -3,18 +3,6 @@ package ui
 // /bundle drill list surface. Replaces the static text dump in
 // tab_bundle_detail.go's body with a sortable list table over the
 // preview's components.
-//
-// Row = one component in the bundle's retrieve / deploy preview.
-// Action = "To retrieve" / "To deploy" / "Delete" / "Conflict" /
-// "Ignored" — sourced from which slice of the ManifestPreview the
-// item came from. Kind / Member mirror the preview's Type /
-// FullName.
-//
-// Storage lives on Model.bundleDetail* (not orgData) because
-// bundles are org-independent. The table state resolver
-// (listTableBundleDetail) is wired via TabSpec.ListTable rather
-// than the listSurface registry so the closures can reach Model
-// directly.
 
 import (
 	"charm.land/lipgloss/v2"
@@ -25,10 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// bundleDetailRow is one selectable row in the bundle detail
-// list. Action drives the leftmost column + the recolor pass
-// (green = retrieve, blue = deploy, red = delete, yellow =
-// conflict, muted = ignored).
 type bundleDetailRow struct {
 	Action    string // "To retrieve" / "To deploy" / "Delete" / "Conflict" / "Ignored"
 	Kind      string // ManifestPreviewItem.Type — e.g. "Flow", "ApexClass", "CustomField"
@@ -37,10 +21,6 @@ type bundleDetailRow struct {
 	Namespace string // managed-package prefix; empty for non-managed
 }
 
-// bundleDetailColumnSchema is the canonical column spec for the
-// list. Action / Kind / Member is the natural reading order;
-// sortable so users can group by action ("show me everything I'd
-// retrieve") or by kind ("show me all the flows").
 func bundleDetailColumnSchema() tablemodel.Schema[bundleDetailRow] {
 	return tablemodel.Schema[bundleDetailRow]{
 		DefaultColumns: func(scope string) []string {
@@ -72,18 +52,10 @@ func bundleDetailColumnSchema() tablemodel.Schema[bundleDetailRow] {
 	}
 }
 
-// bundleDetailListCols is the published column list. Same shape
-// the renderer uses + the TabSpec.ListTable resolver returns.
 func bundleDetailListCols() []uilayout.ListColumn {
 	return mustResolveColumns(bundleDetailColumnSchema()).ListColumns()
 }
 
-// listTableBundleDetail is the TabSpec.ListTable resolver. Hands
-// back the persistent list-table state + canonical column defs so
-// the c (column-mode) / s (sort) / [ ] (resize) gestures wire
-// onto this surface for free. Branches on view mode so the FILES
-// view gets its own table-state + columns instead of sharing the
-// components surface's.
 func listTableBundleDetail(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	if m == nil {
 		return nil, nil
@@ -132,10 +104,6 @@ func bundleDetailRowsFromPreview(p bundlePreview) []bundleDetailRow {
 	return rows
 }
 
-// recolorBundleDetailRow tints the Action cell based on the row's
-// action — green retrieve / blue deploy / yellow conflict / red
-// delete / muted ignored. Returns the style derived from the row;
-// applies only to col 0 (Action), leaves the rest untouched.
 func recolorBundleDetailRow(r bundleDetailRow, col int, base lipgloss.Style) lipgloss.Style {
 	if col != 0 {
 		return base

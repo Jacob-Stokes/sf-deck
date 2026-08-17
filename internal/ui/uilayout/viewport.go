@@ -1,10 +1,5 @@
 package uilayout
 
-// Viewport is the shared "scroll a list of rows that exceeds the pane"
-// primitive. Every list-based view (Flows, Objects, SOQL results, etc.)
-// pipes through RenderRows so cursor-following, row windowing, the
-// scroll indicator, and the reserved-lines math all live in one place.
-
 import (
 	"fmt"
 	"strings"
@@ -46,10 +41,6 @@ func RenderRows(
 	for i := start; i < end; i++ {
 		out = append(out, renderRow(i))
 	}
-	// Always render the position indicator — even when the full list
-	// fits in the viewport. "33 / 33" gives users a stable count
-	// reference; the previous "hide when nothing to scroll" behaviour
-	// looked like the count had vanished on small lists.
 	if n > 0 {
 		out = append(out, scrollIndicator(sel, n, inner))
 	}
@@ -119,18 +110,10 @@ func RenderRowsPaged(
 	for i := start; i < end; i++ {
 		out = append(out, renderRow(i))
 	}
-	// Always render the page indicator so users see a stable
-	// "Page 1 / 1" reference even on small lists. Hiding it when
-	// totalPages==1 looked like the count had disappeared on
-	// short result sets.
 	out = append(out, pageIndicator(page, totalPages, inner))
 	return out, totalPages
 }
 
-// pageIndicator is the right-aligned "Page X / N" footer hint
-// shown beneath the rows when paginated mode covers more than one
-// page. Mirrors scrollIndicator's positioning so users get the same
-// visual anchor in both modes.
 func pageIndicator(page, total, width int) string {
 	s := fmt.Sprintf("Page %d / %d", page+1, total)
 	pad := width - len(s) - 2
@@ -170,10 +153,6 @@ func window(sel, n, visible int) (int, int) {
 	return start, end
 }
 
-// scrollIndicator renders a one-line "N / M" position hint, right-
-// aligned to the given inner width. Callers only emit it when the
-// viewport is a proper subset of the list; RenderRows handles that
-// check automatically.
 func scrollIndicator(sel, total, width int) string {
 	s := fmt.Sprintf("%d / %d", sel+1, total)
 	pad := width - len(s) - 2

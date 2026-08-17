@@ -133,9 +133,6 @@ restart:
 		if len(q.Records) == 0 {
 			break
 		}
-		// Last page: a partial fill (< batchSize rows returned) means
-		// we've reached the end. Process it and exit before firing
-		// the dead "are we there yet" probe call.
 		lastPage := len(q.Records) < batchSize
 		prevLast := lastID
 		for _, r := range q.Records {
@@ -180,8 +177,6 @@ restart:
 			break
 		}
 	}
-	// Re-sort by QualifiedApiName (case-insensitive) so the UI sees
-	// alphabetical order; server order was by DurableId for paging.
 	sortByName(all)
 	return all, nil
 }
@@ -194,8 +189,6 @@ func unsupportedLastModifiedBy(err error) bool {
 			strings.Contains(s, "invalid field"))
 }
 
-// sortByName orders SObjects by QualifiedApiName, case-insensitive,
-// so the UI renders alphabetically regardless of server sort order.
 func sortByName(xs []SObject) {
 	sort.SliceStable(xs, func(i, j int) bool {
 		return strings.ToLower(xs[i].Name) < strings.ToLower(xs[j].Name)

@@ -1,12 +1,5 @@
 package ui
 
-// /compare — Saved + History subtabs, plus the Enter (activate) handler.
-//
-// Saved comparison DEFINITIONS persist in settings.toml (settings
-// CompareDefs); this file snapshots them into per-org ListViews so the
-// shared list engine drives them (same approach as SOQL Saved/History).
-// Run History is in-memory for the session.
-
 import (
 	"fmt"
 	"strings"
@@ -21,14 +14,11 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// --- Saved subtab ---------------------------------------------------------
-
 func (m *Model) reloadCompareSaved(d *orgData) {
 	if d == nil {
 		return
 	}
 	var rows []CompareDefRow
-	// Saved comparisons (data-ful) first — these are the primary artifact.
 	if m.devProjects != nil {
 		if saved, err := m.devProjects.ListSavedComparisons(); err == nil {
 			for _, sc := range saved {
@@ -44,7 +34,6 @@ func (m *Model) reloadCompareSaved(d *orgData) {
 			}
 		}
 	}
-	// Templates (recipe-only) after.
 	if m.settings != nil {
 		for _, def := range m.settings.CompareDefs() {
 			rows = append(rows, CompareDefRow{
@@ -137,8 +126,6 @@ func (m Model) renderCompareSavedSubtab(w, innerH int) string {
 	return strings.Join(renderListModel(m, model, m.focus, inner, innerH), "\n")
 }
 
-// --- History subtab -------------------------------------------------------
-
 func (m *Model) reloadCompareHistory(d *orgData) {
 	if d == nil {
 		return
@@ -148,8 +135,6 @@ func (m *Model) reloadCompareHistory(d *orgData) {
 			return strings.Contains(strings.ToLower(r.Name+" "+r.Source+" "+r.Target), q)
 		})
 	}
-	// History is kept on the ListView itself (appended on each run); just
-	// mark loaded so the OnEnter guard doesn't clear it.
 	d.HistoryLoaded = true
 }
 
@@ -225,7 +210,6 @@ func (m Model) renderCompareHistorySubtab(w, innerH int) string {
 	return strings.Join(renderListModel(m, model, m.focus, inner, innerH), "\n")
 }
 
-// recordCompareRun appends a finished run to the history ListView.
 func (d *orgData) recordCompareRun(run *compareRun) {
 	_, different, aOnly, bOnly := run.Inv.Summary()
 	row := CompareHistoryRow{
@@ -242,12 +226,6 @@ func (d *orgData) recordCompareRun(run *compareRun) {
 	d.HistoryLoaded = true
 }
 
-// --- activate (Enter) -----------------------------------------------------
-
-// activateCompare handles Enter across the compare subtabs:
-//   - New: edit the focused setup field, or run the comparison
-//   - Result / inventory: open the body diff for the selected row
-//   - Saved: open/run the selected saved comparison
 func (m *Model) activateCompare() tea.Cmd {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -264,7 +242,6 @@ func (m *Model) activateCompare() tea.Cmd {
 	return nil
 }
 
-// activateCompareNew handles Enter on the setup form (New subtab).
 func (m *Model) activateCompareNew(d *orgData) tea.Cmd {
 	if d.Run == nil {
 		d.Run = m.newCompareRun()
@@ -303,8 +280,6 @@ func (m *Model) activateCompareNew(d *orgData) tea.Cmd {
 	return nil
 }
 
-// activateCompareResult handles Enter on the Result subtab: open the
-// body-diff drill-in for the selected inventory row.
 func (m *Model) activateCompareResult(d *orgData) tea.Cmd {
 	if d.Run == nil || d.Run.Phase != comparePhaseInventory || d.Diff != nil {
 		return nil
@@ -312,8 +287,6 @@ func (m *Model) activateCompareResult(d *orgData) tea.Cmd {
 	return m.openCompareDiff(d)
 }
 
-// newCompareRun builds a fresh run seeded with the active org as source
-// and the default (all-types) scope.
 func (m *Model) newCompareRun() *compareRun {
 	var source endpoint
 	if len(m.orgs) > 0 {
@@ -327,9 +300,6 @@ func (m *Model) newCompareRun() *compareRun {
 	}
 }
 
-// activateSavedRow handles Enter on a Saved-subtab row:
-//   - comparison → OPEN it offline (load stored snapshots + inventory)
-//   - template   → RE-RUN it (fetch fresh)
 func (m *Model) activateSavedRow(d *orgData) tea.Cmd {
 	row, ok := d.SavedList.Selected()
 	if !ok {
@@ -338,13 +308,9 @@ func (m *Model) activateSavedRow(d *orgData) tea.Cmd {
 	if row.Kind == savedRowComparison {
 		return m.openSavedComparison(d, row.ID)
 	}
-	// Template Enter → prefill the setup screen (templates have no
-	// stored result to open offline).
 	return m.rerunEditSelected(d)
 }
 
-// openSavedComparison loads a stored comparison's data and shows its
-// inventory immediately — no API calls, works offline.
 func (m *Model) openSavedComparison(d *orgData, id string) tea.Cmd {
 	if m.devProjects == nil {
 		return nil
@@ -359,12 +325,8 @@ func (m *Model) openSavedComparison(d *orgData, id string) tea.Cmd {
 		m.flash("open: " + err.Error())
 		return nil
 	}
-	// Remember where this came from so saving offers overwrite-vs-new.
 	run.OriginSavedID = sc.ID
 	run.OriginSavedName = sc.Name
-	// Stamp when it last ran so the inventory shows a staleness banner —
-	// a saved comparison is a point-in-time photo; components may have
-	// changed since.
 	run.OpenedSavedAt = sc.UpdatedAt
 	if run.OpenedSavedAt.IsZero() {
 		run.OpenedSavedAt = sc.CreatedAt
@@ -372,16 +334,10 @@ func (m *Model) openSavedComparison(d *orgData, id string) tea.Cmd {
 	d.Run = run
 	d.syncInventoryList()
 	d.InventoryList.ResetCursor()
-	// Opened result shows on the Result subtab (its phase is Inventory).
 	m.compareSubtabIdx = compareSubtabResultIdx
 	return nil
 }
 
-// rerunEditSelected loads the selected saved row's config into the New
-// setup screen (comparePhaseSetup) — PREFILLED but NOT fetched — so the
-// user can tweak source/target/scope/method, then press Compare. This
-// is the "rerun = prefill the main screen" model: the setup screen is
-// the editor, no bespoke edit modal needed.
 func (m *Model) rerunEditSelected(d *orgData) tea.Cmd {
 	row, ok := d.SavedList.Selected()
 	if !ok {
@@ -393,8 +349,6 @@ func (m *Model) rerunEditSelected(d *orgData) tea.Cmd {
 			m.flash("edit: " + err.Error())
 			return nil
 		}
-		// Saved comparisons edit in the dedicated modal — keeps the
-		// edit/clone state off the persistent run (no Editing-row leak).
 		m.openCompareEditModal(compareEditSeed{
 			OriginID:   sc.ID,
 			OriginName: sc.Name,
@@ -405,8 +359,6 @@ func (m *Model) rerunEditSelected(d *orgData) tea.Cmd {
 		})
 		return nil
 	}
-	// Template (recipe, no stored result, not an overwrite target):
-	// prefill the plain New setup form.
 	if m.settings != nil {
 		for _, def := range m.settings.CompareDefs() {
 			if def.Name != row.Name {
@@ -427,10 +379,6 @@ func (m *Model) rerunEditSelected(d *orgData) tea.Cmd {
 	return nil
 }
 
-// editCurrentCompareInSetup opens the edit modal seeded from the ACTIVE
-// run (e.g. a just-opened saved comparison's inventory) when it's linked
-// to a saved comparison. Unlinked runs fall back to the in-subtab setup
-// form (no saved comparison to edit/clone).
 func (m *Model) editCurrentCompareInSetup(d *orgData) tea.Cmd {
 	if d.Run == nil {
 		return nil
@@ -446,7 +394,6 @@ func (m *Model) editCurrentCompareInSetup(d *orgData) tea.Cmd {
 		})
 		return nil
 	}
-	// Unlinked active run → tweak it in the setup form (New subtab).
 	d.Run.Phase = comparePhaseSetup
 	d.Run.Err = nil
 	d.Diff = nil
@@ -455,8 +402,6 @@ func (m *Model) editCurrentCompareInSetup(d *orgData) tea.Cmd {
 	return nil
 }
 
-// saveSelectedAsTemplate derives a data-less template from a saved
-// comparison row (or no-ops on a row that's already a template).
 func (m *Model) saveSelectedAsTemplate(d *orgData) tea.Cmd {
 	row, ok := d.SavedList.Selected()
 	if !ok || row.Kind != savedRowComparison || m.settings == nil {
@@ -471,8 +416,6 @@ func (m *Model) saveSelectedAsTemplate(d *orgData) tea.Cmd {
 	return nil
 }
 
-// deleteSelectedSaved removes the selected saved comparison (templates
-// are managed via settings and skipped here).
 func (m *Model) deleteSelectedSaved(d *orgData) tea.Cmd {
 	row, ok := d.SavedList.Selected()
 	if !ok {
@@ -487,7 +430,6 @@ func (m *Model) deleteSelectedSaved(d *orgData) tea.Cmd {
 		d.SavedLoaded = false
 		return nil
 	}
-	// Template: drop from settings.
 	if m.settings != nil {
 		var keep []settings.CompareDef
 		for _, def := range m.settings.CompareDefs() {
@@ -503,7 +445,6 @@ func (m *Model) deleteSelectedSaved(d *orgData) tea.Cmd {
 	return nil
 }
 
-// settingsCompareDefFromRow builds a template def from a saved-comparison row.
 func settingsCompareDefFromRow(row CompareDefRow) settings.CompareDef {
 	return settings.CompareDef{
 		Name:   row.Name + " (template)",
@@ -513,7 +454,6 @@ func settingsCompareDefFromRow(row CompareDefRow) settings.CompareDef {
 	}
 }
 
-// renameSelectedSaved renames the selected saved comparison.
 func (m *Model) renameSelectedSaved(d *orgData) tea.Cmd {
 	row, ok := d.SavedList.Selected()
 	if !ok || row.Kind != savedRowComparison || m.devProjects == nil {
@@ -536,9 +476,6 @@ func (m *Model) renameSelectedSaved(d *orgData) tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// settingsCompareDef converts an in-memory run + name into the
-// persisted settings shape. Persists org refs (v1 endpoints are always
-// org-kind; project endpoints will extend the settings shape later).
 func settingsCompareDef(name string, run *compareRun) settings.CompareDef {
 	return settings.CompareDef{
 		Name:   name,
@@ -549,7 +486,6 @@ func settingsCompareDef(name string, run *compareRun) settings.CompareDef {
 	}
 }
 
-// parseCompareMethod maps a persisted method label back to the enum.
 func parseCompareMethod(s string) compareMethod {
 	switch s {
 	case "Tooling":

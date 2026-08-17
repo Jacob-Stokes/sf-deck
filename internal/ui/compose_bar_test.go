@@ -16,8 +16,6 @@ func TestComposeBarKeepsMiddleByTruncatingLeft(t *testing.T) {
 	left := "records · Account · a-very-long-breadcrumb-that-would-crowd-the-bar-out"
 	middle := "⟳ getting new token…"
 	right := "API 412"
-	// Width comfortably above the width-70 floor (caller handles that),
-	// but not enough for the full breadcrumb + middle + right.
 	out := composeBar(90, left, middle, right)
 
 	if !strings.Contains(out, "getting new token…") {

@@ -4,12 +4,6 @@ import (
 	"testing"
 )
 
-// project import-bundle reads a package.xml from disk and stamps
-// each member as a project item. Without a real path, the
-// validation path runs — that's what we exercise. The
-// service-layer code that actually parses package.xml is covered
-// by tests inside internal/services/projects.
-
 func TestProjectImportBundle_MissingArgs(t *testing.T) {
 	a := newTestAppWithStore(t)
 	cases := []struct {

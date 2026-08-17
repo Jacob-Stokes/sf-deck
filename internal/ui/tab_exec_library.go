@@ -1,11 +1,5 @@
 package ui
 
-// /exec Saved + History subtabs. Mirrors tab_soql_library.go's shape
-// (per-org ListViews of devproject store snapshots, listSurface
-// wiring, load-into-editor + save/duplicate/delete/rename handlers).
-// Differs only in storage table (saved_apex / apex_history) and the
-// load-target (editor textarea instead of single-line input).
-
 import (
 	"fmt"
 	"strings"
@@ -19,9 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// ----- Saved subtab -----------------------------------------------
-
-// reloadExecSaved refreshes d.ExecSavedList from the devproject store.
 func (m *Model) reloadExecSaved(d *orgData) {
 	if d == nil {
 		return
@@ -111,8 +102,6 @@ var execSavedListSurface = listSurface{
 		}, true
 	},
 }
-
-// ----- History subtab ---------------------------------------------
 
 func (m *Model) reloadExecHistory(d *orgData) {
 	if d == nil {
@@ -217,18 +206,11 @@ var execHistoryListSurface = listSurface{
 	},
 }
 
-// ----- Renderers (replacements for stage 3 stubs) ----------------
-
 func (m Model) renderExecSavedSubtab(w, innerH int) string {
 	d, ok := m.activeOrgState()
 	if !ok {
 		return noOrgPlaceholder()
 	}
-	// Lazy reload on render so post-mutation invalidations
-	// (rename / delete / duplicate / save) repopulate the list
-	// without needing the user to leave + re-enter the subtab.
-	// reloadExecSaved is cheap (one local SQLite query) so doing
-	// it inline on a single render after mutation is fine.
 	if !d.ExecSavedLoaded {
 		mm := m
 		(&mm).reloadExecSaved(d)
@@ -260,11 +242,6 @@ func (m Model) renderExecHistorySubtab(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// ----- Activate (Enter) handlers ---------------------------------
-
-// loadCursoredExecSavedEntry — Enter on a Saved row loads it into
-// the editor and flips back to the Editor subtab. Same shape as
-// loadCursoredSavedEntry on /soql.
 func (m *Model) loadCursoredExecSavedEntryReal() {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -284,8 +261,6 @@ func (m *Model) loadCursoredExecSavedEntryReal() {
 	d.ExecSavedLoaded = false
 }
 
-// loadCursoredExecHistoryEntry — Enter on a History row loads the
-// body back into the editor.
 func (m *Model) loadCursoredExecHistoryEntryReal() {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -300,8 +275,6 @@ func (m *Model) loadCursoredExecHistoryEntryReal() {
 	m.execSubtabIdx = execSubtabIndex(SubtabExecEditor)
 	m.execEditingSavedID = ""
 }
-
-// ----- Save / delete / rename / duplicate ------------------------
 
 // handleExecSave saves the current editor body — updating the
 // existing snippet when execEditingSavedID is set, otherwise
@@ -342,7 +315,6 @@ func (m Model) handleExecSave() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleExecLibraryDelete deletes the cursored Saved snippet.
 func (m Model) handleExecLibraryDelete() (tea.Model, tea.Cmd) {
 	if m.devProjects == nil {
 		return m, nil
@@ -367,8 +339,6 @@ func (m Model) handleExecLibraryDelete() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleExecRename opens an edit modal pre-populated with the
-// cursored snippet's name + description.
 func (m Model) handleExecRename() (tea.Model, tea.Cmd) {
 	if m.currentSubtab() != SubtabExecSaved {
 		return m, nil
@@ -410,8 +380,6 @@ func (m Model) handleExecRename() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// handleExecDuplicate creates "Copy of X" from the cursored Saved
-// snippet.
 func (m Model) handleExecDuplicate() (tea.Model, tea.Cmd) {
 	if m.devProjects == nil {
 		return m, nil
@@ -433,10 +401,6 @@ func (m Model) handleExecDuplicate() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// ----- Helpers ----------------------------------------------------
-
-// collapseApex flattens a multi-line Apex body to a single-line
-// preview for the Saved + History tables. Mirrors collapseSOQL.
 func collapseApex(body string) string {
 	out := strings.ReplaceAll(body, "\r", " ")
 	out = strings.ReplaceAll(out, "\n", " ")
@@ -447,9 +411,6 @@ func collapseApex(body string) string {
 	return strings.TrimSpace(out)
 }
 
-// firstNonEmptyLine returns the first line of s that isn't blank,
-// truncated to 60 chars. Used as a default snippet name when the
-// user saves without explicitly naming.
 func firstNonEmptyLine(s string) string {
 	for _, ln := range strings.Split(s, "\n") {
 		ln = strings.TrimSpace(ln)

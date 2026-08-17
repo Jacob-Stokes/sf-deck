@@ -12,10 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// orgSummary is the headless-facing view of one connected org. The
-// underlying sf.Org carries fields that aren't useful in JSON output
-// (LastUsed string, internal flags); we project to just what an agent
-// or script consumer cares about.
 type orgSummary struct {
 	Alias       string `json:"alias,omitempty"`
 	Username    string `json:"username"`
@@ -163,9 +159,6 @@ func orgSafetyGet(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 		return writeOrgErr("org.safety.get", *target, err, stdout, mode)
 	}
 	level := a.SafetyFor(o)
-	// Look up whether the value comes from an explicit override or
-	// from kind-defaults — useful for callers who want to know "is
-	// this user-set or implicit?".
 	override, hasOverride := a.Settings.OrgSafetyOverride(o.Username, o.Alias)
 	r := headless.Success("org.safety.get", o.Username, app.TargetArg(o), false,
 		map[string]any{
@@ -215,9 +208,6 @@ func orgSafetySet(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 		a.Settings.SetOrg(o.Username, settings.SafetyReadOnly, true)
 	} else {
 		lvl := settings.ParseSafetyLevel(*levelRaw)
-		// ParseSafetyLevel is forgiving (unknown → read_only). Reject
-		// unknown values explicitly so the JSON shape signals the
-		// caller mistake rather than silently downgrading.
 		if !isKnownSafetyString(*levelRaw) {
 			return writeArgErr("org.safety.set",
 				fmt.Errorf("invalid safety level %q (want read_only|records|metadata|full)", *levelRaw),
@@ -270,9 +260,6 @@ func isKnownSafetyString(s string) bool {
 	return false
 }
 
-// writeOrgErr maps app.ResolveOrg errors into typed JSON. Currently
-// the only typed error is "not found"; everything else (e.g. "no orgs
-// connected") becomes invalid_argument.
 func writeOrgErr(command, target string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	msg := err.Error()
 	if strings.Contains(msg, "not found") {

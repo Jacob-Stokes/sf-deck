@@ -5,21 +5,12 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
+	"github.com/charmbracelet/x/ansi"
 )
 
-// Per-surface sidebars for /objects + object-detail subtabs: object
-// list/detail, records, fields (+ FLS actions), record types,
-// triggers, validation rules. Split out of sidebar.go.
-
-// sidebarObjectDetailDispatch routes to the right per-subtab sidebar
-// for ObjectDetail, whose subtabs aren't declared in TabSpec.Subtabs
-// (they fan out from a render-time switch instead). Mirror of the
-// Identity dispatcher; explicit branches per subtab — no default
-// fallback so a future SubtabXX without an entry no-ops cleanly.
 func sidebarObjectDetailDispatch(m Model, inner int) string {
 	switch m.currentSubtab() {
 	case SubtabDetails:
@@ -40,10 +31,6 @@ func sidebarObjectDetailDispatch(m Model, inner int) string {
 	return ""
 }
 
-// sidebarObjectDetailRecord is the Object-drill Records-subtab sidebar.
-// Shows the selected row's full KV. Source depends on the active chip:
-// synthetic "recent" pulls from d.Records; a Salesforce list view
-// pulls from d.ListViewResults.
 func (m Model) sidebarObjectDetailRecord(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -80,8 +67,6 @@ func (m Model) sidebarObjectDetailRecord(inner int) string {
 	return renderKVPanel(inner, title, rows)
 }
 
-// sidebarRecords shows the full selected record as KV when in record-
-// list mode, or the selected sObject's summary when in picker mode.
 func (m Model) sidebarRecords(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -226,13 +211,8 @@ func (m Model) sidebarField(inner int) string {
 		return sideEmpty("no matches")
 	}
 
-	// Each section builds a []kv (or plain strings) and is joined at
-	// the end. Sections separate with a blank line + dim title.
 	fieldRef := r.Value().Name + "." + f.Name
 	var out []string
-	// In stacked mode fold tags/projects into the title line (they're
-	// suppressed from the body below by sidebarTagsProjectsSection); in
-	// RHS mode the plain title stays and the body section renders.
 	titleLine := sideTitle(f.Name)
 	if m.compactSidebarPills() {
 		titleLine = m.stackedTitleWithTagsProjects(sideTitle(f.Name), "",
@@ -382,8 +362,6 @@ func (m Model) sidebarField(inner int) string {
 			sideDim("  "+wrap(f.InlineHelpText, inner-2), inner))
 	}
 
-	// fieldRef computed above. In stacked mode this returns "" (tags/
-	// projects were folded into the title); RHS mode renders the body.
 	if section := m.sidebarTagsProjectsSection(devproject.KindField, fieldRef, o.Username, inner); section != "" {
 		out = append(out, section)
 	}
@@ -392,17 +370,10 @@ func (m Model) sidebarField(inner int) string {
 	return strings.Join(laid, "\n")
 }
 
-// sidebarFieldBudget is the content-height the schema-subtab field
-// sidebar may use before it should reflow into columns. The title +
-// separator that renderKVPanel-style headers add aren't present here
-// (sidebarField emits its own title), so the budget is the full
-// available sidebar height.
 func (m Model) sidebarFieldBudget() int {
 	return m.sidebarInnerH
 }
 
-// sidebarFieldTypeDisplay matches the TYPE column's virtual-type
-// expansion so the sidebar is consistent with the table.
 func sidebarFieldTypeDisplay(f sf.Field) string {
 	switch {
 	case f.AutoNumber:
@@ -425,10 +396,6 @@ func sidebarFieldTypeDisplay(f sf.Field) string {
 	return f.Type
 }
 
-// renderSchemaFieldRow formats one field row in the schema sidebar.
-// Layout: "  fieldName  type · flags". Reference fields append
-// "→ TargetSObject". Picklists append the value count. Wider
-// sidebar widths reveal more detail; narrow widths truncate.
 func renderSchemaFieldRow(f sf.Field, inner int) string {
 	prefix := "  "
 	nameStyle := lipgloss.NewStyle().Foreground(theme.Fg)
@@ -445,9 +412,6 @@ func renderSchemaFieldRow(f sf.Field, inner int) string {
 	} else if f.Type == "picklist" {
 		typeStr = fmt.Sprintf("picklist (%d)", len(f.PicklistValues))
 	}
-	// Capability badges: only show the ones that DIFFER from the
-	// usual defaults (filterable+sortable are common; non-
-	// filterable is the notable case).
 	var badges []string
 	if !f.Filterable {
 		badges = append(badges, "noFilter")
@@ -470,17 +434,12 @@ func renderSchemaFieldRow(f sf.Field, inner int) string {
 	return ansi.Truncate(body, inner, "…")
 }
 
-// sidebarFieldActions is the TabFieldDetail right sidebar — a context
-// panel for the cursored field-detail row.
 func (m Model) sidebarFieldActions(inner int) string {
 	ctx := m.fieldRowContext()
 	ctx.Hints = detailNavHints(true)
 	return m.sidebarRowContext("FIELD · CONTEXT", inner, ctx)
 }
 
-// fieldRowContext builds the context panel for the cursored field
-// row. The field actions write via the Tooling CustomField API (not
-// the Metadata deploy that object edits use).
 func (m Model) fieldRowContext() rowContext {
 	idx, ok := m.fieldDetailActionForCursor()
 	if !ok {
@@ -532,7 +491,6 @@ func (m Model) fieldRowContext() rowContext {
 	return ctx
 }
 
-// fieldActionCurrentValue returns the "now:" value for a field action.
 func fieldActionCurrentValue(idx int, f sf.Field) string {
 	switch idx {
 	case fieldActLabel:
@@ -556,12 +514,6 @@ func fieldActionCurrentValue(idx int, f sf.Field) string {
 	return ""
 }
 
-// sidebarObjectActions is the Details-subtab right sidebar. It is now
-// INFO-ONLY: the action menu lives in the main pane (arrow keys walk
-// the editable rows; Enter / ctrl+e fires them). This sidebar just
-// mirrors the catalog of available actions and highlights whichever
-// one the cursored main-pane row maps to, so the user can safely hide
-// it without losing the ability to act.
 func (m Model) sidebarObjectActions(inner int) string {
 	ctx := m.objectRowContext()
 
@@ -573,9 +525,6 @@ func (m Model) sidebarObjectActions(inner int) string {
 	return m.sidebarRowContext("OBJECT · CONTEXT", inner, ctx)
 }
 
-// objectRowContext builds the context panel for the cursored Details
-// row. Read-only rows explain themselves; editable rows carry the
-// deploy routing + consequence so the user knows what a write ships.
 func (m Model) objectRowContext() rowContext {
 	idx, ok := m.objectDetailActionForCursor()
 	if !ok {
@@ -623,8 +572,6 @@ func (m Model) objectRowContext() rowContext {
 	return ctx
 }
 
-// objectActionCurrentValue returns the current value string for an
-// object action index, used as the "now:" line in the context panel.
 func objectActionCurrentValue(idx int, v sf.SObjectDescribe, base *sf.CustomObjectBaseline) string {
 	switch idx {
 	case 0:
@@ -655,10 +602,6 @@ func objectActionCurrentValue(idx int, v sf.SObjectDescribe, base *sf.CustomObje
 	return ""
 }
 
-// sidebarRecordType renders a compact summary of the currently-
-// selected record type on the Record Types subtab. Drill into a
-// record type (enter) to open TabRecordTypeDetail for the full
-// Metadata + action menu.
 func (m Model) sidebarRecordType(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -703,9 +646,6 @@ func (m Model) sidebarRecordType(inner int) string {
 		devproject.KindRecordType, rt.ID, o.Username, rows, extra...)
 }
 
-// sidebarTrigger renders a compact summary of the currently-selected
-// trigger on the Triggers subtab. Drill (enter) to open
-// TabTriggerDetail for the body + action menu.
 func (m Model) sidebarTrigger(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -750,10 +690,6 @@ func (m Model) sidebarTrigger(inner int) string {
 		devproject.KindApexTrigger, t.ID, o.Username, rows, extra...)
 }
 
-// sidebarValidationRule renders a compact summary of the currently-
-// selected rule on the Validation subtab. Drill into a rule (enter)
-// to open TabValidationDetail for the full formula body + action
-// menu.
 func (m Model) sidebarValidationRule(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {

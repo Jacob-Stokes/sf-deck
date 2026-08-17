@@ -17,7 +17,6 @@ func TestFilteredCacheReturnsSameSliceOnRepeatCall(t *testing.T) {
 	if len(a) != 2 || a[0] != 2 || a[1] != 4 {
 		t.Fatalf("Filtered() = %v, want [2 4]", a)
 	}
-	// Slice headers point at same backing array — cache hit.
 	if &a[0] != &b[0] {
 		t.Fatal("expected identical backing array on repeat Filtered() call (cache miss)")
 	}
@@ -90,7 +89,6 @@ func TestFilteredCacheInvalidatesOnSearchChange(t *testing.T) {
 	lv.Search.SetBuffer("a")
 	lv.Search.Active = true
 	got := lv.Filtered()
-	// "a" matches alpha, beta, gamma, delta — all four.
 	if len(got) != 4 {
 		t.Fatalf("after search 'a', Filtered() = %v, want 4", got)
 	}

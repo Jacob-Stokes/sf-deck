@@ -1,13 +1,6 @@
 package sf
 
 // Composite requests.
-//
-// Salesforce's /composite endpoint accepts up to 25 subrequests in one
-// round-trip. Used here to batch SOQL queries that would otherwise be
-// issued serially (multiple describes, a PermissionSet+Profile lookup
-// pair, /home's five independent data queries, etc.). Round-trip
-// latency dominates each REST call, so bundling is a near-linear
-// speedup for parallel-queryable work.
 
 import (
 	"encoding/json"
@@ -63,7 +56,6 @@ func (c *Client) Composite(requests []CompositeRequest, allOrNone bool) ([]Compo
 	return out, nil
 }
 
-// compositeOnce issues a single /composite HTTP call (≤25 subrequests).
 func (c *Client) compositeOnce(requests []CompositeRequest, allOrNone bool) ([]CompositeResponse, error) {
 	type subreq struct {
 		Method      string `json:"method"`

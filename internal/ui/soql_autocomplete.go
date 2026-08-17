@@ -4,17 +4,6 @@ package ui
 // to the pure-logic internal/soqlauto engine: snapshot per
 // keystroke → classify → suggest → render popup → accept inserts
 // into the textinput.
-//
-// Lifecycle:
-//   - Editor enters edit mode → autocompleteState.Enabled = true.
-//   - Every keystroke recomputes the suggestion slice (cached by
-//     (query, cursor) memo key so idle ticks are free).
-//   - Popup renders below the input line.
-//   - Tab/Enter inserts the selected suggestion at the token slot.
-//   - Esc dismisses the popup (keeps editor open).
-//
-// The state struct lives on soqlSession so the /soql tab and the
-// SOQL modal each carry their own popup independently.
 
 import (
 	"strings"
@@ -31,33 +20,21 @@ import (
 )
 
 func init() {
-	// Wire the engine's NameFieldHint to the curated standard-sObject
-	// registry so "FROM Task" expands to "SELECT Id, Subject FROM Task"
-	// (not the INVALID_FIELD-throwing "Id, Name").
 	soqlauto.NameFieldHint = sf.NameFieldFor
 }
 
-// autocompleteState is the per-session popup state. The popup
-// renders unconditionally while the editor is open — Items may be
-// empty (popup shows "no suggestions" + key hints) but the box
-// height is always the same so the layout doesn't jump.
 type autocompleteState struct {
 	Enabled bool
 	Items   []soqlauto.Suggestion
 	Cursor  int
 	Loading []string
 
-	// MemoKey skips recompute when (query, cursor) hasn't changed
-	// since the previous tick. Set by refresh().
 	MemoKey string
 
 	// Class captures the most recent classification so accept() can
 	// reuse the token boundary computed there.
 	Class soqlauto.Classification
 
-	// Live distinct-value fetch state (Ctrl+Space on a text field
-	// in WhereValue context). ValuesGen is bumped on each fetch
-	// so in-flight results from prior fetches are dropped.
 	ValuesGen     uint64
 	ValuesLoading bool
 	ValuesField   string
@@ -66,9 +43,6 @@ type autocompleteState struct {
 	ValuesCancel  func()
 }
 
-// autocompleteRefresh recomputes suggestions for the active SOQL
-// session. Called from the SOQL edit-key handler after each
-// keystroke. Cheap on no-change (memo short-circuit).
 func (m *Model) autocompleteRefresh(s *soqlSession) {
 	if s == nil {
 		return
@@ -83,9 +57,6 @@ func (m *Model) autocompleteRefresh(s *soqlSession) {
 	}
 
 	query := s.soqlInput.Value()
-	// textarea exposes cursor as (line, col) — flatten across the
-	// newline-joined Value() to a byte offset for the engine's regex
-	// math.
 	byteCursor := textareaCursorByte(&s.soqlInput, query)
 
 	key := autocompleteMemoKey(query, byteCursor)
@@ -93,9 +64,6 @@ func (m *Model) autocompleteRefresh(s *soqlSession) {
 		return
 	}
 	ac.MemoKey = key
-	// Any post-fetch keystroke invalidates the in-flight live
-	// values fetch. Bump gen + cancel ctx so the late result is
-	// dropped by applyAutocompleteValues.
 	if ac.ValuesCancel != nil {
 		ac.ValuesCancel()
 		ac.ValuesCancel = nil
@@ -115,8 +83,6 @@ func (m *Model) autocompleteRefresh(s *soqlSession) {
 	}
 }
 
-// buildAutocompleteSnapshot wires the engine's lookup callbacks to
-// the active org's describe + sObject caches.
 func (m *Model) buildAutocompleteSnapshot(d *orgData, query string, byteCursor int) soqlauto.Snapshot {
 	if d == nil {
 		return soqlauto.Snapshot{Query: query, CursorPos: byteCursor, SelEnd: byteCursor}
@@ -126,10 +92,6 @@ func (m *Model) buildAutocompleteSnapshot(d *orgData, query string, byteCursor i
 		alias = targetArg(m.orgs[m.selected])
 	}
 
-	// sObject catalog — only the API names; queryable filter is
-	// applied at suggestion time when we have it. If the catalog
-	// hasn't been fetched yet, kick the fetch via the cmd queue;
-	// the popup will populate on the next render after results land.
 	var sobjects []string
 	if d.SObjects.FetchedAt().IsZero() {
 		if alias != "" && !d.SObjects.Busy() {
@@ -184,10 +146,6 @@ func (m *Model) buildAutocompleteSnapshot(d *orgData, query string, byteCursor i
 	}
 }
 
-// activeAutocompleteSession returns the SOQL session whose popup
-// is currently visible (modal first, tab second), or nil when no
-// popup is open. Used by the wheel dispatcher to redirect scroll
-// events to the suggestion list when it's active.
 func (m Model) activeAutocompleteSession() *soqlSession {
 	if m.soqlModal != nil {
 		s := &m.soqlModal.session
@@ -212,8 +170,6 @@ func (m Model) activeAutocompleteSession() *soqlSession {
 func (m *Model) autocompleteInvalidate() {
 	if m.soqlSession.autocomplete != nil {
 		m.soqlSession.autocomplete.MemoKey = ""
-		// Pre-emptively repopulate so the next render shows the
-		// fresh suggestions without waiting on a keystroke.
 		m.autocompleteRefresh(&m.soqlSession)
 	}
 	if m.soqlModal != nil && m.soqlModal.session.autocomplete != nil {
@@ -222,10 +178,6 @@ func (m *Model) autocompleteInvalidate() {
 	}
 }
 
-// queueAutocompleteCmd buffers a tea.Cmd that should fire on the
-// next return-to-bubbletea. The describe-ensure path needs a cmd
-// channel; the edit-key handler reads + clears this buffer when it
-// returns.
 func (m *Model) queueAutocompleteCmd(cmd tea.Cmd) {
 	if cmd == nil {
 		return
@@ -233,8 +185,6 @@ func (m *Model) queueAutocompleteCmd(cmd tea.Cmd) {
 	m.autocompletePending = append(m.autocompletePending, cmd)
 }
 
-// drainAutocompleteCmds returns the buffered cmds + clears the
-// buffer. Called once per edit-key tick.
 func (m *Model) drainAutocompleteCmds() tea.Cmd {
 	if len(m.autocompletePending) == 0 {
 		return nil
@@ -293,8 +243,6 @@ func (m *Model) autocompleteKey(s *soqlSession, key string) (bool, tea.Cmd) {
 		case soqlauto.ContextAfterSelectKeyword:
 			m.autocompleteBulkExpand(s)
 		case soqlauto.ContextWhereValue, soqlauto.ContextInWithValues:
-			// Pick the target based on whether we're in the
-			// modal or the tab. Compare receiver pointer.
 			target := soqlSessionTab
 			if m.soqlModal != nil && s == &m.soqlModal.session {
 				target = soqlSessionModal
@@ -305,9 +253,6 @@ func (m *Model) autocompleteKey(s *soqlSession, key string) (bool, tea.Cmd) {
 		}
 		return true, nil
 	case "esc":
-		// Don't consume — let the caller's edit-mode esc handler
-		// run (it exits edit mode, which is what the user wants
-		// when they press esc with the popup visible).
 		return false, nil
 	}
 	return false, nil
@@ -376,11 +321,8 @@ func (m *Model) autocompleteAccept(s *soqlSession) {
 	newQuery := query[:tokenStart] + inserted + query[byteCursor:]
 	s.soqlInput.SetValue(newQuery)
 
-	// Move cursor to right after the inserted text. Position by
-	// re-deriving line/col from the new byte offset.
 	textareaSetCursorByte(&s.soqlInput, newQuery, tokenStart+len(inserted))
 
-	// Force refresh on the next call.
 	ac.MemoKey = ""
 }
 
@@ -406,7 +348,6 @@ func renderAutocompletePopup(ac *autocompleteState, width, maxRows int) []string
 
 	rows := make([]string, 0, maxRows+2)
 
-	// Slide window so the cursor stays visible.
 	start := 0
 	end := len(ac.Items)
 	if end > maxRows {
@@ -424,8 +365,6 @@ func renderAutocompletePopup(ac *autocompleteState, width, maxRows int) []string
 		rows = append(rows, renderAutocompleteRow(s, i == ac.Cursor, rowW))
 	}
 
-	// Empty-state hint occupies the first row when there are no
-	// suggestions. Keeps the box from looking broken.
 	if len(rows) == 0 {
 		hint := "  no suggestions — keep typing or press esc to dismiss"
 		if len(ac.Loading) > 0 {
@@ -434,13 +373,10 @@ func renderAutocompletePopup(ac *autocompleteState, width, maxRows int) []string
 		rows = append(rows, lipgloss.NewStyle().Foreground(theme.FgDim).Italic(true).Render(hint))
 	}
 
-	// Pad remaining rows with blanks so the box height is stable.
 	for len(rows) < maxRows {
 		rows = append(rows, "")
 	}
 
-	// Loading footer (italic yellow) — used for both describe-load
-	// hops and live-values fetch.
 	switch {
 	case ac.ValuesLoading:
 		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Yellow).Italic(true).
@@ -452,7 +388,6 @@ func renderAutocompletePopup(ac *autocompleteState, width, maxRows int) []string
 		rows = append(rows, "") // keep slot height stable
 	}
 
-	// Footer with key hints — always rendered.
 	footer := "  ↑/↓ cycle · tab accept · ctrl+space expand"
 	if len(ac.Items) > maxRows {
 		footer = "  ↑/↓ cycle (" + itoaShort(ac.Cursor+1) + "/" + itoaShort(len(ac.Items)) + ") · tab accept · ctrl+space expand"
@@ -460,11 +395,6 @@ func renderAutocompletePopup(ac *autocompleteState, width, maxRows int) []string
 	rows = append(rows, lipgloss.NewStyle().Foreground(theme.FgDim).Render(footer))
 
 	body := strings.Join(rows, "\n")
-	// Double border in the main panel colour — distinct from the
-	// single-rounded chrome everywhere else (record-drill uses
-	// magenta thick, global search uses cyan double already) so
-	// the popup reads as "important live overlay" without
-	// requiring a new colour.
 	box := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(theme.Border).
@@ -474,15 +404,10 @@ func renderAutocompletePopup(ac *autocompleteState, width, maxRows int) []string
 	return strings.Split(box, "\n")
 }
 
-// renderAutocompleteRow formats one suggestion line: cursor bar,
-// kind-tinted display text, dim detail. Truncates to width.
 func renderAutocompleteRow(s soqlauto.Suggestion, cursor bool, width int) string {
 	prefix := "  "
 	displayStyle := lipgloss.NewStyle().Foreground(theme.Fg)
 	if cursor {
-		// BorderHi bar against the dim frame gives a strong
-		// "you are here" cue without changing the popup's overall
-		// tone — same affordance as listtable row cursors.
 		prefix = lipgloss.NewStyle().Foreground(theme.BorderHi).Render("▌") + " "
 		displayStyle = displayStyle.Bold(true).Background(theme.BgAlt)
 	}
@@ -516,16 +441,11 @@ func renderAutocompleteRow(s soqlauto.Suggestion, cursor bool, width int) string
 	}
 	body := prefix + displayStyle.Render(display) + gapStyle.Render(gap) + detailStyle.Render(detail)
 	if cursor {
-		// Pad to width with BgAlt so the highlight bar runs to the
-		// right edge.
 		body = lipgloss.NewStyle().Width(width).Background(theme.BgAlt).Render(body)
 	}
 	return body
 }
 
-// applyKindColor tints the display text by suggestion kind so
-// users learn the vocabulary at a glance (relationships green,
-// keywords cyan, picklist values yellow, etc.).
 func applyKindColor(base lipgloss.Style, kind soqlauto.SuggestionKind, cursor bool) lipgloss.Style {
 	var styled lipgloss.Style
 	switch kind {
@@ -546,17 +466,9 @@ func applyKindColor(base lipgloss.Style, kind soqlauto.SuggestionKind, cursor bo
 	return styled
 }
 
-// textareaCursorByte flattens the textarea's (line, column) cursor
-// into a byte offset across the newline-joined Value() string.
-// Lines are joined with `\n` (textarea's own separator). The Column
-// returned by bubbles/textarea is a RUNE index within the active
-// line — not a byte index — so we walk the line decoding runes to
-// land on the right byte.
 func textareaCursorByte(ta *textareaModel, value string) int {
 	line := ta.Line()
 	col := ta.Column()
-	// Walk newline-joined lines: sum each prior line's byte length
-	// (+1 for the joining \n) until we reach the cursor's line.
 	off := 0
 	lineIdx := 0
 	for lineIdx < line && off < len(value) {
@@ -568,7 +480,6 @@ func textareaCursorByte(ta *textareaModel, value string) int {
 		off += nl + 1
 		lineIdx++
 	}
-	// Add the rune-col offset into the current line.
 	off += runeIndexToByte(value[off:], col)
 	if off > len(value) {
 		off = len(value)
@@ -576,11 +487,6 @@ func textareaCursorByte(ta *textareaModel, value string) int {
 	return off
 }
 
-// textareaSetCursorByte positions the textarea cursor at the given
-// byte offset of the post-edit Value(). Walks newlines to derive
-// (line, col) and then uses CursorDown/Up + SetCursorColumn to land
-// there. col passed to SetCursorColumn is a rune index — convert
-// from byte offset within the line.
 func textareaSetCursorByte(ta *textareaModel, value string, byteOff int) {
 	if byteOff < 0 {
 		byteOff = 0
@@ -588,7 +494,6 @@ func textareaSetCursorByte(ta *textareaModel, value string, byteOff int) {
 	if byteOff > len(value) {
 		byteOff = len(value)
 	}
-	// Find which line + within-line byte offset.
 	line := 0
 	lineStart := 0
 	for i := 0; i < byteOff; i++ {
@@ -598,7 +503,6 @@ func textareaSetCursorByte(ta *textareaModel, value string, byteOff int) {
 		}
 	}
 	withinByte := byteOff - lineStart
-	// Determine the matching rune-column.
 	col := 0
 	for i := 0; i < withinByte; {
 		_, sz := decodeRune(value[lineStart+i:])
@@ -608,7 +512,6 @@ func textareaSetCursorByte(ta *textareaModel, value string, byteOff int) {
 		i += sz
 		col++
 	}
-	// Walk vertically: textarea exposes CursorDown/CursorUp.
 	currentLine := ta.Line()
 	for currentLine < line {
 		ta.CursorDown()
@@ -621,14 +524,8 @@ func textareaSetCursorByte(ta *textareaModel, value string, byteOff int) {
 	ta.SetCursorColumn(col)
 }
 
-// textareaModel is a tiny re-export of the textarea pointer-receiver
-// shape so the helpers above can live in this file without needing
-// a direct charm.land import.
 type textareaModel = textarea.Model
 
-// runeIndexToByte converts a rune-indexed cursor position (what
-// bubbles/textinput uses) to a byte offset (what the engine's
-// regex math needs). For ASCII queries the two are identical.
 func runeIndexToByte(s string, runeIdx int) int {
 	if runeIdx <= 0 {
 		return 0
@@ -645,8 +542,6 @@ func runeIndexToByte(s string, runeIdx int) int {
 	return i
 }
 
-// decodeRune is a tiny wrapper around utf8.DecodeRuneInString so
-// the file doesn't need an extra import.
 func decodeRune(s string) (r rune, size int) {
 	if len(s) == 0 {
 		return 0, 0
@@ -675,12 +570,10 @@ func decodeRune(s string) (r rune, size int) {
 	}
 }
 
-// autocompleteMemoKey is the cheap dedup key for refresh().
 func autocompleteMemoKey(query string, cursor int) string {
 	return query + "\x00" + itoaShort(cursor)
 }
 
-// itoaShort is strconv.Itoa without the import cost.
 func itoaShort(n int) string {
 	if n == 0 {
 		return "0"
@@ -703,7 +596,6 @@ func itoaShort(n int) string {
 	return string(buf[i:])
 }
 
-// uniqueStrings dedupes while preserving order.
 func uniqueStrings(in []string) []string {
 	seen := map[string]bool{}
 	out := make([]string, 0, len(in))

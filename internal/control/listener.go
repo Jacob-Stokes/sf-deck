@@ -245,7 +245,6 @@ type ProjectImportBundleArgs struct {
 type ProjectListArgs struct{}
 
 type ProjectShowArgs struct {
-	// One of ID or Name. ID wins when both are set.
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 }
@@ -616,18 +615,12 @@ func (s *Server) Listen(ctx context.Context) (instance.Entry, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return instance.Entry{}, err
 	}
-	// Claim with a placeholder socket path so the registry picks
-	// the slot number; we then mint the socket using that number
-	// and re-claim with the real path.
 	pid := os.Getpid()
 	prelim, err := instance.Claim(pid, "", s.Label)
 	if err != nil {
 		return instance.Entry{}, err
 	}
 	socketPath := filepath.Join(dir, fmt.Sprintf("control-%d.sock", prelim.Number))
-	// Drop any stale socket file from a prior crash. Best-effort —
-	// if the file's owned by another process, Listen will fail
-	// loudly below and the user can clear it manually.
 	_ = os.Remove(socketPath)
 	lst, err := net.Listen("unix", socketPath)
 	if err != nil {
@@ -687,7 +680,6 @@ func (s *Server) acceptLoop(ctx context.Context, lst net.Listener) {
 	for {
 		conn, err := lst.Accept()
 		if err != nil {
-			// Listener closed → exit cleanly.
 			return
 		}
 		go s.handleConn(ctx, conn)
@@ -697,8 +689,6 @@ func (s *Server) acceptLoop(ctx context.Context, lst net.Listener) {
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	scanner := bufio.NewScanner(conn)
-	// Allow long lines for subscribe-stream cancellation frames or
-	// future inline-Apex args. 1 MiB is more than enough.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	writer := json.NewEncoder(conn)
 	for scanner.Scan() {
@@ -715,8 +705,6 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	}
 }
 
-// dispatch routes one request to its handler. Subscribe-style verbs
-// take over the connection for streaming output.
 func (s *Server) dispatch(ctx context.Context, req Request, conn net.Conn, w *json.Encoder) {
 	switch req.Command {
 	case "state.get":

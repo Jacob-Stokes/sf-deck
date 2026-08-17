@@ -1,14 +1,5 @@
 package ui
 
-// Accessors for per-org UI state (active tab + view-chip / subtab
-// cursors). These live on orgData so switching orgs preserves where
-// the user was; before any org is selected, reads/writes go to
-// Model.noOrgTab etc.
-//
-// Keep this file minimal — it's the seam for "per-org context."
-
-// tab returns the active Tab for the currently-selected org, or the
-// global noOrg fallback if no org is selected yet.
 func (m Model) tab() Tab {
 	if m.tabOverrideSet {
 		return m.tabOverride
@@ -19,11 +10,6 @@ func (m Model) tab() Tab {
 	return m.noOrgTab
 }
 
-// setTab writes the active Tab to the currently-selected org's state
-// (or noOrgTab if no org is selected). Allocates orgData if needed so
-// the per-org context survives the first tab change. Also records the
-// tab under its stem so number-key nav can restore drill-in state when
-// the user comes back to a family.
 func (m *Model) setTab(t Tab) {
 	// Maintain the overflow slot: when the new tab's stem isn't on
 	// the pinned bar, stash it in slot 0 so the user has a one-key
@@ -35,10 +21,6 @@ func (m *Model) setTab(t Tab) {
 		m.overflowTab = stem
 		m.overflowSet = true
 	}
-	// Auto-collapse the left rail when navigating to a different
-	// tab — but only if the user didn't pin it open with `ctrl+\`. The
-	// rail was opened transiently to pick / inspect orgs; once
-	// they navigate elsewhere it should get out of the way.
 	if !m.leftPinned && m.leftOpen {
 		m.leftOpen = false
 		if m.focus == focusOrgs {
@@ -55,34 +37,16 @@ func (m *Model) setTab(t Tab) {
 	if d.LastTabInStem == nil {
 		d.LastTabInStem = map[Tab]Tab{}
 	}
-	// Skip transient drill-ins. LastTabInStem powers "number key
-	// restores the last view in this family" — useful for per-entity
-	// drills (sObject schema, flow detail, apex class detail) where
-	// the user might genuinely want to bounce back. Useless and
-	// surprising for transient drills (one-record /record, one-field
-	// detail, one-trigger detail) where the drill is gone the moment
-	// the user moves on. Recording those means later number-key
-	// nav from another stem teleports the user into a stale row
-	// they'd already mentally closed.
 	if !isTransientDrill(t) {
 		d.LastTabInStem[stem] = t
 	}
 }
 
-// isTransientDrill reports whether t is a drill-in that should not
-// be remembered by LastTabInStem. Per-row / per-event detail tabs
-// belong here; per-entity drills (TabObjectDetail, TabFlowDetail,
-// TabApexDetail, TabUserDetail, TabPermParentDetail, etc.) do not —
-// users expect "press the number key, return to that entity I was
-// inspecting." See setTab for the broader rationale.
 func isTransientDrill(t Tab) bool {
 	spec := lookupTabSpec(t)
 	return spec != nil && spec.TransientDrill
 }
 
-// isPinnedTab reports whether t is currently on the number bar
-// (slots 1-8). Falls back to defaults when the user hasn't
-// customised the bar.
 func isPinnedTab(t Tab) bool {
 	for _, p := range TabsForNumbers() {
 		if p == t {
@@ -92,9 +56,6 @@ func isPinnedTab(t Tab) bool {
 	return false
 }
 
-// resolveStem returns the tab to land on when the user invokes the
-// given stem (e.g. via the number-key for Objects). Prefers the last
-// tab the user was on in that family; falls back to the stem itself.
 func (m Model) resolveStem(stem Tab) Tab {
 	if d := m.activeOrgData(); d != nil {
 		if prev, ok := d.LastTabInStem[stem]; ok && m.stemForTab(prev) == stem {
@@ -142,10 +103,6 @@ func (m Model) stemForTab(t Tab) Tab {
 	return t.stem()
 }
 
-// objectsChipIdx / recordsChipIdx / objectSubtab mirror the old
-// Model-level fields but now read/write per-org. When no org is
-// selected they return 0 / no-op (the corresponding views don't
-// render in that state anyway).
 func (m Model) objectsChipIdx() int {
 	if d := m.activeOrgData(); d != nil {
 		return d.ObjectsChipIdx
@@ -369,9 +326,6 @@ func (m *Model) setAllUsersChipIdx(i int) {
 	}
 	d := m.ensureOrgData(m.orgs[m.selected].Username)
 	d.AllUsersChipIdx = i
-	// Resolve the chip ID against the live registry so listSurface
-	// closures (which only have d) can read the active chip without
-	// re-walking the strip. See activeUsersChipID for the rationale.
 	if m.chipRegistry(domainUsers) != nil {
 		chips := m.chipRegistry(domainUsers).ChipsFor("*")
 		if i >= 0 && i < len(chips) {
@@ -551,10 +505,6 @@ func (m *Model) setPermParentSubtab(i int) {
 	m.ensureOrgData(m.orgs[m.selected].Username).PermParentSubtab = i
 }
 
-// activeOrgData returns the orgData for the currently-selected org,
-// or nil if no org is selected yet. Non-allocating — for read paths.
-// Setters above use ensureOrgData instead so the entry exists before
-// they write to it.
 func (m Model) activeOrgData() *orgData {
 	if len(m.orgs) == 0 {
 		return nil

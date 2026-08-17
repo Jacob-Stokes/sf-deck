@@ -1,29 +1,6 @@
 package sf
 
 // Object-level edits via the Metadata API.
-//
-// Why this file exists: CustomObject is read-only via Tooling (see
-// README_API_ROUTING.md). Every user-visible object-level edit —
-// label, plural label, description, feature toggles — goes through
-// the Metadata API instead.
-//
-// IMPORTANT invariant: Salesforce validates a CustomObject deploy
-// as a complete standalone definition. Required top-level elements
-// include <label>, <pluralLabel>, <nameField>, <deploymentStatus>,
-// and <sharingModel>. Shipping a partial XML that omits them
-// triggers "Must specify a non-empty X" errors even when X is
-// already set on the org.
-//
-// So this file does a round-trip:
-//   1. Read current state (describe for label/pluralLabel/nameField;
-//      Tooling CustomObject for Description + SharingModel).
-//   2. Build a COMPLETE CustomObject XML with those values.
-//   3. Overlay the user's patch on top (only fields they changed).
-//   4. Deploy.
-//
-// This costs 1-2 extra API calls per edit but it's the only
-// reliable way to deploy a single-field change through the
-// Metadata API without managing the full object source locally.
 
 import (
 	"encoding/json"
@@ -65,9 +42,6 @@ type CustomObjectBaseline struct {
 	PluralLabel string // from describe
 	Description string // from Tooling CustomObject row
 
-	// nameField metadata — identifies the object's primary "Name"
-	// field so the deploy XML carries it. Text + "Account Name" is
-	// the normal shape; AutoNumber objects have a different sub-tree.
 	NameFieldLabel string
 	NameFieldType  string // "Text" or "AutoNumber"
 
@@ -76,12 +50,6 @@ type CustomObjectBaseline struct {
 	// "Private", "ControlledByParent".
 	SharingModel string
 
-	// Feature toggles — current state. Decoded from the Tooling
-	// CustomObject GET (same call we make for Description /
-	// SharingModel). When SF doesn't return a flag (e.g. on certain
-	// standard objects whose toggle is implicitly true / managed
-	// elsewhere) the pointer stays nil and the UI shows "current
-	// state unknown."
 	EnableReports    *bool
 	EnableActivities *bool
 	EnableHistory    *bool
@@ -137,8 +105,6 @@ func FetchCustomObjectBaselineWithDescribe(target, apiName string, d SObjectDesc
 		base.NameFieldType = "Text"
 	}
 
-	// Tooling CustomObject carries SharingModel + Description on
-	// the sobject row itself. Read them directly.
 	id, err := CustomObjectID(target, apiName)
 	if err != nil {
 		return nil, fmt.Errorf("lookup CustomObject id: %w", err)
@@ -151,10 +117,6 @@ func FetchCustomObjectBaselineWithDescribe(target, apiName string, d SObjectDesc
 	if err != nil {
 		return nil, fmt.Errorf("fetch CustomObject: %w", upgradeToSFError(err))
 	}
-	// CustomObject record exposes only Description + SharingModel.
-	// The metadata-level feature toggles (enableReports etc.) are
-	// NOT on this endpoint — they live on EntityDefinition under
-	// Is*-prefixed columns (mapped in fetchEntityDefinitionToggles).
 	var row struct {
 		Description  *string `json:"Description"`
 		SharingModel string  `json:"SharingModel"`
@@ -165,10 +127,6 @@ func FetchCustomObjectBaselineWithDescribe(target, apiName string, d SObjectDesc
 	if row.Description != nil {
 		base.Description = *row.Description
 	}
-	// Layer in the toggle flags from a SOQL against EntityDefinition.
-	// Best-effort — failures here just leave the *bool fields nil
-	// (UI surfaces as "current state unknown" rather than blocking
-	// the rest of the baseline.)
 	if toggles, terr := fetchEntityDefinitionToggles(c, apiName); terr == nil {
 		base.EnableReports = toggles.EnableReports
 		base.EnableActivities = toggles.EnableActivities
@@ -176,9 +134,6 @@ func FetchCustomObjectBaselineWithDescribe(target, apiName string, d SObjectDesc
 		base.EnableFeeds = toggles.EnableFeeds
 		base.EnableSearch = toggles.EnableSearch
 	}
-	// Tooling reports SharingModel as "Edit" / "Read" / "Private" /
-	// "ControlledByParent"; Metadata API wants "ReadWrite" where
-	// Tooling says "Edit". Translate.
 	switch row.SharingModel {
 	case "Edit":
 		base.SharingModel = "ReadWrite"
@@ -190,11 +145,6 @@ func FetchCustomObjectBaselineWithDescribe(target, apiName string, d SObjectDesc
 	return base, nil
 }
 
-// objectToggles is the subset of EntityDefinition columns we map
-// onto the CustomObject metadata enable* flags. SF's column
-// naming is non-obvious — verified empirically (see the
-// describe-EntityDefinition probe history) that these five
-// columns correspond to the five metadata flags one-to-one.
 type objectToggles struct {
 	EnableReports    *bool
 	EnableActivities *bool
@@ -203,25 +153,6 @@ type objectToggles struct {
 	EnableSearch     *bool
 }
 
-// fetchEntityDefinitionToggles runs a single Tooling SOQL against
-// EntityDefinition for the metadata-level feature flags. Mapping:
-//
-//	enableReports     → IsReportingEnabled
-//	enableActivities  → IsActivityTrackable
-//	enableHistory     → IsFieldHistoryTracked
-//	enableFeeds       → IsFeedEnabled
-//	enableSearch      → IsSearchable
-//
-// EntityDefinition is queryable for both standard and custom
-// objects, so this works on Account / Contact / etc. as well as
-// __c objects — unlike the CustomObject endpoint which is
-// custom-only.
-//
-// All fields come back as plain bool from EntityDefinition (no
-// nullability indicator), but we expose them as *bool so the
-// caller can distinguish "Salesforce gave us a value" from
-// "we didn't fetch / it errored." Set to a non-nil pointer for
-// every successful row.
 func fetchEntityDefinitionToggles(c *Client, apiName string) (*objectToggles, error) {
 	q := "SELECT IsReportingEnabled, IsActivityTrackable, IsFieldHistoryTracked, IsFeedEnabled, IsSearchable " +
 		"FROM EntityDefinition WHERE QualifiedApiName='" + sqlEscape(apiName) + "'"
@@ -254,8 +185,6 @@ func fetchEntityDefinitionToggles(c *Client, apiName string) (*objectToggles, er
 	}, nil
 }
 
-// boolPtr returns &b for value b. Used so we can put plain bool
-// query results behind *bool baseline fields (nil = unknown).
 func boolPtr(b bool) *bool { return &b }
 
 // DeployCustomObjectPatch is the one-shot entry point for callers
@@ -295,9 +224,6 @@ func DeployCustomObjectPatchWithBaseline(target, apiName string, patch CustomObj
 	return DeployMetadata(target, "", members, files)
 }
 
-// applyPatch overwrites baseline fields with patch values where the
-// patch has them set. String patches use empty-means-skip; pointer
-// bool patches are left to the XML builder to emit separately.
 func applyPatch(b *CustomObjectBaseline, p CustomObjectPatch) {
 	if p.Label != "" {
 		b.Label = p.Label
@@ -310,10 +236,6 @@ func applyPatch(b *CustomObjectBaseline, p CustomObjectPatch) {
 	}
 }
 
-// buildCustomObjectXML emits a complete CustomObject XML. Required
-// elements (label, pluralLabel, nameField, deploymentStatus,
-// sharingModel) come from the baseline + patch overlay; feature-
-// toggle bools come from the patch directly (only emitted when set).
 func buildCustomObjectXML(b *CustomObjectBaseline, p CustomObjectPatch) string {
 	var sb strings.Builder
 	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
@@ -350,19 +272,16 @@ func buildCustomObjectXML(b *CustomObjectBaseline, p CustomObjectPatch) string {
 		sb.WriteString(">\n")
 	}
 
-	// Feature toggles — only the ones the user set.
 	writeBool("enableReports", p.EnableReports)
 	writeBool("enableActivities", p.EnableActivities)
 	writeBool("enableHistory", p.EnableHistory)
 	writeBool("enableFeeds", p.EnableFeeds)
 	writeBool("enableSearch", p.EnableSearch)
 
-	// Required identity.
 	writeStr("label", b.Label)
 	writeStr("pluralLabel", b.PluralLabel)
 	writeStr("description", b.Description)
 
-	// Required nameField sub-tree.
 	sb.WriteString("  <nameField>\n")
 	sb.WriteString("    <label>")
 	sb.WriteString(xmlEscape(b.NameFieldLabel))
@@ -372,7 +291,6 @@ func buildCustomObjectXML(b *CustomObjectBaseline, p CustomObjectPatch) string {
 	sb.WriteString("</type>\n")
 	sb.WriteString("  </nameField>\n")
 
-	// Required scope.
 	sb.WriteString("  <deploymentStatus>Deployed</deploymentStatus>\n")
 	writeStr("sharingModel", b.SharingModel)
 

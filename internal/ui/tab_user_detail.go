@@ -1,24 +1,6 @@
 package ui
 
 // /user-detail — drill-in for one User.
-//
-// Main pane shows the read-only user card (Name / Username / Profile /
-// Role / Last login / Status) followed by a navigable ACTIONS list.
-// Most user actions are operations / launchers rather than edits of a
-// displayed property, so — unlike the metadata-edit detail surfaces
-// where each editable property is its own row — the whole action list
-// lives in the main pane:
-//
-//   - Reset password / get reset link (SF emails or yanks a temp URL)
-//   - Freeze / Unfreeze (UserLogin.IsFrozen)
-//   - Activate / Deactivate (PATCH IsActive)
-//   - Login as user (su flow) · Open in Setup · perm-sets · login history
-//   - Yank Id / username to the clipboard
-//
-// Arrows walk the list (skipping separators); Enter runs the cursored
-// action; Esc returns to /users. Destructive / mutating actions gate
-// behind a confirm modal + the org safety level. The right sidebar is
-// INFO-ONLY — safe to hide.
 
 import (
 	"strings"
@@ -31,11 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// triggerOpenUser drills into the User detail tab. Sets UserCur,
-// switches tabs, kicks off a fresh User fetch so the card shows the
-// latest values (post any chip-driven mutations earlier in the
-// session). The ACTIONS list in the main pane is the cursor target —
-// no body/sidebar focus split anymore.
 func (m *Model) triggerOpenUser(userID string) tea.Cmd {
 	if userID == "" {
 		return nil
@@ -54,13 +31,6 @@ func (m *Model) triggerOpenUser(userID string) tea.Cmd {
 	return tea.Batch(m.onTabChanged(), userFetchCmd(targetArg(o), userID))
 }
 
-// renderUserDetail draws the body of TabUserDetail: the read-only
-// user card followed by the navigable ACTIONS list. Most user actions
-// are operations / launchers (reset password, login-as, open in
-// Setup, yank Id…) rather than edits of a displayed property, so the
-// whole action list lives here in the main pane. Arrow keys walk it
-// (skipping separators), Enter runs the cursored action. The sidebar
-// is INFO-ONLY.
 func (m Model) renderUserDetail(w, innerH int) string {
 	d := m.activeOrgData()
 	if d == nil {
@@ -93,9 +63,6 @@ func (m Model) renderUserDetail(w, innerH int) string {
 	lines = append(lines, kvLine("Status", statusStyle.Render(status), inner))
 	lines = append(lines, "")
 
-	// ACTIONS — the navigable list. Cursor (d.UserActionCur) indexes
-	// the full slice (separators included); stepThroughSelectable keeps
-	// it off divider rows.
 	actions := m.cursoredUserActions(d)
 	sel := clampSelectableUserIdx(actions, d.UserActionCur)
 	active := m.focus == focusMain
@@ -104,11 +71,8 @@ func (m Model) renderUserDetail(w, innerH int) string {
 	for i, a := range actions {
 		lines = append(lines, renderUserActionLine(a, i == sel && active, active, inner))
 	}
-	// Audit sections — read-only, below the actions. Soft-absent
-	// when the org denies LoginHistory / PSA reads.
 	lines = append(lines, m.renderUserAuditSections(d, inner)...)
 
-	// Keep the cursored action visible when the list overflows.
 	cursorAbs := actionsStart + sel
 	return scrollLinesToCursor(lines, cursorAbs, innerH)
 }
@@ -168,9 +132,6 @@ func (m Model) renderUserAuditSections(d *orgData, inner int) []string {
 	return lines
 }
 
-// renderUserActionLine renders one action row in the main-pane list.
-// Separators become a thin divider; the cursored row gets a bar +
-// trailing "↵ run" affordance (or the disabled reason when blocked).
 func renderUserActionLine(a userActionRow, cursored, active bool, inner int) string {
 	if a.Separator {
 		return "  " + dimLine(strings.Repeat("─", clamp(inner-2, 1, 24)), inner)
@@ -205,8 +166,6 @@ func renderUserActionLine(a userActionRow, cursored, active bool, inner int) str
 	return ansi.Truncate(line, inner, "…")
 }
 
-// sidebarUserDetail renders the right-pane panel — a context panel for
-// the cursored action in the main-pane list.
 func (m Model) sidebarUserDetail(inner int) string {
 	ctx, ok := m.userRowContext()
 	if !ok {
@@ -215,8 +174,6 @@ func (m Model) sidebarUserDetail(inner int) string {
 	return m.sidebarRowContext("USER · CONTEXT", inner, ctx)
 }
 
-// userRowContext builds the context for the cursored user action.
-// (false when there's no user loaded.)
 func (m Model) userRowContext() (rowContext, bool) {
 	d := m.activeOrgData()
 	if d == nil || d.UserCur == "" {
@@ -224,8 +181,6 @@ func (m Model) userRowContext() (rowContext, bool) {
 	}
 	actions := m.cursoredUserActions(d)
 	sel := clampSelectableUserIdx(actions, d.UserActionCur)
-	// User launchers live in the main-pane list, so the hint bar is
-	// just navigation.
 	navHints := detailNavHints(false)
 	if sel < 0 || sel >= len(actions) {
 		return rowContext{Hints: navHints}, true
@@ -255,8 +210,6 @@ func (m Model) userRowContext() (rowContext, bool) {
 	return ctx, true
 }
 
-// moveUserDetailCursor walks the main-pane ACTIONS list, skipping
-// separator rows.
 func (m *Model) moveUserDetailCursor(delta int) {
 	d := m.activeOrgData()
 	if d == nil || d.UserCur == "" {
@@ -297,9 +250,6 @@ func clampSelectableUserIdx(rows []userActionRow, sel int) int {
 	return sel
 }
 
-// cursoredUserRow returns the freshest UserRow we have for userID.
-// Prefers d.UserDetailRows (post-fetch snapshot); falls back to the
-// list-row data so the card renders during the initial load.
 func (m Model) cursoredUserRow(d *orgData, userID string) sf.UserRow {
 	if d == nil || userID == "" {
 		return sf.UserRow{}
@@ -309,8 +259,6 @@ func (m Model) cursoredUserRow(d *orgData, userID string) sf.UserRow {
 			return r
 		}
 	}
-	// Walk every cached per-chip All Users ListView for the row —
-	// the user may have drilled in from any chip.
 	for _, lv := range d.ChipUsersList {
 		if lv == nil {
 			continue
@@ -329,21 +277,14 @@ func (m Model) cursoredUserRow(d *orgData, userID string) sf.UserRow {
 	return sf.UserRow{ID: userID}
 }
 
-// userFetchedMsg is dispatched after FetchUser returns. Caches the
-// fresh row so the detail card updates without a full list refresh.
-// UserLogin sub-row is fetched alongside so the freeze toggle can
-// render state-aware on the first frame.
 type userFetchedMsg struct {
 	UserID   string
 	Row      sf.UserRow
 	Login    sf.UserLoginRow
 	LoginErr error // non-nil and ignored when no UserLogin row exists yet
 	Err      error
-	// Audit sections — soft-fail: nil on query error so the card +
-	// actions still render when LoginHistory/PSA aren't readable
-	// (field-level perms vary by org).
-	History []sf.LoginHistoryRow
-	Access  sf.UserAccess
+	History  []sf.LoginHistoryRow
+	Access   sf.UserAccess
 }
 
 func userFetchCmd(target, userID string) tea.Cmd {
@@ -364,7 +305,6 @@ func userFetchCmd(target, userID string) tea.Cmd {
 	}
 }
 
-// applyUserFetched folds a userFetchedMsg into orgData.
 func (m *Model) applyUserFetched(msg userFetchedMsg) tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -381,8 +321,6 @@ func (m *Model) applyUserFetched(msg userFetchedMsg) tea.Cmd {
 	if d.UserLoginRows == nil {
 		d.UserLoginRows = map[string]sf.UserLoginRow{}
 	}
-	// Cache even when LoginErr is set — empty Id signals "no row";
-	// the action menu renders the freeze toggle as disabled.
 	d.UserLoginRows[msg.UserID] = msg.Login
 	if d.UserLoginHist == nil {
 		d.UserLoginHist = map[string][]sf.LoginHistoryRow{}
@@ -395,9 +333,6 @@ func (m *Model) applyUserFetched(msg userFetchedMsg) tea.Cmd {
 	return nil
 }
 
-// userDetailHeader renders the bold title row at the top of the
-// User detail body. Local helper so we don't collide with the
-// shared kvLine helper in format.go.
 func userDetailHeader(text string, inner int) string {
 	style := lipgloss.NewStyle().Foreground(theme.Fg).Bold(true)
 	return lipgloss.NewStyle().Width(inner).Render("  " + style.Render(text))

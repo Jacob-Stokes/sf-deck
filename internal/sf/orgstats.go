@@ -57,11 +57,7 @@ type UserRow struct {
 	UserRoleName  string
 	LastLoginDate string
 	IsActive      bool
-	// ExtraTargets are appended to Targets() after the standard
-	// User-row destinations. Populated by the UI layer with
-	// context-specific actions ("Log in as user") that need org
-	// state the bare UserRow doesn't carry.
-	ExtraTargets []OpenTarget
+	ExtraTargets  []OpenTarget
 }
 
 // Field implements query.Row for filter predicates. Both the bare

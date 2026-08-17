@@ -75,9 +75,6 @@ func TestBulkQuery_Lifecycle(t *testing.T) {
 		http:        srv.Client(),
 	}
 
-	// Tighten poll cadence for the test — overriding via a tiny
-	// retry loop driver isn't worth a Client field; just accept the
-	// 2s first-poll and run the test in parallel-able mode.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -178,7 +175,6 @@ func TestParseBulkCSV(t *testing.T) {
 		})
 	}
 
-	// Spot-check field plumbing on a representative row.
 	res, err := parseBulkCSV([]byte("Id,Account.Name\n001,Acme\n"))
 	if err != nil {
 		t.Fatal(err)

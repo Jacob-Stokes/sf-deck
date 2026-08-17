@@ -1,9 +1,5 @@
 package ui
 
-// /components LWC + Aura list surfaces — declared via
-// ListViewTableSpec[T]. LWC gets a green Exposed-cell tint;
-// Aura has no equivalent flag.
-
 import (
 	"charm.land/lipgloss/v2"
 

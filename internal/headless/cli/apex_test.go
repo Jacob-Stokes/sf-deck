@@ -15,12 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// newApexTestApp opens a devproject store under a temp HOME (for the
-// snippet sub-noun) and includes both a prod org (read_only by
-// default → blocks WriteAnonymous) and a scratch org (full by default
-// → allows it). Apex `execute` tests cover the gate; live execution
-// against the scratch org is deferred to manual smoke testing per the
-// sf-write guardrails.
 func newApexTestApp(t *testing.T) *app.App {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
@@ -126,9 +120,6 @@ func TestApexExecute_SafetyBlockedOnSandbox(t *testing.T) {
 }
 
 func TestApexExecute_SafetyBlockBeforeNetwork(t *testing.T) {
-	// Defensive: the gate fires before sf.ExecuteAnonymous. Without
-	// the gate this would attempt a network call and the test would
-	// fail with a connection error rather than safety_blocked.
 	a := newApexTestApp(t)
 	code, _ := runApexCLI(t, a, "--json", "apex", "execute",
 		"--org", "prod", "--body", "anything;")
@@ -158,12 +149,9 @@ func TestApexExecute_BodyFile(t *testing.T) {
 	}
 }
 
-// --- snippet CRUD ----------------------------------------------------
-
 func TestApexSnippet_FullLifecycle(t *testing.T) {
 	a := newApexTestApp(t)
 
-	// Create.
 	code, got := runApexCLI(t, a, "--json", "apex", "snippet", "create",
 		"--name", "hello", "--description", "first snippet",
 		"--body", "System.debug('hi');")
@@ -180,7 +168,6 @@ func TestApexSnippet_FullLifecycle(t *testing.T) {
 		t.Errorf("id = %q, want ax_ prefix", id)
 	}
 
-	// List shows it.
 	code, got = runApexCLI(t, a, "--json", "apex", "snippet", "list")
 	if code != headless.ExitOK {
 		t.Fatalf("list exit = %d", code)
@@ -190,7 +177,6 @@ func TestApexSnippet_FullLifecycle(t *testing.T) {
 			got["data"].(map[string]any)["count"])
 	}
 
-	// Update.
 	code, got = runApexCLI(t, a, "--json", "apex", "snippet", "update",
 		"--id", id, "--name", "renamed")
 	if code != headless.ExitOK {
@@ -200,7 +186,6 @@ func TestApexSnippet_FullLifecycle(t *testing.T) {
 		t.Errorf("update changed = %v", got["changed"])
 	}
 
-	// Show reflects.
 	code, got = runApexCLI(t, a, "--json", "apex", "snippet", "show",
 		"--id", id)
 	if code != headless.ExitOK {
@@ -212,14 +197,12 @@ func TestApexSnippet_FullLifecycle(t *testing.T) {
 		t.Errorf("name = %v, want renamed", snip["name"])
 	}
 
-	// Delete.
 	code, _ = runApexCLI(t, a, "--json", "apex", "snippet", "delete",
 		"--id", id)
 	if code != headless.ExitOK {
 		t.Fatalf("delete exit = %d", code)
 	}
 
-	// Show now not_found.
 	code, _ = runApexCLI(t, a, "--json", "apex", "snippet", "show",
 		"--id", id)
 	if code != headless.ExitNotFound {
@@ -255,7 +238,6 @@ func TestApexSnippet_UpdateRequiresFields(t *testing.T) {
 
 func TestApexExecute_SnippetIDPath(t *testing.T) {
 	a := newApexTestApp(t)
-	// Create a snippet, then reference it.
 	_, got := runApexCLI(t, a, "--json", "apex", "snippet", "create",
 		"--name", "tmp", "--body", "System.debug('z');")
 	id := got["data"].(map[string]any)["snippet"].(map[string]any)["id"].(string)
@@ -322,7 +304,6 @@ func TestApexSnippet_ListOmitsBody(t *testing.T) {
 	if m["body_sha256"] == nil {
 		t.Errorf("body_sha256 missing")
 	}
-	// Show should include the full body.
 	id, _ := m["id"].(string)
 	_, showResp := runApexCLI(t, a, "--json", "apex", "snippet", "show", "--id", id)
 	showData, _ := showResp["data"].(map[string]any)
@@ -360,7 +341,6 @@ func TestApexExecute_SuccessEnvelopeDropsBody(t *testing.T) {
 
 func TestResolveApexBody_SourceDiscriminator(t *testing.T) {
 	a := newApexTestApp(t)
-	// Create a snippet so the snippet:<id> path resolves.
 	_, got := runApexCLI(t, a, "--json", "apex", "snippet", "create",
 		"--name", "tmp", "--body", "System.debug('z');")
 	id := got["data"].(map[string]any)["snippet"].(map[string]any)["id"].(string)
@@ -379,17 +359,12 @@ func TestResolveApexBody_SourceDiscriminator(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if c.path != "" && c.path != "-" {
-				// Make the file exist for the file:<path> case.
 				if err := os.WriteFile(c.path, []byte("// x"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 				defer os.Remove(c.path)
 			}
 			if c.name == "stdin" {
-				// resolveApexBody calls resolveSOQL which reads
-				// from os.Stdin; in tests Stdin is empty so we
-				// get an empty body but the source label is still
-				// "stdin". Skip the body assertion for this case.
 			}
 			_, source, err := resolveApexBody(a, c.inline, c.path, c.snippetID)
 			if err != nil {

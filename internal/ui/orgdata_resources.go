@@ -1,18 +1,5 @@
 package ui
 
-// orgData Resource initialisation.
-//
-// Extracted from newOrgData in model.go — these are the 20 top-level
-// Resource[T] fields that get the same shape of "Scope/Key/TTL/Fetch"
-// wiring on org-data construction. Lifting them into their own
-// function keeps newOrgData readable (the constructor was 632 lines)
-// without losing co-location.
-//
-// The ttl closure is passed in so the same settings.CacheTTL fallback
-// machinery applies as before — caller threads its st.CacheTTL
-// wrapper. Same alias/username are threaded as the closures still
-// capture them.
-
 import (
 	"time"
 
@@ -20,10 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// initOrgDataResources wires every top-level Resource on orgData.
-// Called once per org from newOrgData. Per-key sub-Resources
-// (Records, ChipRecords, FlowVersions, etc.) are still lazy via
-// the Ensure* methods on orgData.
 func initOrgDataResources(d *orgData, username, alias string, st *settings.Settings, ttl func(string, time.Duration) time.Duration) {
 	d.PermissionSets = Resource[[]sf.FLSPickerEntry]{
 		Scope: username, Key: "permsets", TTL: ttl("permsets", 2*time.Hour), NoCache: true,
@@ -34,17 +17,10 @@ func initOrgDataResources(d *orgData, username, alias string, st *settings.Setti
 	d.Home = Resource[HomeData]{
 		Scope: username, Key: "home", TTL: ttl("home", 10*time.Minute),
 		Fetch: func() (HomeData, error) {
-			// loginLimit was historically borrowed from the async-job
-			// setting (so /users · Recent silently capped at 10) —
-			// dedicated setting since 2026-06-12.
 			return fetchHome(alias, username,
 				st.LimitRecentLogins(), st.LimitAsyncJobHistory(), st.LimitDeployHistory())
 		},
 	}
-	// Organization singleton — separate Resource so the cloud-banner
-	// header on the Home tab can render before the heavier Home payload
-	// (limits + users + jobs + …) lands. Long TTL — Org name and edition
-	// don't change often.
 	d.OrgInfo = Resource[sf.OrgInfo]{
 		Scope: username, Key: "org_info", TTL: ttl("org_info", 24*time.Hour),
 		Fetch: func() (sf.OrgInfo, error) { return sf.FetchOrgInfo(alias) },
@@ -69,10 +45,6 @@ func initOrgDataResources(d *orgData, username, alias string, st *settings.Setti
 		Scope: username, Key: "active_users_v1", TTL: ttl("active_users", 1*time.Minute),
 		Fetch: func() ([]sf.ActiveUserRow, error) { return sf.ActiveUsers(alias, time.Now()) },
 	}
-	// Async apex jobs are live/operational — short TTL so the Jobs
-	// subtab reflects in-flight executions. Browse limit is generous
-	// (200) since the default AsyncJobs cap is tuned for the Home
-	// summary, not a scrollable list.
 	d.AsyncJobs = Resource[[]sf.AsyncJobRow]{
 		Scope: username, Key: "async_jobs_v1", TTL: ttl("async_jobs", 1*time.Minute),
 		Fetch: func() ([]sf.AsyncJobRow, error) { return sf.AsyncJobs(alias, 200) },
@@ -87,9 +59,6 @@ func initOrgDataResources(d *orgData, username, alias string, st *settings.Setti
 	}
 	d.Deploys = Resource[[]sf.DeployRow]{
 		Scope: username, Key: "deploys_v2", TTL: ttl("deploys", 2*time.Minute),
-		// Delta-refresh: on second+ fetch, we only pull rows newer than
-		// the most recent row we have and merge client-side. Full
-		// re-pull happens only when the cached slice is empty.
 		FetchWithExisting: func(existing []sf.DeployRow) ([]sf.DeployRow, error) {
 			return fetchDeploysDelta(alias, existing, st.LimitDeployHistory())
 		},
@@ -162,23 +131,12 @@ func initOrgDataResources(d *orgData, username, alias string, st *settings.Setti
 		Scope: username, Key: "public_groups_v2", TTL: ttl("public_groups", 30*time.Minute),
 		Fetch: func() ([]sf.PublicGroupRow, error) { return sf.ListPublicGroups(alias) },
 	}
-	// Notifications: 5-minute TTL. Chatter mentions / approval pings
-	// aren't realtime-critical for a TUI workflow — the user presses
-	// r to force-refresh when they care. A 90s TTL was firing 40+
-	// notification calls/hour over an idle session (3 calls per
-	// refresh: the connect/notifications endpoint + the chatter feed
-	// + sometimes a /query for unread counts) which is the single
-	// biggest source of background API noise. 5min cuts that to ~12
-	// calls/hour and matches the cadence Lightning's bell icon polls.
 	d.Notifications = Resource[sf.NotificationsList]{
 		Scope: username, Key: "notifications", TTL: ttl("notifications", 5*time.Minute),
 		Fetch: func() (sf.NotificationsList, error) {
 			return sf.ListNotifications(alias, st.LimitNotifications())
 		},
 	}
-	// RecentlyViewed: 5-minute TTL. Quick to refresh on demand and
-	// the server-side list doesn't change second-by-second; longer
-	// would feel stale but shorter would re-query every visit.
 	d.RecentlyViewed = Resource[[]sf.RecentlyViewedRow]{
 		Scope: username, Key: "recently_viewed", TTL: ttl("recently_viewed", 5*time.Minute),
 		NoCache: true,
@@ -194,8 +152,6 @@ func initOrgDataResources(d *orgData, username, alias string, st *settings.Setti
 			})
 		},
 	}
-	// Cross-sObject ApexTrigger list — populated when /apex's
-	// Triggers chip is active. Same TTL as the apex class list.
 	d.ApexTriggersFlat = Resource[[]sf.TriggerRow]{
 		Scope: username, Key: "apex_triggers_flat_v2", TTL: ttl("apex_triggers_flat", 30*time.Minute),
 		Fetch: func() ([]sf.TriggerRow, error) {

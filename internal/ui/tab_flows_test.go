@@ -14,12 +14,10 @@ func TestFlowVersionCell(t *testing.T) {
 	}{
 		{"active only", sf.Flow{ActiveVersionNum: 3, LatestVersionNum: 3}, "v3"},
 		{"active, no latest set", sf.Flow{ActiveVersionNum: 3}, "v3"},
-		// Edge case: active v3, a newer draft v4 → bracketed.
 		{"newer draft", sf.Flow{ActiveVersionNum: 3, LatestVersionNum: 4}, "v3 (v4)"},
 		// No active version (never activated) → show the latest number bare.
 		{"draft only", sf.Flow{ActiveVersionNum: 0, LatestVersionNum: 2}, "v2"},
 		{"none", sf.Flow{}, "—"},
-		// Guard: latest somehow behind active (shouldn't happen) → no brackets.
 		{"latest behind active", sf.Flow{ActiveVersionNum: 5, LatestVersionNum: 4}, "v5"},
 	}
 	for _, c := range cases {

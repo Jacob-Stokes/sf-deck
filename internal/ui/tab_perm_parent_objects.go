@@ -1,11 +1,5 @@
 package ui
 
-// Object-permissions subtab of TabPermParentDetail.
-//
-// 7-column grid: OBJECT · R · C · E · D · VA · MA.
-// Read-only for PSGs (they have no direct permset; show a hint).
-// Toggling is handled in perm_actions.go (Phase G).
-
 import (
 	"fmt"
 	"strings"
@@ -17,11 +11,9 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderPermParentObjects replaces the stub from views_perm_parent_detail.go.
 func (m Model) renderPermParentObjects(w, inner, innerH int, o sf.Org) string {
 	d := m.ensureOrgDataRef(o.Username)
 
-	// PSGs have no direct permset — union of components. Show a hint.
 	if d.PermParentPermSetID == "" {
 		return psgNoDirectPermsNote(inner, "Object")
 	}
@@ -43,7 +35,6 @@ func (m Model) renderPermParentObjects(w, inner, innerH int, o sf.Org) string {
 	}
 
 	allRows := res.Value()
-	// Filter by search buffer (substring match against SobjectType).
 	search := d.ObjPermSearch[key]
 	q := ""
 	if search != nil {
@@ -81,12 +72,10 @@ func (m Model) renderPermParentObjects(w, inner, innerH int, o sf.Org) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Column widths.
 	nameW := inner * 40 / 100
 	if nameW < 20 {
 		nameW = 20
 	}
-	// 6 perm columns × 4 chars each + separators.
 	permColW := 3
 
 	lines = append(lines, renderObjPermHeader(nameW, permColW, inner))
@@ -99,9 +88,6 @@ func (m Model) renderPermParentObjects(w, inner, innerH int, o sf.Org) string {
 	return strings.Join(lines, "\n")
 }
 
-// derefSearch returns a zero searchState if s is nil, so the
-// headerWithSearchPill / searchBar helpers (which take a value,
-// not a pointer) don't blow up before the user ever activates search.
 func derefSearch(s *searchState) searchState {
 	if s == nil {
 		return searchState{}
@@ -153,7 +139,6 @@ func renderObjPermRow(row sf.ObjectPermission, selected, mainFocused bool, nameW
 		inner, "…")
 }
 
-// objPermCell renders one boolean cell as ● (on) or ○ (off).
 func objPermCell(on bool) string {
 	if on {
 		return lipgloss.NewStyle().Foreground(theme.Green).Bold(true).Render("●")
@@ -161,7 +146,6 @@ func objPermCell(on bool) string {
 	return lipgloss.NewStyle().Foreground(theme.FgDim).Render("○")
 }
 
-// psgNoDirectPermsNote returns the standard "PSG: no direct perms" message.
 func psgNoDirectPermsNote(inner int, permKind string) string {
 	var lines []string
 	lines = append(lines, sectionTitle(strings.ToUpper(permKind)+" PERMISSIONS"))

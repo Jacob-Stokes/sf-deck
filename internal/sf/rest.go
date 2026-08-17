@@ -1,19 +1,6 @@
 package sf
 
 // REST client.
-//
-// Stage 2 of the perf roadmap: skip the sf CLI's ~1s Node-startup cost
-// for hot-path data calls. sf still owns auth (JWT refresh, OAuth web
-// flow, token storage, keyring integration) — we borrow the org metadata
-// from `sf org display` and, on newer CLIs that redact secrets from that
-// command, fetch the access token through the explicit credential command
-// `sf org auth show-access-token`.
-//
-// When a token expires, Salesforce returns 401 INVALID_SESSION_ID. The
-// client catches this, discards the token, re-runs bootstrap (which
-// triggers sf's refresh machinery), retries once. User never sees it.
-//
-// REST-direct calls are ~10× faster than shelling out to sf every time.
 
 import (
 	"context"
@@ -37,13 +24,7 @@ import (
 // cap at 100k rows) yet bounds the worst case.
 const maxResponseBytes = 512 << 20 // 512 MiB
 
-// readBodyLimited reads an HTTP response body up to maxResponseBytes.
-// Returns an error when the body exceeds the cap (rather than
-// silently truncating, which would hand a half-parsed body to JSON /
-// XML decoders). Callers pass resp.Body directly.
 func readBodyLimited(body io.Reader) ([]byte, error) {
-	// +1 so a body exactly at the cap reads fully and anything larger
-	// trips the length check below.
 	data, err := io.ReadAll(io.LimitReader(body, maxResponseBytes+1))
 	if err != nil {
 		return nil, err
@@ -170,31 +151,22 @@ func ReconcileRESTClients(wantInstanceURL map[string]string) {
 	for alias, entry := range clients {
 		want, known := wantInstanceURL[alias]
 		if !known {
-			// Alias no longer in the org list — drop it.
 			delete(clients, alias)
 			continue
 		}
 		if entry.client == nil {
-			// A bootstrap that errored (client nil) — let it retry.
 			delete(clients, alias)
 			continue
 		}
 		entry.client.mu.Lock()
 		have := entry.client.instanceURL
 		entry.client.mu.Unlock()
-		// Only compare when the org list actually carries an
-		// instanceURL for this alias; an empty want means "unknown,
-		// don't second-guess a working client."
 		if want != "" && have != "" && !sameInstanceHost(have, want) {
 			delete(clients, alias)
 		}
 	}
 }
 
-// sameInstanceHost reports whether two instance URLs point at the same
-// Salesforce host, tolerating trailing slashes and scheme differences.
-// Used by ReconcileRESTClients to detect an alias repoint without being
-// fooled by cosmetic URL variance.
 func sameInstanceHost(a, b string) bool {
 	norm := func(s string) string {
 		s = strings.TrimSpace(s)
@@ -321,8 +293,6 @@ func tokenIsRedacted(token string) bool {
 	return trimmed == ""
 }
 
-// get performs a GET against a path relative to the instance URL,
-// returning the raw body. Handles auto-re-bootstrap on 401 once.
 func (c *Client) get(path string, query url.Values) ([]byte, error) {
 	return c.doWithRetry("GET", path, query, nil)
 }
@@ -340,10 +310,6 @@ func (c *Client) getCtx(ctx context.Context, path string, query url.Values) ([]b
 	return c.doWithRetryCtx(ctx, "GET", path, query, nil)
 }
 
-// getWithAcceptTimeout is getWithAccept with a per-call timeout override.
-// Pass 0 to use the client's default. Used by the report-export path
-// where the analytics endpoint regularly takes 60-120s to serialize a
-// large workbook server-side and the default 30s aborts mid-flight.
 func (c *Client) getWithAcceptTimeout(path string, query url.Values, accept string, timeout time.Duration) ([]byte, error) {
 	resp, err := c.doOnceWithAccept(path, query, accept, timeout)
 	if err == nil {
@@ -381,8 +347,6 @@ func (c *Client) doOnceWithAccept(path string, query url.Values, accept string, 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", accept)
 	req.Header.Set("User-Agent", "sf-deck/0.1")
-	// xlsx exports go through the same call-tracking the rest of the
-	// REST path uses — these count against the daily API limit.
 	logPath := path
 	if len(query) > 0 {
 		logPath += "?" + query.Encode()
@@ -390,10 +354,6 @@ func (c *Client) doOnceWithAccept(path string, query url.Values, accept string, 
 	startedAt := time.Now()
 	defer func() { fireOnCall(c.alias, []string{"GET", logPath}, err, time.Since(startedAt)) }()
 
-	// When the caller passed a per-call timeout, build a one-shot client
-	// that won't enforce the shared client's shorter default. The shared
-	// http.Client.Timeout is a hard ceiling that overrides the request
-	// context, so we need a fresh client to honour the longer deadline.
 	httpc := c.http
 	if timeout > 0 && (c.http.Timeout == 0 || timeout > c.http.Timeout) {
 		httpc = &http.Client{Timeout: timeout, Transport: c.http.Transport}
@@ -413,10 +373,6 @@ func (c *Client) doOnceWithAccept(path string, query url.Values, accept string, 
 	return respBody, nil
 }
 
-// patch performs a PATCH against a path relative to the instance URL
-// with a JSON body. Used for write-path calls — primarily Tooling API
-// updates to CustomField / CustomObject / ValidationRule. Handles the
-// same auto-re-bootstrap on 401 that GETs do.
 func (c *Client) patch(path string, body []byte) ([]byte, error) {
 	return c.doWithRetry("PATCH", path, nil, body)
 }
@@ -431,11 +387,6 @@ func (c *Client) delete(path string) ([]byte, error) {
 	return c.doWithRetry("DELETE", path, nil, nil)
 }
 
-// postMultipart sends a multipart/form-data POST. Used by the
-// Metadata REST API which accepts deploy payloads as a two-part
-// form: "entity_content" (JSON with deploy options) and "file"
-// (ZIP bytes). Bypasses doWithRetry's JSON-body path since we need
-// a custom Content-Type + prebuilt body.
 func (c *Client) postMultipart(path string, contentType string, body []byte) ([]byte, error) {
 	resp, err := c.doOnceMultipart(path, contentType, body)
 	if err == nil {
@@ -506,9 +457,6 @@ func (c *Client) doWithRetry(method, path string, query url.Values, body []byte)
 	return c.doOnce(method, path, query, body)
 }
 
-// doWithRetryCtx is the cancellable twin of doWithRetry.  ctx is
-// threaded into the underlying http.Request so its cancellation
-// aborts an in-flight call.
 func (c *Client) doWithRetryCtx(ctx context.Context, method, path string, query url.Values, body []byte) ([]byte, error) {
 	resp, err := c.doOnceCtx(ctx, method, path, query, body)
 	if err == nil {
@@ -535,10 +483,6 @@ func (c *Client) doOnce(method, path string, query url.Values, body []byte) (out
 	return c.doOnceCtx(context.Background(), method, path, query, body)
 }
 
-// doOnceCtx is the context-aware HTTP path.  doOnce delegates here
-// with context.Background so the simple synchronous callers don't
-// have to thread context — only the cancellable hot paths (SOQL,
-// SOSL) build a real cancellable context and pass it through.
 func (c *Client) doOnceCtx(ctx context.Context, method, path string, query url.Values, body []byte) (out []byte, err error) {
 	c.mu.Lock()
 	token := c.accessToken
@@ -564,10 +508,6 @@ func (c *Client) doOnceCtx(ctx context.Context, method, path string, query url.V
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	// Every REST call still ticks the usage tracker — Salesforce counts
-	// these exactly the same as sf-CLI-mediated calls. Include the
-	// query string so the API log can show what SOQL / which describe
-	// was actually fetched, not just the bare endpoint.
 	logPath := path
 	if len(query) > 0 {
 		logPath += "?" + query.Encode()
@@ -605,11 +545,6 @@ func (c *Client) ToolingPath(suffix string) string {
 	return "/services/data/v" + c.apiVersion + "/tooling/" + strings.TrimLeft(suffix, "/")
 }
 
-// defaultAPIVersion is the fallback API version when neither the
-// REST client nor `sf org display` can supply one. Kept on the high
-// end so a brand-new SF release doesn't immediately reject calls
-// that fall through to this default. Bump alongside any release
-// where the codebase starts relying on newer endpoints.
 const defaultAPIVersion = "62.0"
 
 // APIVersionForAlias resolves the org's API version without
@@ -650,8 +585,6 @@ func lookupClient(alias string) (*Client, bool) {
 	return entry.client, true
 }
 
-// sfHTTPError carries a non-2xx response so callers (and retry logic)
-// can introspect.
 type sfHTTPError struct {
 	Status int
 	Body   []byte
@@ -696,24 +629,17 @@ func isRateLimited(err error) bool {
 	return ok && he.Status == 429
 }
 
-// isDailyLimitExceeded reports whether err is the 24h API-limit error,
-// which retrying won't help — callers surface it with a clear message
-// rather than the raw HTTP error.
 func isDailyLimitExceeded(err error) bool {
 	he, ok := err.(*sfHTTPError)
 	return ok && strings.Contains(string(he.Body), "REQUEST_LIMIT_EXCEEDED")
 }
 
-// classifyQueryErr wraps a SOQL/pagination error with a clearer message
-// for the two limit cases, leaving everything else untouched.
 func classifyQueryErr(err error) error {
 	if isDailyLimitExceeded(err) {
 		return fmt.Errorf("daily API request limit exhausted for this org (REQUEST_LIMIT_EXCEEDED): %w", err)
 	}
 	return err
 }
-
-// --- high-level convenience methods --------------------------------------
 
 // QueryREST runs a SOQL via the REST API (or Tooling API when tooling
 // is true). Same shape as the CLI-based Query() so call-sites can be
@@ -805,14 +731,8 @@ func (c *Client) QueryRESTCapped(soql string, tooling bool, cap int) (QueryResul
 		return out, nil
 	}
 
-	// Follow the cursor until done OR we hit the row cap.
-	// nextRecordsUrl is an absolute path like
-	// "/services/data/vNN/query/01g…-2000" — passed through the get
-	// helper as-is, no params.
 	for !page.Done && page.NextRecordsURL != "" {
 		if cap > 0 && len(out.Records) >= cap {
-			// Truncate — leave Done=false so callers see the cursor
-			// stopped early.
 			out.Done = false
 			if len(out.Records) > cap {
 				out.Records = out.Records[:cap]
@@ -821,10 +741,6 @@ func (c *Client) QueryRESTCapped(soql string, tooling bool, cap int) (QueryResul
 		}
 		body, err := c.get(page.NextRecordsURL, nil)
 		if err != nil {
-			// A follow-on page failed (rate limit, daily limit, network).
-			// Don't throw away the thousands of rows already accumulated —
-			// return them with Done=false so the caller can show a partial
-			// result + a clear error instead of nothing.
 			out.Done = false
 			return out, classifyQueryErr(err)
 		}
@@ -870,7 +786,6 @@ func (c *Client) QueryRESTCtx(ctx context.Context, soql string, tooling bool) (Q
 	for !page.Done && page.NextRecordsURL != "" {
 		body, err := c.getCtx(ctx, page.NextRecordsURL, nil)
 		if err != nil {
-			// Keep the rows already fetched (see QueryRESTCapped).
 			out.Done = false
 			return out, classifyQueryErr(err)
 		}
@@ -885,9 +800,6 @@ func (c *Client) QueryRESTCtx(ctx context.Context, soql string, tooling bool) (Q
 	return out, nil
 }
 
-// queryPage is the wire shape of one SOQL response. Separate from
-// QueryResult so we can keep the public type clean while still
-// unmarshaling nextRecordsUrl for cursor-following.
 type queryPage struct {
 	Records        []map[string]any `json:"records"`
 	TotalSize      int              `json:"totalSize"`
@@ -916,7 +828,6 @@ func (c *Client) LimitsREST() ([]Limit, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Limits endpoint returns { "LimitName": { "Max": 100, "Remaining": 99 } }.
 	var raw map[string]struct {
 		Max       int `json:"Max"`
 		Remaining int `json:"Remaining"`

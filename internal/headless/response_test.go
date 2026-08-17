@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// The JSON shape is a public contract — every field name, casing, and
-// omitempty behaviour is something downstream skills / scripts depend
-// on. These tests pin the shape.
-
 func TestSuccess_JSONShape(t *testing.T) {
 	r := Success("chip.create", "dev@example.com", "dev", true, map[string]any{
 		"id":   "a01xx0000000001AAA",
@@ -22,8 +18,6 @@ func TestSuccess_JSONShape(t *testing.T) {
 		t.Fatalf("Write: %v", err)
 	}
 
-	// Decode round-trip so we test what callers see, not internal
-	// struct layout.
 	var got map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal: %v\nout: %s", err, buf.String())
@@ -137,7 +131,6 @@ func TestExitCodeFor(t *testing.T) {
 }
 
 func TestErrorImplementsError(t *testing.T) {
-	// Should be usable as a plain Go error.
 	var err error = &Error{Code: ErrNotFound, Message: "no such org"}
 	if err.Error() != "no such org" {
 		t.Errorf("Error() = %q, want 'no such org'", err.Error())
@@ -201,7 +194,6 @@ func TestJSONFieldNamesArePinned(t *testing.T) {
 			Details: map[string]any{"k": "v"},
 		},
 	}
-	// Force OK=false so Error renders too.
 	r.OK = false
 	b, err := json.Marshal(r)
 	if err != nil {

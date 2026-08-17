@@ -5,12 +5,6 @@ package projects
 // of the bundle.create writer: agents point us at a `force-app/`
 // checkout (a git repo, another tool's export, an existing bundle
 // dir) and we infer what kinds of items to register.
-//
-// Compound shapes (Field = "<sObject>.<Field>") survive the round
-// trip because Salesforce's package.xml encodes them the same way.
-// Kinds we can't safely round-trip (FlowVersion, Record, the
-// org-agnostic soql_query / apex_snippet) are skipped — no
-// MetadataAPI equivalent.
 
 import (
 	"encoding/xml"
@@ -78,8 +72,6 @@ func ImportBundle(s *devproject.Store, in ImportBundleInput) (ImportBundleResult
 		return ImportBundleResult{}, err
 	}
 
-	// Pre-load existing project items keyed by (kind, ref) so we
-	// can dedup without an INSERT-then-rollback cycle.
 	existing, err := s.ListItems(in.ProjectID, "")
 	if err != nil {
 		return ImportBundleResult{}, err
@@ -103,7 +95,6 @@ func ImportBundle(s *devproject.Store, in ImportBundleInput) (ImportBundleResult
 		for _, member := range t.Members {
 			ref := strings.TrimSpace(member)
 			if ref == "" || ref == "*" {
-				// Wildcards aren't trackable as discrete items.
 				continue
 			}
 			key := itemKey(kind, ref)
@@ -142,9 +133,6 @@ func ImportBundle(s *devproject.Store, in ImportBundleInput) (ImportBundleResult
 	return result, nil
 }
 
-// resolveManifestPath accepts either a sfdx-project dir or a direct
-// path to package.xml. The TUI / bundle.link surface both treat a
-// directory as the canonical shape; we honor that here.
 func resolveManifestPath(path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -164,8 +152,6 @@ func resolveManifestPath(path string) (string, error) {
 	return abs, nil
 }
 
-// packageXML is the minimal subset of the MetadataAPI manifest we
-// care about — list of types, each with members + name.
 type packageXML struct {
 	XMLName xml.Name         `xml:"Package"`
 	Types   []packageXMLType `xml:"types"`
@@ -230,15 +216,6 @@ func metadataTypeToKind(name string) (devproject.ItemKind, bool) {
 	return "", false
 }
 
-// deriveName is the best-effort guess at what to stamp on Item.Name
-// when the manifest only gave us a ref. The UI shows Name when set,
-// falling back to Ref. For most kinds Ref IS the canonical
-// human-readable identifier (an Account.Phone field reads the same
-// in any UI), so echoing it as Name keeps the list legible.
-//
-// For fields we use the bare field portion (after the dot) so the
-// UI doesn't render "Account.Phone Account.Phone" — the Type column
-// already carries the parent sobject.
 func deriveName(kind devproject.ItemKind, ref string) string {
 	if kind == devproject.KindField {
 		if i := strings.IndexByte(ref, '.'); i > 0 && i < len(ref)-1 {
@@ -246,7 +223,6 @@ func deriveName(kind devproject.ItemKind, ref string) string {
 		}
 	}
 	if kind == devproject.KindReport {
-		// Reports are "Folder/DeveloperName" — show just the dev name.
 		if i := strings.IndexByte(ref, '/'); i > 0 && i < len(ref)-1 {
 			return ref[i+1:]
 		}

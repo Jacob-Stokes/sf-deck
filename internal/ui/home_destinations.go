@@ -8,39 +8,13 @@ import (
 
 // home_destinations.go — the "Lightning Destinations" catalog
 // rendered below the SF-DECK logo on /home → Landing.
-//
-// Each entry is a curated Lightning Setup path that an admin
-// reaches for daily. The catalog is grouped into named sections;
-// each section + each item carries a single-letter shortcut for
-// two-keystroke navigation:
-//
-//   <section letter>  → focuses the section, item letters go live
-//   <item letter>     → opens that destination in Lightning
-//
-// Section letters are global on /home Landing; item letters scope
-// to the focused section so reuse across sections is fine (s in
-// ADMIN = Setup home, s in SECURITY = Setup Audit Trail).
-//
-// An item letter MAY equal another section's section letter (e.g.
-// CODE's "m" Custom Metadata Types vs DEPLOY's "m" section). The
-// dispatcher resolves this by precedence, not by forbidding it:
-// while a section is focused, its own item letters win, so the
-// committed-to item fires rather than teleporting to the colliding
-// section. Switching sections is then esc-then-letter (or j/k).
-// See onHomeDestinationsKey.
 
-// homeDestination is one row in the Lightning destinations grid.
-// Path is instance-relative; the open-menu pipeline prepends the
-// org's instance URL via sf.FullURL.
 type homeDestination struct {
 	Label string
 	Path  string
 	Key   string // single lowercase letter for the in-section shortcut
 }
 
-// homeDestinationSection groups related destinations under a
-// section header (ADMIN, DATA, etc.). Letter is the section-focus
-// shortcut shown bracketed in the header.
 type homeDestinationSection struct {
 	Label   string
 	Letter  string
@@ -148,8 +122,6 @@ var homeDestinations = []homeDestinationSection{
 	},
 }
 
-// homeDestinationSectionByLetter returns the section whose letter
-// matches, or nil + false.
 func homeDestinationSectionByLetter(letter string) (*homeDestinationSection, bool) {
 	for i := range homeDestinations {
 		if homeDestinations[i].Letter == letter {
@@ -159,8 +131,6 @@ func homeDestinationSectionByLetter(letter string) (*homeDestinationSection, boo
 	return nil, false
 }
 
-// homeDestinationByItemLetter returns the destination inside the
-// given section whose Key matches.
 func homeDestinationByItemLetter(section *homeDestinationSection, letter string) (*homeDestination, bool) {
 	if section == nil {
 		return nil, false
@@ -173,23 +143,6 @@ func homeDestinationByItemLetter(section *homeDestinationSection, letter string)
 	return nil, false
 }
 
-// onHomeDestinationsKey is the keystroke dispatcher for the /home
-// Landing destinations grid. Returns (model, cmd, consumed). When
-// not on TabHome → SubtabHomeLanding, returns consumed=false so the
-// global handlers run.
-//
-// Keystroke regimes:
-//   - Section letter (a/d/t/u/c/s/m) with no focus → focuses that
-//     section, cursor lands on first entry, item letters go live.
-//   - Section letter while already focused on a section → switch
-//     focus to the new section.
-//   - Item letter while a section is focused → open that
-//     destination in Lightning.
-//   - j / k / down / up → move cursor across the flat grid; focus
-//     follows whichever section the cursor lands in.
-//   - enter → open the cursored destination.
-//   - esc → clear section focus + cursor (only when no other esc-
-//     consumer is in scope; the global Back handler runs after us).
 func (m Model) onHomeDestinationsKey(key string) (Model, tea.Cmd, bool) {
 	if m.tab() != TabHome || m.homeSubtab() < 0 {
 		return m, nil, false
@@ -225,10 +178,6 @@ func (m Model) onHomeDestinationsKey(key string) (Model, tea.Cmd, bool) {
 		_ = s
 		return m, m.fireHomeDestination(e), true
 	}
-	// Single-letter keys: section letter or item letter (when a
-	// section is focused). Reject anything that isn't a single
-	// printable letter so multi-char keys (ctrl+x, etc.) fall
-	// through to the global handler.
 	if len(key) != 1 {
 		return m, nil, false
 	}
@@ -236,14 +185,6 @@ func (m Model) onHomeDestinationsKey(key string) (Model, tea.Cmd, bool) {
 	if c < 'a' || c > 'z' {
 		return m, nil, false
 	}
-	// Item letters of the FOCUSED section win first. Many item
-	// letters collide with some OTHER section's section letter
-	// (e.g. CODE's "m" Custom Metadata Types vs DEPLOY's "m"
-	// section). The user has already committed to a section, so
-	// the in-section item is the intent; without this priority the
-	// keystroke would teleport to the colliding section instead.
-	// To switch sections, press esc first (or navigate with j/k),
-	// then the section letter focuses the new section.
 	if m.homeFocusedSectionLetter != "" {
 		if sec, ok := homeDestinationSectionByLetter(m.homeFocusedSectionLetter); ok {
 			if e, ok := homeDestinationByItemLetter(sec, key); ok {
@@ -264,9 +205,6 @@ func (m Model) onHomeDestinationsKey(key string) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// syncHomeDestFocus updates homeFocusedSectionLetter to match the
-// section the cursor currently sits in. Called after j/k movement
-// so the focused section visual highlight follows the cursor.
 func (m *Model) syncHomeDestFocus() {
 	s, _, ok := homeDestSectionEntryAtIndex(m.homeDestCursor)
 	if !ok || s == nil {
@@ -293,8 +231,6 @@ func (m *Model) moveHomeDestCursor(delta int) {
 	m.syncHomeDestFocus()
 }
 
-// homeDestSectionIndex returns the position of the section with
-// the given letter in the catalog, or -1.
 func homeDestSectionIndex(letter string) int {
 	for i, s := range homeDestinations {
 		if s.Letter == letter {
@@ -304,9 +240,6 @@ func homeDestSectionIndex(letter string) int {
 	return -1
 }
 
-// fireHomeDestination dispatches an open-in-browser command for
-// the chosen destination. Composes the full URL via the standard
-// openInBrowserCmd pipeline so user browser settings are honored.
 func (m Model) fireHomeDestination(e *homeDestination) tea.Cmd {
 	if e == nil {
 		return nil

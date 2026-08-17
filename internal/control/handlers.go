@@ -7,7 +7,6 @@ import (
 	"net"
 )
 
-// handleStateGet returns a snapshot of the live UI state.
 func (s *Server) handleStateGet(req Request, w *json.Encoder) {
 	state, err := s.Backend.State()
 	if err != nil {
@@ -32,9 +31,6 @@ func (s *Server) handleStateSubscribe(ctx context.Context, req Request, conn net
 		return
 	}
 	defer cancel()
-	// Send the initial snapshot synchronously so the client gets
-	// state immediately rather than having to wait for the first
-	// change tick.
 	if init, err := s.Backend.State(); err == nil {
 		_ = w.Encode(success(req, init))
 	}
@@ -78,7 +74,6 @@ func (s *Server) handleTabOpen(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// handleChipApply applies a chip on the active surface.
 func (s *Server) handleChipApply(req Request, w *json.Encoder) {
 	var args ApplyChipArgs
 	if len(req.Args) > 0 {
@@ -103,8 +98,6 @@ func (s *Server) handleChipApply(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// handleOrgSwitch flips the active org. Args.OrgUser preferred;
-// Args.Alias is the human-friendly fallback.
 func (s *Server) handleOrgSwitch(req Request, w *json.Encoder) {
 	var args SwitchOrgArgs
 	if len(req.Args) > 0 {
@@ -129,7 +122,6 @@ func (s *Server) handleOrgSwitch(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// handleProjectLoad loads a DevProject into the active org's scope.
 func (s *Server) handleProjectLoad(req Request, w *json.Encoder) {
 	var args LoadProjectArgs
 	if len(req.Args) > 0 {
@@ -154,9 +146,6 @@ func (s *Server) handleProjectLoad(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// handleProjectUnload clears the loaded DevProject for the active
-// org. Implemented as LoadProject with an empty id so the UI hook
-// stays single-purpose.
 func (s *Server) handleProjectUnload(req Request, w *json.Encoder) {
 	err := s.withWriteLock(func() error {
 		return s.Backend.LoadProject(LoadProjectArgs{})
@@ -168,9 +157,6 @@ func (s *Server) handleProjectUnload(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// handlePreviewChip spawns a session-only chip on the active org's
-// strip. Returns the minted id so the agent can later save or
-// dismiss without having to track args back to the response.
 func (s *Server) handlePreviewChip(req Request, w *json.Encoder) {
 	var args PreviewChipArgs
 	if len(req.Args) > 0 {
@@ -200,8 +186,6 @@ func (s *Server) handlePreviewChip(req Request, w *json.Encoder) {
 	_ = w.Encode(resp)
 }
 
-// handlePreviewSaveChip promotes an ephemeral chip to a persisted
-// one under a caller-supplied new_id.
 func (s *Server) handlePreviewSaveChip(req Request, w *json.Encoder) {
 	var args PreviewSaveChipArgs
 	if len(req.Args) > 0 {
@@ -226,7 +210,6 @@ func (s *Server) handlePreviewSaveChip(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// handlePreviewDismissChip drops a session-only chip.
 func (s *Server) handlePreviewDismissChip(req Request, w *json.Encoder) {
 	var args PreviewDismissChipArgs
 	if len(req.Args) > 0 {
@@ -251,18 +234,12 @@ func (s *Server) handlePreviewDismissChip(req Request, w *json.Encoder) {
 	_ = w.Encode(Response{ID: req.ID, OK: true, Command: req.Command, Changed: true})
 }
 
-// encodeBackendErr maps the typed errors a Backend may return to
-// matching JSON error codes. Falls back to internal_error.
 func (s *Server) encodeBackendErr(req Request, w *json.Encoder, err error) {
 	if errors.Is(err, errBusy) {
 		_ = w.Encode(fail(req, ErrInstanceBusy,
 			"another client holds the write channel", nil))
 		return
 	}
-	// Backend errors that implement Coded() get their code surfaced
-	// verbatim, so the UI layer can return safety_blocked,
-	// confirmation_required, etc., without the control package
-	// knowing every variant up-front.
 	type coded interface{ Code() string }
 	var c coded
 	if errors.As(err, &c) {

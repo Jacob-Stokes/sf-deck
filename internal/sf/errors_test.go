@@ -72,8 +72,6 @@ func TestClassifyErrorCode_Table(t *testing.T) {
 		status int
 		want   ErrorKind
 	}{
-		// One representative per classification bucket + the
-		// codes that have bitten in the field.
 		{"INSUFFICIENT_ACCESS_OR_READONLY", 403, ErrPermission},
 		{"CANNOT_MODIFY_MANAGED_OBJECT", 400, ErrPermission},
 		{"REQUIRED_FIELD_MISSING", 400, ErrValidation},
@@ -87,14 +85,12 @@ func TestClassifyErrorCode_Table(t *testing.T) {
 		{"ENTITY_IS_DELETED", 404, ErrConflict},
 		{"INVALID_SESSION_ID", 401, ErrSession},
 		{"INVALID_LOGIN", 401, ErrSession},
-		// No recognizable code → HTTP-status fallback ladder.
 		{"", 401, ErrSession},
 		{"", 403, ErrPermission},
 		{"", 500, ErrServer},
 		{"", 503, ErrServer},
 		{"", 400, ErrValidation},
 		{"", 0, ErrUnknown},
-		// Unknown code falls through to the status ladder too.
 		{"SOME_FUTURE_CODE", 403, ErrPermission},
 	}
 	for _, c := range cases {

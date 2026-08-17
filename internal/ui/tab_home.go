@@ -1,17 +1,5 @@
 package ui
 
-// /home — landing surface.
-//
-// Layout: pinned ORG card up top, subtab strip, per-subtab list-table
-// body. Each subtab now uses the shared list-table primitive
-// (uilayout.LayoutListTable + RenderListTableHeader/Row) so search,
-// sort, column-mode, and horizontal scroll all behave the same as
-// /objects, /flows, /apex, etc.
-//
-// The Recent + Logs + API + Audit subtabs delegate to other
-// renderers (renderRecent, renderApexLogs, renderSystemAPI,
-// joinPlaceholder) — same lookup path as the rest of the registry.
-
 import (
 	_ "embed"
 	"fmt"
@@ -40,16 +28,10 @@ import (
 //go:embed home_logo.txt
 var homeLandingLogo string
 
-// renderHome dispatches by subtab. ORG card is always pinned; the
-// remaining vertical budget is owned by the subtab body.
 func (m Model) renderHome(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
 	if !ok {
-		// No org connected yet — show the onboarding panel.
-		// renderHomeOnboarding picks the right copy based on whether
-		// `sf` is missing (install path) vs. just no orgs configured
-		// (login path).
 		return m.renderHomeOnboarding(inner, innerH)
 	}
 	if !canUseOrg(o) {
@@ -58,10 +40,6 @@ func (m Model) renderHome(w, innerH int) string {
 	d := m.data[o.Username]
 
 	var lines []string
-	// ORG card moved to the right sidebar (sidebarHome) so the main
-	// pane is dedicated to the active subtab's content. The sidebar
-	// version pairs with the rotating cloud banner; both pull from
-	// d.OrgInfo + d.Home.
 	_ = o // keep ref to discourage future mistakes that re-pin a card here
 	subs := homeSubtabs()
 	sel := m.homeSubtab()
@@ -73,7 +51,6 @@ func (m Model) renderHome(w, innerH int) string {
 		lines = append(lines, strip)
 	}
 
-	// Hand the subtab the remaining vertical budget.
 	budget := innerH - len(lines) - 1
 	if budget < 5 {
 		budget = 5
@@ -87,15 +64,8 @@ func (m Model) renderHome(w, innerH int) string {
 	case SubtabHomeNotifications:
 		lines = append(lines, m.renderHomeNotifications(d, inner, budget)...)
 	case SubtabHomeLimits:
-		// Routes through the standard list-table renderer via the
-		// homeLimitsListSurface BuildRenderModel — same path /apex
-		// and friends use, so scroll / search / sort / column-mode
-		// all behave consistently.
 		lines = append(lines, renderListSurface(m, &homeLimitsListSurface, inner+4, budget, d))
 	case SubtabHomeLicenses:
-		// Same shared-renderer path as Limits. UserLicense +
-		// PermSetLicense are merged into one list via homeLicenseRow
-		// in SyncHomeLists.
 		lines = append(lines, renderListSurface(m, &homeLicensesListSurface, inner+4, budget, d))
 	case SubtabHomeDownloads:
 		lines = append(lines, m.renderHomeDownloads(inner, budget)...)
@@ -121,31 +91,22 @@ func (m Model) renderHome(w, innerH int) string {
 // (no scrolling yet — the catalog is bounded at ~38 entries which
 // fits comfortably in two columns on standard 24-row terminals).
 func (m Model) renderHomeLanding(inner, budget int) []string {
-	// Split the embedded banner. figlet adds a trailing blank line +
-	// possibly a final empty after the \n; trim those so the logo
-	// block is exactly the printable rows.
 	logoLines := strings.Split(strings.TrimRight(homeLandingLogo, "\n"), "\n")
 	for len(logoLines) > 0 && strings.TrimSpace(logoLines[len(logoLines)-1]) == "" {
 		logoLines = logoLines[:len(logoLines)-1]
 	}
 
 	out := make([]string, 0, 64)
-	// Top breathing room — two blank lines before the logo.
 	out = append(out, "", "")
 	for _, ln := range logoLines {
 		out = append(out, centerLine(ln, inner, theme.BorderHi, false))
 	}
-	// Tagline.
 	out = append(out, "")
 	out = append(out, centerLine("a salesforce TUI", inner, theme.BorderHi, false))
 	if notice := m.updateNoticeText(); notice != "" {
 		out = append(out, "", centerLine(notice, inner, theme.Yellow, false))
 	}
-	// Bottom breathing room — three blanks before the destinations grid.
 	out = append(out, "", "", "")
-	// Destinations grid. destRow is the cursored entry's absolute row
-	// within the grid slice; offset it by the lines already in `out` to
-	// get its row in the combined block.
 	gridStart := len(out)
 	grid, destRow := m.renderHomeDestinations(inner)
 	out = append(out, grid...)
@@ -154,24 +115,13 @@ func (m Model) renderHomeLanding(inner, budget int) []string {
 	if destRow >= 0 {
 		cursorAbs = gridStart + destRow
 	}
-	// Top-anchored scroll: keep the logo visible on first paint (cursor
-	// starts on the first destination, which is below the fold of a tall
-	// logo — a centred 1/3-bias scroll would hide the logo immediately).
-	// Only scroll down once the cursor would fall past the bottom. "↑/↓ N
-	// more" markers show when the view is windowed.
 	return splitScrolled(scrollLinesKeepTop(out, cursorAbs, budget))
 }
 
-// splitScrolled re-splits a scrollLinesToCursor result (a joined
-// string) back into the []string the landing renderer returns.
 func splitScrolled(s string) []string {
 	return strings.Split(s, "\n")
 }
 
-// centerLine pads `s` left/right with spaces so it visually sits in the
-// middle of `width` cells, then wraps it in a foreground style. ANSI
-// codes inside `s` are ignored for width math via ansi.StringWidth so
-// already-styled banner lines still center correctly.
 func centerLine(s string, width int, fg color.Color, dim bool) string {
 	w := ansi.StringWidth(s)
 	pad := (width - w) / 2
@@ -243,13 +193,6 @@ func (m Model) renderHomeNotifications(d *orgData, inner, budget int) []string {
 		})
 }
 
-// renderHomeListTable is the home-subtab adapter that builds a
-// listRenderModel from the spec + recolor + title + state + search
-// the home renderers already pass in, and delegates to the shared
-// renderListModel. Lets the eight home subtabs keep their
-// imperative shape (build cols + spec inline, branch on busy/empty
-// states, then hand off here) while still flowing through the same
-// renderer the other tabs use.
 func (m Model) renderHomeListTable(
 	spec uilayout.ListTableSpec,
 	state *uilayout.ListTableState,
@@ -274,8 +217,6 @@ func (m Model) renderHomeListTable(
 	return renderListModel(m, model, m.focus, inner, budget)
 }
 
-// notifTypeLabel collapses Salesforce's wire types into shorter
-// labels for the TYPE column.
 func notifTypeLabel(t string) string {
 	switch t {
 	case "task_mention", "mention":
@@ -344,7 +285,6 @@ func asciiBar(used, total, width int) string {
 		"]"
 }
 
-// fmtThousands formats an int with comma separators.
 func fmtThousands(n int) string {
 	if n < 0 {
 		return "-" + fmtThousands(-n)

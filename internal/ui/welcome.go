@@ -1,22 +1,9 @@
 package ui
 
-// First-launch welcome. On a user's very first TUI launch (tracked by
-// the persistent settings flag ui.welcome_seen), a blocking choice modal
-// introduces sf-deck and offers two opt-in paths: import a fully-seeded
-// demo org, or start the guided walkthrough. The flag is set the moment
-// the modal is shown, so it fires exactly once regardless of what the
-// user picks (or if they skip).
-//
-// Phase 1 wires the trigger + modal + copy; the two action values
-// (import demo / start walkthrough) are dispatched as messages so later
-// phases can grow real behaviour behind them without touching this file.
-
 import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// welcome action values — the choiceOption.Value carried through
-// OnSuccessTyped when the user picks a row.
 const (
 	welcomeActionDemo        = "demo"
 	welcomeActionWalkthrough = "walkthrough"
@@ -29,16 +16,10 @@ const (
 // m.choiceModal directly.
 type welcomeModalMsg struct{}
 
-// welcomeTriggerCmd returns a command that opens the welcome modal, or
-// nil when it shouldn't fire. Called from Init. Fires only on a genuine
-// first launch: the settings flag is unset AND we're not in --demo mode
-// (demo already IS the tour-world; a welcome-to-demo modal is noise).
 func (m Model) welcomeTriggerCmd() tea.Cmd {
 	if Demo {
 		return nil
 	}
-	// Debug override: [ui.debug] force_welcome shows the modal on every
-	// launch so it can be tested without resetting welcome_seen.
 	if m.settings.DebugForceWelcome() {
 		return func() tea.Msg { return welcomeModalMsg{} }
 	}
@@ -100,15 +81,8 @@ func (m Model) applyWelcomeModal() (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// welcomeActionMsg carries the user's welcome-modal choice back into
-// Update, where each action dispatches to its handler. Kept as a message
-// (rather than calling handlers inline from the OnSuccessTyped closure)
-// so the choice modal fully closes before the next surface opens.
 type welcomeActionMsg struct{ action string }
 
-// applyWelcomeAction dispatches the chosen welcome path. Phase 1 stubs
-// the two real actions to flashes; phases 2 and 3 replace these arms
-// with demo-org import and the walkthrough launch respectively.
 func (m Model) applyWelcomeAction(msg welcomeActionMsg) (Model, tea.Cmd) {
 	switch msg.action {
 	case welcomeActionDemo:
@@ -122,7 +96,6 @@ func (m Model) applyWelcomeAction(msg welcomeActionMsg) (Model, tea.Cmd) {
 		m.startWalkthrough()
 		return m, nil
 	default:
-		// Skip / esc: nothing to do; the flag is already set.
 		return m, nil
 	}
 }

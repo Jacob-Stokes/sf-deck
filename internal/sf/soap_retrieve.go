@@ -1,16 +1,5 @@
 package sf
 
-// High-level metadata retrieval for the /compare feature, built on the
-// fast paths (NOT the slow `sf project retrieve` fan-out):
-//
-//   - RetrieveViaSOAP: list names + parallel batched readMetadata. For
-//     object-rooted types it also extracts the object's nested children
-//     (fields, validation rules, record types, list views, field sets,
-//     and the other CustomObject childXmlNames) so one object read yields
-//     the full object-rooted surface.
-//   - BulkApexBodies: ONE Tooling query for every Apex body (readMetadata
-//     rejects Apex; a bulk query is faster than anything anyway).
-
 import (
 	"fmt"
 	"sync"
@@ -49,8 +38,6 @@ func RetrieveViaSOAPGated(alias, metadataType string, names []string, extractChi
 		return SOAPSnapshot{metadataType: {}}, nil
 	}
 
-	// Batch by the per-type size (heavy types like Profile go small so a
-	// single response isn't tens of MB); run in parallel.
 	bsize := soapBatchSizeFor(metadataType)
 	var batches [][]string
 	for i := 0; i < len(names); i += bsize {
@@ -141,8 +128,6 @@ var objectChildTagMap = []struct {
 	{"sharingReasons", "SharingReason"},
 }
 
-// extractObjectChildren pulls every nested child component out of one
-// CustomObject's XML into the snapshot, keyed "<Object>.<Name>".
 func extractObjectChildren(object, objectXML string, snap SOAPSnapshot) {
 	for _, child := range objectChildTagMap {
 		for _, block := range extractBlocks(objectXML, child.tag) {
@@ -162,9 +147,6 @@ func extractObjectChildren(object, objectXML string, snap SOAPSnapshot) {
 // ONE Tooling query (ApexClass or ApexTrigger). Returns name → body.
 // Far faster than readMetadata (which rejects Apex) or per-class fetch.
 func BulkApexBodies(alias, apexType string) (map[string]string, error) {
-	// apexType is interpolated into SOQL as an identifier — allowlist
-	// it rather than trusting callers. Only these two entities carry
-	// a Body column anyway, so anything else is a caller bug.
 	if apexType != "ApexClass" && apexType != "ApexTrigger" {
 		return nil, fmt.Errorf("bulk apex bodies: unsupported type %q", apexType)
 	}

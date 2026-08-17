@@ -8,7 +8,6 @@ import "testing"
 // global-search SF-50 hard clamp.
 
 func TestStartupBools_TriState(t *testing.T) {
-	// nil settings → built-in default passed through unchanged.
 	var nilS *Settings
 	if !nilS.StartupSidebarOpen(true) {
 		t.Errorf("nil StartupSidebarOpen(true) = false, want true")
@@ -76,11 +75,9 @@ func TestLimitAccessors_ZeroFallbackAndClamp(t *testing.T) {
 	}
 
 	s := &Settings{}
-	// Zero → fallback.
 	if got := s.LimitNotifications(); got != LimitNotificationsFallback {
 		t.Errorf("zero LimitNotifications() = %d, want %d", got, LimitNotificationsFallback)
 	}
-	// Override honoured.
 	s.UI.Limits.Notifications = 7
 	if got := s.LimitNotifications(); got != 7 {
 		t.Errorf("LimitNotifications() = %d, want 7", got)
@@ -109,7 +106,6 @@ func TestLayoutAccessors_ZeroFallbackAndFloor(t *testing.T) {
 	if got := s.LayoutObjectPinnedSubtabs(); got != LayoutObjectPinnedSubtabsFallback {
 		t.Errorf("zero LayoutObjectPinnedSubtabs() = %d, want %d", got, LayoutObjectPinnedSubtabsFallback)
 	}
-	// Override.
 	s.UI.Layout.AutocompleteRows = 12
 	if got := s.LayoutAutocompleteRows(); got != 12 {
 		t.Errorf("LayoutAutocompleteRows() = %d, want 12", got)
@@ -134,7 +130,6 @@ func TestAPIAccessors_ZeroFallback(t *testing.T) {
 	if got := s.APIHTTPTimeoutSec(); got != 120 {
 		t.Errorf("APIHTTPTimeoutSec() = %d, want 120", got)
 	}
-	// API version: empty unless explicitly set; trimmed.
 	if got := s.APIVersionOverride(); got != "" {
 		t.Errorf("default APIVersionOverride() = %q, want empty", got)
 	}

@@ -15,7 +15,6 @@ func TestTextEditor_StringRoundTrip(t *testing.T) {
 	if state.Raw != "Acme Corp" {
 		t.Errorf("Init lost value: %q", state.Raw)
 	}
-	// Edit: append " Inc"
 	for _, r := range " Inc" {
 		consumed, _ := e.HandleKey(&state, fakeKey(string(r)))
 		if !consumed {
@@ -41,7 +40,6 @@ func TestTextEditor_IntRejectsNonNumeric(t *testing.T) {
 	if state.Raw != "42" {
 		t.Errorf("Init lost int value: %q", state.Raw)
 	}
-	// Replace 42 with "abc"
 	for i := 0; i < 2; i++ {
 		e.HandleKey(&state, fakeKey("backspace"))
 	}
@@ -64,7 +62,6 @@ func TestTextEditor_NillableEmptyCommitsNull(t *testing.T) {
 	e := &textEditor{kind: textKindString}
 	f := sf.Field{Name: "Phone", Type: "string", Updateable: true, Nillable: true}
 	state := e.Init(f, "555-1212")
-	// Wipe.
 	for state.Raw != "" {
 		e.HandleKey(&state, fakeKey("backspace"))
 	}
@@ -115,9 +112,6 @@ func TestRegistry_StringResolves(t *testing.T) {
 	}
 }
 
-// fakeKey builds a minimal tea.KeyMsg whose String() returns the
-// requested key string. Sufficient for the editors which only
-// inspect msg.String().
 func fakeKey(s string) tea.KeyMsg {
 	if len(s) == 1 {
 		return tea.KeyPressMsg{Code: rune(s[0]), Text: s}

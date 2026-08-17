@@ -1,12 +1,5 @@
 package ui
 
-// Seed integrity for `sf-deck --demo`. The TUI reads the demo world
-// through the normal cache-first Resource path, so the contract is:
-// every kv key a demo org's surfaces load on first visit exists and
-// round-trips through the cache layer, and nothing in the fixture
-// set references a real org (the whole point of hand-written
-// fixtures).
-
 import (
 	"path/filepath"
 	"strings"
@@ -177,8 +170,6 @@ func TestSeedDemoCache_FullPages(t *testing.T) {
 			t.Errorf("describe %s has %d fields, want >= 12", so.Name, n)
 		}
 	}
-	// Operational surfaces added later: same "don't quietly shrink"
-	// contract.
 	if n := len(demoSetupAudit()); n < 15 {
 		t.Errorf("setup audit rows = %d, want >= 15", n)
 	}
@@ -278,8 +269,6 @@ func TestSeedDemoCache_CrossReferences(t *testing.T) {
 }
 
 func TestSeedDemoCache_NothingRealLeaks(t *testing.T) {
-	// The fixtures are hand-written, but pin it: no org identity may
-	// reference anything outside the fictional Northwind world.
 	for _, o := range demoOrgs() {
 		if !strings.HasSuffix(o.Username, "@northwind.example") {
 			t.Errorf("non-fictional username: %q", o.Username)
@@ -308,7 +297,6 @@ func TestDemoFlipInFlightDeploys(t *testing.T) {
 			t.Error("in-flight row flipped immediately; want a delay before completion")
 		}
 	}
-	// Backdate past the flip threshold → completes, counters filled.
 	aged := make([]sf.DeployRow, len(rows))
 	copy(aged, rows)
 	for i := range aged {

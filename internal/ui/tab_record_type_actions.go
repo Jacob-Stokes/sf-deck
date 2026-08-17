@@ -1,8 +1,5 @@
 package ui
 
-// Record-type action menu — generic Action[Ctx] + ToolingEntity
-// write surface. No per-entity save/load helpers.
-
 import (
 	tea "charm.land/bubbletea/v2"
 
@@ -160,9 +157,6 @@ func recordTypeDeletedCmd(c recordTypeCtx) tea.Cmd {
 	}
 }
 
-// recordTypePoppedMsg signals that a record type was deleted and we
-// should pop back from TabRecordTypeDetail to TabObjectDetail +
-// RecordTypes subtab, then fire the carried refresh cmd.
 type recordTypePoppedMsg struct {
 	alias    string
 	rtID     string

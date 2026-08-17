@@ -13,9 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
-// newTagTestApp opens a real devproject store under a temp HOME and
-// wires it into a stub App. SaveSettings is a no-op (chips path is
-// not exercised). Cleanup closes the store.
 func newTagTestApp(t *testing.T) *app.App {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
@@ -106,7 +103,6 @@ func TestTagUpdate_PartialAndIdempotent(t *testing.T) {
 	_, created := runTagCLI(t, a, "--json", "tag", "create", "--name", "old")
 	id := tagIDFromCreate(t, created)
 
-	// First update — Changed=true.
 	code, got := runTagCLI(t, a, "--json", "tag", "update",
 		"--id", fmt.Sprint(id), "--name", "new")
 	if code != headless.ExitOK {
@@ -116,7 +112,6 @@ func TestTagUpdate_PartialAndIdempotent(t *testing.T) {
 		t.Errorf("changed = %v", got["changed"])
 	}
 
-	// Same name — Changed=false.
 	code, got = runTagCLI(t, a, "--json", "tag", "update",
 		"--id", fmt.Sprint(id), "--name", "new")
 	if code != headless.ExitOK {
@@ -141,7 +136,6 @@ func TestTagDelete_Roundtrip(t *testing.T) {
 		t.Errorf("changed = %v", got["changed"])
 	}
 
-	// Second delete — not_found.
 	code, _ = runTagCLI(t, a, "--json", "tag", "delete",
 		"--id", fmt.Sprint(id))
 	if code != headless.ExitNotFound {
@@ -164,7 +158,6 @@ func TestTagApply_Idempotent(t *testing.T) {
 		t.Errorf("first apply changed = %v", got["changed"])
 	}
 
-	// Re-apply — Changed=false.
 	code, got = runTagCLI(t, a, "--json", "tag", "apply",
 		"--id", fmt.Sprint(id),
 		"--kind", "record", "--ref", "001A", "--org-user", "dev@x")
@@ -287,9 +280,6 @@ func TestTag_NilProjectsRendersTypedError(t *testing.T) {
 	}
 }
 
-// tagIDFromCreate extracts the int id out of a tag.create response's
-// data.tag.id field. The Go JSON decoder returns numbers as float64
-// by default so we round-trip via fmt.
 func tagIDFromCreate(t *testing.T, resp map[string]any) int64 {
 	t.Helper()
 	data, _ := resp["data"].(map[string]any)

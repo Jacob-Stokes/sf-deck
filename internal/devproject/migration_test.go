@@ -66,7 +66,6 @@ func TestMigrateFromOrgProjects(t *testing.T) {
 		t.Fatalf("new schema: %v", err)
 	}
 
-	// Populate: 1 DP with 2 OPs (different orgs), each with 2 items.
 	if _, err := db.Exec(`
 		INSERT INTO dev_projects (id, name, description, created_at, touched_at)
 		VALUES ('dp1', 'Q2 migration', '', 1000, 1000);
@@ -87,7 +86,6 @@ func TestMigrateFromOrgProjects(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// Assert: dev_project_items has 4 rows, properly keyed.
 	rows, err := db.Query(`
 		SELECT dev_project_id, org_user, kind, ref, name
 		FROM dev_project_items ORDER BY org_user, kind, ref`)

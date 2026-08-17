@@ -8,8 +8,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/diff"
 )
 
-// newBudgetRun builds a run with empty snapshot/hash maps and the given
-// per-body cap + ceiling (bytes), as startCompare would.
 func newBudgetRun(bodyCap int, ceiling int64) *compareRun {
 	return &compareRun{
 		snapA: diff.Snapshot{}, snapB: diff.Snapshot{},
@@ -26,11 +24,9 @@ func TestRecordComponentsPerBodyCap(t *testing.T) {
 		"Small": small, "Big": big,
 	})
 
-	// Hashes recorded for BOTH (so the diff is complete).
 	if run.hashA["Profile"]["Small"] == "" || run.hashA["Profile"]["Big"] == "" {
 		t.Fatalf("expected hashes for both; got %+v", run.hashA["Profile"])
 	}
-	// Body retained only for the small one.
 	if _, ok := run.snapA["Profile"]["Small"]; !ok {
 		t.Error("small body should be retained")
 	}
@@ -43,8 +39,6 @@ func TestRecordComponentsPerBodyCap(t *testing.T) {
 }
 
 func TestRecordComponentsTotalCeiling(t *testing.T) {
-	// No per-body cap; ceiling of 120 bytes. Three 50-byte bodies: first
-	// two fit (100), third would exceed 120 → hash only.
 	run := newBudgetRun(0, 120)
 	body := strings.Repeat("z", 50)
 	run.recordComponents("target", "Layout", map[string]string{"A": body})
@@ -73,7 +67,6 @@ func TestHashBodyDistinguishesContentAndLength(t *testing.T) {
 	if first != second {
 		t.Error("same content hashed unequal")
 	}
-	// Length-prefix guards against a same-hash different-length collision.
 	if strings.SplitN(hashBody("abc"), ":", 2)[0] != "3" {
 		t.Errorf("hash should be length-prefixed: %q", hashBody("abc"))
 	}
@@ -107,7 +100,6 @@ func TestCompareOverHashesMatchesBodies(t *testing.T) {
 // normalized body, so these compare Same.
 func TestCompareHashesNormalizeCosmeticXML(t *testing.T) {
 	run := newBudgetRun(1<<20, 0)
-	// Same XML, different cosmetic formatting between the two orgs.
 	srcXML := "<root><a>1</a><b>2</b></root>"
 	tgtXML := "<root>\n  <a>1</a>\n  <b>2</b>\n</root>\n"
 	run.recordComponents("source", "CustomObject", map[string]string{"Acct": srcXML})

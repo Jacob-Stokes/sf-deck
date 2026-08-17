@@ -130,8 +130,6 @@ func TestRankBuckets(t *testing.T) {
 	}
 }
 
-// helpers -------------------------------------------------------------
-
 func suggestionValues(ss []Suggestion) []string {
 	out := make([]string, len(ss))
 	for i, s := range ss {

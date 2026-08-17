@@ -16,8 +16,6 @@ func newStubSettings(seed ...settings.ChipConfig) *settings.Settings {
 	return s
 }
 
-// counter helper builds a Persister that bumps a counter so we can
-// assert Save is called exactly when we expect.
 func counter() (func() error, *int) {
 	n := 0
 	return func() error { n++; return nil }, &n
@@ -60,7 +58,6 @@ func TestList_StableSort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Stable order: domain then label then id.
 	want := []string{"Mid", "Alpha", "Zeta"}
 	if len(got) != 3 {
 		t.Fatalf("len = %d", len(got))
@@ -362,7 +359,6 @@ func TestFavourite_TogglesAndIsIdempotent(t *testing.T) {
 	})
 	save, n := counter()
 
-	// First toggle on — should mutate + save.
 	res, err := Favourite(st, "records", "x", true, save)
 	if err != nil {
 		t.Fatalf("Favourite on: %v", err)
@@ -374,7 +370,6 @@ func TestFavourite_TogglesAndIsIdempotent(t *testing.T) {
 		t.Errorf("save n = %d, want 1", *n)
 	}
 
-	// Re-favourite — no-op, no save.
 	res, err = Favourite(st, "records", "x", true, save)
 	if err != nil {
 		t.Fatalf("Favourite idempotent: %v", err)

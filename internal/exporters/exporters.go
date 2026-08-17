@@ -1,33 +1,5 @@
 // Package exporters is the shared "shape an internal data structure
 // into a portable file" toolbox.
-//
-// The package decomposes into:
-//
-//   - exporters.go (this file)  — shared types: ExportRow, Format,
-//     Write dispatch
-//   - csv.go / xlsx.go / json.go — per-format writers; each takes a
-//     []ExportRow + io.Writer and emits
-//     the appropriate bytes
-//   - <subject>/                 — per-subject row builders that turn
-//     domain objects into []ExportRow.
-//     Today: devproject/. Future: recent/,
-//     soql/, snapshot/, … any data the
-//     TUI accumulates that a user might
-//     want as a file.
-//
-// Why a generic ExportRow rather than each subject having its own
-// writers: every subject's export ends up looking like a tabular
-// reference list ("here's what's in this collection, with stable
-// identifiers + URLs"). Centralising the row shape means a new export
-// subject is one row-builder file + zero writer changes; a new format
-// (markdown? html?) is one writer file + zero subject changes.
-//
-// Counter-arguments that lost: per-subject ExportRow types could
-// carry richer typed columns (e.g. "ItemKind" as a typed enum rather
-// than a string). True, but the gain is small and the cost is N×M
-// implementations. The shared row uses string columns; subjects pre-
-// format their values when shaping rows. The output is destined for
-// spreadsheets either way — strings all the way down is fine.
 package exporters
 
 import (

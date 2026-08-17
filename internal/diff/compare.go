@@ -63,11 +63,8 @@ type Row struct {
 // per-component fetch used on drill-in. Both take an org alias and are
 // project-free (Tooling/REST by alias) for v1 types.
 type Provider interface {
-	// TypeLabel is the metadata type name shown in the TYPE column.
 	TypeLabel() string
-	// List enumerates every component of this type in the org.
 	List(alias string) ([]Component, error)
-	// Body fetches the source/text of one component for diffing.
 	Body(alias, id string) (string, error)
 }
 
@@ -328,7 +325,6 @@ func normalizeBody(s string) string {
 	for i := range lines {
 		lines[i] = trimTrailingSpace(lines[i])
 	}
-	// Drop trailing empty lines.
 	for len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}

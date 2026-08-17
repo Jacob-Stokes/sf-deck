@@ -5,8 +5,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/services/tags"
 )
 
-// IPC verb handlers for tags: create/apply/remove/set/list/show/update/delete. Split out of control_backend.go.
-
 func (s *ControlState) TagList(args control.TagListArgs) ([]any, error) {
 	if err := s.ensureStore(); err != nil {
 		return nil, err

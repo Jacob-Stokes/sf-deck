@@ -2,19 +2,6 @@ package sf
 
 // Field-Level Security (FLS) helpers — list + update FieldPermissions
 // records via the regular REST API.
-//
-// FLS in Salesforce is stored on the FieldPermissions sobject. Each
-// row carries (Field, ParentId, PermissionsRead, PermissionsEdit).
-// Parent is always a PermissionSet — profiles own an implicit
-// PermissionSet whose ProfileId is non-null, so filtering by
-// ParentId handles both "a profile's FLS" and "a perm set's FLS"
-// uniformly.
-//
-// Gotcha: FieldPermissions rows exist only for fields that have
-// been explicitly set. When a field was created with its default
-// FLS and never touched, there's no row — callers render that as
-// "read=false, edit=false" (which IS the effective permission for
-// a missing row).
 
 import (
 	"encoding/json"
@@ -39,7 +26,6 @@ type FLSPickerEntry struct {
 	Name      string // internal api name — stable key
 	Label     string // user-facing label
 	ProfileID string // non-empty when this permset is a profile's implicit permset
-	// IsPermSet == true means standalone PermissionSet (not a profile).
 	IsPermSet bool
 }
 
@@ -65,9 +51,6 @@ func mapFLSPickerEntry(r map[string]any) FLSPickerEntry {
 		Label:     asString(r["Label"]),
 		ProfileID: asString(r["ProfileId"]),
 	}
-	// IsOwnedByProfile is a bool; when true, this permset is a
-	// profile's implicit one, and we should surface the profile's
-	// label instead (which is what the admin actually recognizes).
 	if b, ok := r["IsOwnedByProfile"].(bool); ok && b {
 		row.IsPermSet = false
 		if p, ok := r["Profile"].(map[string]any); ok {
@@ -153,8 +136,6 @@ func UpsertFieldPermission(target, id, sobject, field, parentID string, read, ed
 		}
 		return resp.ID, nil
 	}
-	// PATCH the minimum fields (Sobject/Field/Parent are immutable
-	// after creation, so they're omitted from the update body).
 	patchBody, err := json.Marshal(map[string]any{
 		"PermissionsRead": read,
 		"PermissionsEdit": edit,

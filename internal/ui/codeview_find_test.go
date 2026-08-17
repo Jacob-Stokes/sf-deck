@@ -17,8 +17,6 @@ const findTestBody = "public class Foo {\n" +
 	"    }\n" +
 	"}"
 
-// newCodeFindModel builds a model whose active org is on TabApexDetail
-// with a painted code body, so the find/hscroll key gates open.
 func newCodeFindModel(t *testing.T) (Model, *orgData) {
 	t.Helper()
 	d := &orgData{}
@@ -30,7 +28,6 @@ func newCodeFindModel(t *testing.T) (Model, *orgData) {
 			data:     map[string]*orgData{"find@test": d},
 		},
 	}
-	// Simulate the paint that records what's on screen.
 	m.renderCodeView(d, codeViewSpec{
 		BodyID: "apex:test", Body: findTestBody, Lang: "",
 		Inner: 60, Height: 10, Focused: true,
@@ -44,20 +41,16 @@ func newCodeFindModel(t *testing.T) (Model, *orgData) {
 func TestCodeFindMatchScan(t *testing.T) {
 	st := &codeFindState{Buffer: "query"}
 	ms := codeFindMatchesFor(st, findTestBody)
-	// "query" (line 1), "runQuery" (line 2, case-insensitive),
-	// "query the query" (line 3, twice) = 4 matches.
 	if len(ms) != 4 {
 		t.Fatalf("got %d matches, want 4: %+v", len(ms), ms)
 	}
 	if ms[0].Line != 1 || ms[1].Line != 2 || ms[2].Line != 3 || ms[3].Line != 3 {
 		t.Errorf("match lines wrong: %+v", ms)
 	}
-	// Memo: same query + body returns the identical slice.
 	again := codeFindMatchesFor(st, findTestBody)
 	if len(again) != 4 || &again[0] != &ms[0] {
 		t.Error("memo miss on unchanged query+body")
 	}
-	// Query change invalidates.
 	st.Buffer = "class"
 	if got := codeFindMatchesFor(st, findTestBody); len(got) != 1 || got[0].Line != 0 {
 		t.Errorf("after query change: %+v", got)
@@ -77,7 +70,6 @@ func TestCodeFindMatchScan(t *testing.T) {
 func TestCodeFindTypingCyclingAndCounter(t *testing.T) {
 	m, d := newCodeFindModel(t)
 
-	// "/" opens the bar.
 	mm, _, ok := m.onCodeViewKey("/")
 	if !ok {
 		t.Fatal("/ must open find on a code surface")
@@ -87,7 +79,6 @@ func TestCodeFindTypingCyclingAndCounter(t *testing.T) {
 		t.Fatal("find bar should be active after /")
 	}
 
-	// Typing appends + live-jumps to the first match.
 	for _, r := range "query" {
 		var handled bool
 		mm, _, handled = mm.handleCodeFindInput(tea.KeyPressMsg{Code: r, Text: string(r)})
@@ -102,7 +93,6 @@ func TestCodeFindTypingCyclingAndCounter(t *testing.T) {
 		t.Errorf("live-jump cursor = %d, want line 1", d.BodyCursor["apex:test"])
 	}
 
-	// Enter cycles forward; shift+enter back (wrapping).
 	mm, _, _ = mm.handleCodeFindInput(keyMsgFromString("enter"))
 	if st.Idx != 1 || d.BodyCursor["apex:test"] != 2 {
 		t.Errorf("enter: idx=%d cursor=%d, want 1 / line 2", st.Idx, d.BodyCursor["apex:test"])
@@ -116,7 +106,6 @@ func TestCodeFindTypingCyclingAndCounter(t *testing.T) {
 		t.Errorf("shift+enter wrap: idx=%d, want 3", st.Idx)
 	}
 
-	// Counter renders "x of y" in the bar.
 	out := mm.renderCodeView(d, codeViewSpec{
 		BodyID: "apex:test", Body: findTestBody, Lang: "",
 		Inner: 60, Height: 10, Focused: true,
@@ -125,7 +114,6 @@ func TestCodeFindTypingCyclingAndCounter(t *testing.T) {
 		t.Errorf("bar should show \"4 of 4\", got %q", ansi.Strip(out[0]))
 	}
 
-	// Esc keeps the query; n keeps cycling from idle state.
 	mm, _, _ = mm.handleCodeFindInput(keyMsgFromString("esc"))
 	if st.Active {
 		t.Fatal("esc must close the bar")
@@ -137,7 +125,6 @@ func TestCodeFindTypingCyclingAndCounter(t *testing.T) {
 	if !ok || st.Idx != 0 {
 		t.Errorf("idle n: handled=%v idx=%d, want cycle to 0", ok, st.Idx)
 	}
-	// C clears everything.
 	if _, _, ok = mm.onCodeViewKey("C"); !ok || st.Buffer != "" {
 		t.Errorf("idle C should clear the query (buffer=%q)", st.Buffer)
 	}
@@ -153,19 +140,16 @@ func TestCodeFindHighlightAndBarConsumeHeight(t *testing.T) {
 		BodyID: "apex:test", Body: findTestBody, Lang: "",
 		Inner: 60, Height: 4, Focused: true,
 	})
-	// Bar + at most Height-1 body rows.
 	if len(out) > 4 {
 		t.Fatalf("output %d rows, budget 4 (bar consumes one)", len(out))
 	}
 	if !strings.Contains(ansi.Strip(out[0]), "/query") {
 		t.Errorf("first row should be the find bar, got %q", ansi.Strip(out[0]))
 	}
-	// A matched line carries background styling (SGR 48; codes).
 	joined := strings.Join(out, "\n")
 	if !strings.Contains(joined, "\x1b[") {
 		t.Error("matched lines should carry ANSI match styling")
 	}
-	// Content is intact after styling.
 	if !strings.Contains(ansi.Strip(joined), "private String query;") {
 		t.Errorf("matched line content mangled:\n%s", ansi.Strip(joined))
 	}
@@ -174,7 +158,6 @@ func TestCodeFindHighlightAndBarConsumeHeight(t *testing.T) {
 func TestCodeViewHorizontalScroll(t *testing.T) {
 	m, d := newCodeFindModel(t)
 
-	// Right scrolls; the body loses leading text and gains the "…" marker.
 	mm, _, ok := m.onCodeViewKey("right")
 	if !ok {
 		t.Fatal("right arrow must be consumed on a code surface")
@@ -193,7 +176,6 @@ func TestCodeViewHorizontalScroll(t *testing.T) {
 	if strings.Contains(plain, "public class Foo") {
 		t.Error("hscroll should shift the body text left")
 	}
-	// Gutter stays put: line numbers still visible.
 	if !strings.Contains(plain, " 1 ") {
 		t.Error("gutter must not scroll horizontally")
 	}
@@ -222,7 +204,6 @@ func TestCodeViewKeysGatedByTab(t *testing.T) {
 	}
 }
 
-// keyMsgFromString builds a KeyPressMsg for special keys by name.
 func keyMsgFromString(s string) tea.KeyPressMsg {
 	switch s {
 	case "enter":

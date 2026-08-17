@@ -1,14 +1,6 @@
 package devproject
 
 // "Collect" — adapter from a generic sf.Openable into a typed Item.
-//
-// The shell's shift+K flow hands us whatever's under the cursor. This
-// file knows how to recognise the kinds we support and emit a stable
-// (Kind, Ref, Type, Name) tuple. Unsupported kinds return ok=false so
-// the modal can refuse cleanly.
-//
-// Adding support for a new kind = one new case here. The store schema
-// itself is type-agnostic.
 
 import (
 	"fmt"
@@ -105,8 +97,6 @@ func FromOpenable(item sf.Openable) (kind ItemKind, ref, typ, name string, ok bo
 		if t.ID == "" {
 			return "", "", "", "", false
 		}
-		// Type carries the implicit-permset id so writers (FLS, object
-		// perms) can target it without re-querying.
 		return KindProfile, t.ID, t.PermissionSetID, t.Name, true
 	case sf.ApexClassRow:
 		if t.ID == "" {

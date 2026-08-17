@@ -117,9 +117,6 @@ func RecentDeploysSince(target string, limit int, since string) ([]DeployRow, er
 	}
 	soql := `SELECT ` + deploySOQLFields + ` FROM DeployRequest`
 	if since != "" {
-		// Salesforce SOQL accepts ISO-8601 literals for dateTime fields
-		// with no quotes. If the caller passed a malformed value we
-		// fall back to the full query.
 		soql += " WHERE CreatedDate > " + since
 	}
 	soql += ` ORDER BY CreatedDate DESC`

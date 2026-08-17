@@ -1,16 +1,5 @@
 package sf
 
-// Record edit (UpdateRecord) + SOSL record search primitives.
-//
-// UpdateRecord PATCHes /services/data/vNN/sobjects/<Type>/<Id> with
-// a JSON body of {field: value} pairs. The server coerces strings
-// to typed values per the field's describe — so we send strings and
-// rely on SF to parse dates / numbers / booleans / etc.
-//
-// SearchRecords runs a SOSL FIND query to back the reference-lookup
-// editor. Returns Id + Name (or whatever the object's name-field
-// is) of matching records for the requested sObject.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -65,9 +54,6 @@ func (c *Client) UpdateRecord(sobject, id string, fields map[string]any) ([]Fiel
 	path := c.APIPath("sobjects/" + sobject + "/" + id)
 	resp, err := c.patch(path, body)
 	if err != nil {
-		// Most failures land as a 400-class with a JSON error array.
-		// doWithRetry wraps non-2xx as sfHTTPError; try to parse the
-		// body before giving up.
 		var httpErr *sfHTTPError
 		if asHTTPError(err, &httpErr) {
 			if parsed := parseFieldErrors(httpErr.Body); len(parsed) > 0 {
@@ -76,7 +62,6 @@ func (c *Client) UpdateRecord(sobject, id string, fields map[string]any) ([]Fiel
 		}
 		return nil, err
 	}
-	// Successful PATCH returns 204 No Content (resp is empty).
 	_ = resp
 	return nil, nil
 }
@@ -121,7 +106,6 @@ func (c *Client) CreateRecord(sobject string, fields map[string]any) ([]FieldErr
 		}
 		return nil, "", err
 	}
-	// SF returns {"id": "001…", "success": true, "errors": []} on 201.
 	var out struct {
 		ID      string `json:"id"`
 		Success bool   `json:"success"`
@@ -169,9 +153,6 @@ func DeleteRecordAlias(alias, sobject, id string) error {
 	return c.DeleteRecord(sobject, id)
 }
 
-// parseFieldErrors decodes the JSON array Salesforce returns on a
-// PATCH rejection. Empty body or unparseable JSON returns nil so
-// callers fall back to the raw HTTP error.
 func parseFieldErrors(body []byte) []FieldError {
 	if len(body) == 0 {
 		return nil
@@ -266,11 +247,6 @@ func SearchRecordsAlias(alias, sobject, nameField, term string, limit int) ([]Se
 	return c.SearchRecords(sobject, nameField, term, limit)
 }
 
-// escapeSOSLBraces escapes characters that have special meaning
-// inside SOSL FIND {...} clauses. The full reserved set is
-// documented at https://developer.salesforce.com/docs/atlas.en-us.soql_sosl.meta/soql_sosl/sforce_api_calls_sosl_find.htm
-// — we cover the common ones; users passing literal SOSL operators
-// stay responsible for their own escaping.
 func escapeSOSLBraces(s string) string {
 	r := strings.NewReplacer(
 		`\`, `\\`,

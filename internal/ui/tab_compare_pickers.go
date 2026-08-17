@@ -1,9 +1,5 @@
 package ui
 
-// /compare — the setup-form pickers: source/target org, scope, and the
-// "save as template" flow. All reuse the generic choiceModal/editModal
-// primitives so no bespoke modal chrome is needed.
-
 import (
 	"fmt"
 	"strings"
@@ -13,8 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 )
 
-// openCompareOrgPicker opens a choice modal to pick the source (isSource
-// = true) or target org for the active run.
 func (m *Model) openCompareOrgPicker(d *orgData, isSource bool) tea.Cmd {
 	if d.Run == nil {
 		d.Run = m.newCompareRun()
@@ -73,8 +67,6 @@ func (m *Model) openCompareScopePicker(d *orgData) tea.Cmd {
 	})
 }
 
-// saveCurrentCompareAsTemplate prompts for a name and persists the
-// active run's source/target/scope as a reusable saved definition.
 func (m *Model) saveCurrentCompareAsTemplate(d *orgData) tea.Cmd {
 	if d.Run == nil || d.Run.Target.IsZero() {
 		m.flash("set up a comparison first")
@@ -108,15 +100,6 @@ func (m *Model) saveCurrentCompareAsTemplate(d *orgData) tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// saveCurrentComparison persists the active comparison RESULT to the
-// devproject store, honouring the run's overwrite-vs-new intent:
-//   - linked + overwrite → update the original in place, no prompt
-//   - linked + new copy (SaveAsNew, set via the edit modal), or
-//     unlinked → name prompt → insert new
-//
-// A run becomes linked+overwrite when opened (↵) from a saved
-// comparison (so ctrl+s saves back to it); it becomes linked+new when
-// the edit modal's clone toggle was chosen.
 func (m *Model) saveCurrentComparison(d *orgData) tea.Cmd {
 	if d.Run == nil || d.Run.Phase != comparePhaseInventory {
 		m.flash("run a comparison first")
@@ -132,8 +115,6 @@ func (m *Model) saveCurrentComparison(d *orgData) tea.Cmd {
 	return m.saveComparisonAsNew(d)
 }
 
-// overwriteSavedComparison updates the originating saved comparison's
-// stored result in place.
 func (m *Model) overwriteSavedComparison(d *orgData) tea.Cmd {
 	run := d.Run
 	blob, err := serializeCompareRun(run)
@@ -152,8 +133,6 @@ func (m *Model) overwriteSavedComparison(d *orgData) tea.Cmd {
 	return nil
 }
 
-// saveComparisonAsNew prompts for a name and inserts a new saved
-// comparison from the active run's result.
 func (m *Model) saveComparisonAsNew(d *orgData) tea.Cmd {
 	run := d.Run
 	initial := fmt.Sprintf("%s → %s", endpointLabel(*m, run.Source), endpointLabel(*m, run.Target))
@@ -186,8 +165,6 @@ func (m *Model) saveComparisonAsNew(d *orgData) tea.Cmd {
 			if err != nil {
 				return err
 			}
-			// The run now corresponds to this saved comparison, so a
-			// subsequent ctrl+s offers overwrite of it.
 			run.OriginSavedID = sc.ID
 			run.OriginSavedName = sc.Name
 			d.SavedLoaded = false
@@ -197,7 +174,6 @@ func (m *Model) saveComparisonAsNew(d *orgData) tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// openCompareMethodPicker lets the user choose the retrieval route.
 func (m *Model) openCompareMethodPicker(d *orgData) tea.Cmd {
 	if d.Run == nil {
 		d.Run = m.newCompareRun()

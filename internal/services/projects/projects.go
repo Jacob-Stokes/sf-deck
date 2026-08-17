@@ -1,30 +1,6 @@
 // Package projects is the service layer for DevProjects — the
 // cross-org collections that group sObjects, fields, flows, records,
 // queries, etc. together for a piece of work.
-//
-// Same pattern as services/chips and services/tags: typed public
-// views, validated input, idempotent writes where it makes sense,
-// typed errors that headless wrappers map to JSON error codes.
-//
-// DevProjects use a caller-provided string ID so the persistence
-// layer doesn't have to round-trip an auto-increment back. Headless
-// callers either pass --id (rare) or let the service generate one;
-// the TUI's chip-manager flow does the same via internal/ui/newID.
-//
-// What lives here:
-//
-//   - Project / Item public views (JSON-tagged, decoupled from
-//     devproject.DevProject / devproject.Item).
-//   - CRUD on projects (list / show / create / update / delete).
-//   - Item ops (add / remove / list).
-//   - Typed errors (ErrNotFound, ErrNotEmpty, ErrInvalidKind).
-//
-// What does NOT live here:
-//
-//   - Collect logic (the "given a UI selection, fold the items into a
-//     project" code lives in devproject/collect.go + UI).
-//   - Salesforce hydration. AddItem just stores name/ref/kind — it
-//     does not validate that the Ref exists in the org.
 package projects
 
 import (
@@ -143,8 +119,6 @@ func (e ErrInvalidRef) Error() string {
 func validateRef(kind devproject.ItemKind, ref string) error {
 	switch kind {
 	case devproject.KindFlow:
-		// FlowDefinition.Id is 300...; FlowDefinitionView.Id is 3dd.
-		// Both are 18 chars, share a prefix, easy to mix up.
 		if strings.HasPrefix(ref, "3dd") {
 			return ErrInvalidRef{
 				Kind: string(kind),
@@ -153,7 +127,6 @@ func validateRef(kind devproject.ItemKind, ref string) error {
 			}
 		}
 	case devproject.KindFlowVersion:
-		// Flow.Id is 301...; same Tooling API as KindFlow.
 		if strings.HasPrefix(ref, "3dd") {
 			return ErrInvalidRef{
 				Kind: string(kind),
@@ -174,9 +147,6 @@ func validateRef(kind devproject.ItemKind, ref string) error {
 	return nil
 }
 
-// validKinds mirrors services/tags. Kept independent so adding a
-// project-only kind doesn't accidentally enable tag bindings for it
-// (or vice versa).
 var validKinds = map[string]devproject.ItemKind{
 	"sobject":         devproject.KindSObject,
 	"field":           devproject.KindField,
@@ -217,9 +187,6 @@ func parseKind(s string) (devproject.ItemKind, error) {
 	return k, nil
 }
 
-// newID generates a short hex id. Matches the TUI's newID — 12 random
-// bytes ≈ 96 bits, plenty for a local store. Caller may override via
-// CreateInput.ID for deterministic tests or scripted rollouts.
 func newID() string {
 	var b [12]byte
 	_, _ = rand.Read(b[:])
@@ -303,9 +270,6 @@ func Show(s *devproject.Store, id, name string) (Project, error) {
 		out.ItemCount = len(items)
 		return out, nil
 	}
-	// Name lookup. ListDevProjects + linear scan: typical user has
-	// <100 projects, so this is cheap, and the store doesn't expose a
-	// direct name lookup.
 	all, err := s.ListDevProjects()
 	if err != nil {
 		return Project{}, err
@@ -362,7 +326,6 @@ func Create(s *devproject.Store, in CreateInput) (Result, error) {
 	if err := s.CreateDevProject(p); err != nil {
 		return Result{}, err
 	}
-	// Re-read so CreatedAt / TouchedAt populated from the row.
 	out, err := s.GetDevProject(p.ID)
 	if err != nil {
 		return Result{}, err
@@ -493,8 +456,6 @@ func AddItem(s *devproject.Store, in AddItemInput) (ItemResult, error) {
 	if err := validateRef(k, in.Ref); err != nil {
 		return ItemResult{}, err
 	}
-	// Pre-check project exists so the error is typed (not_found vs.
-	// a silent no-op).
 	cur, err := s.GetDevProject(in.ProjectID)
 	if err != nil {
 		return ItemResult{}, err
@@ -511,10 +472,7 @@ func AddItem(s *devproject.Store, in AddItemInput) (ItemResult, error) {
 		Name:         in.Name,
 		Notes:        in.Notes,
 		Namespace:    in.Namespace,
-		// Stamp AddedAt ourselves rather than letting the store fill
-		// it in — devproject.AddItem takes Item by value, so we
-		// wouldn't see the timestamp it assigns.
-		AddedAt: time.Now(),
+		AddedAt:      time.Now(),
 	}
 	added, err := s.AddItem(it)
 	if err != nil {

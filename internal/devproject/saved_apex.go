@@ -4,9 +4,6 @@ package devproject
 // taggable + pinnable to DevProjects. Same shape as saved_queries
 // (deliberately) so the /exec Library subtab can mirror /soql's
 // Library without per-table special cases.
-//
-// Identifiers: "ax_" + base32-of-12-random-bytes. Short, sortable
-// roughly by creation order, easy to recognise as ours in logs.
 
 import (
 	"crypto/rand"

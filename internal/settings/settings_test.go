@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// --- SafetyLevel ----------------------------------------------------------
-
 func TestSafetyLevel_String(t *testing.T) {
 	cases := []struct {
 		level SafetyLevel
@@ -58,7 +56,6 @@ func TestParseSafetyLevel(t *testing.T) {
 		{"full", SafetyFull},
 		{"FULL", SafetyFull},
 		{"  records  ", SafetyRecords}, // whitespace tolerance
-		// Unknown values fail closed to ReadOnly.
 		{"yolo", SafetyReadOnly},
 		{"", SafetyReadOnly},
 	}
@@ -95,8 +92,6 @@ func TestSafetyLevel_AllowsLadder(t *testing.T) {
 		}
 	}
 }
-
-// --- DefaultChipLimit -----------------------------------------------------
 
 func TestDefaultChipLimit_NilSettings(t *testing.T) {
 	var s *Settings
@@ -135,7 +130,6 @@ func TestSetDefaultChipLimit_RoundTrip(t *testing.T) {
 	if got := s.DefaultChipLimit(); got != 750 {
 		t.Errorf("got %d, want 750", got)
 	}
-	// 0 clears the override.
 	s.SetDefaultChipLimit(0)
 	if got := s.DefaultChipLimit(); got != DefaultChipLimitFallback {
 		t.Errorf("after clear: got %d, want fallback", got)
@@ -147,8 +141,6 @@ func TestSetDefaultChipLimit_NilSafe(t *testing.T) {
 	// Should not panic.
 	s.SetDefaultChipLimit(1000)
 }
-
-// --- CacheTTL ------------------------------------------------------------
 
 func TestCacheTTL_NilSettingsUsesFallback(t *testing.T) {
 	var s *Settings
@@ -192,7 +184,6 @@ func TestSetCacheTTLOverride_RoundTrip(t *testing.T) {
 	if got := s.CacheTTLOverride("records"); got != "10m" {
 		t.Errorf("got %q, want %q", got, "10m")
 	}
-	// Empty value clears the entry.
 	s.SetCacheTTLOverride("records", "")
 	if got := s.CacheTTLOverride("records"); got != "" {
 		t.Errorf("after clear: got %q, want empty", got)
@@ -205,8 +196,6 @@ func TestCacheTTLOverride_NilSafe(t *testing.T) {
 		t.Errorf("nil Settings: got %q, want empty", got)
 	}
 }
-
-// --- CompareConcurrency ---------------------------------------------------
 
 func TestCompareConcurrency(t *testing.T) {
 	cases := []struct {

@@ -60,11 +60,9 @@ func TestRenderRowsPaged_HappyPath(t *testing.T) {
 	rows, total := RenderRowsPaged(25, 0, 1, 10, 80, func(i int) string {
 		return "row " + string(rune('A'+i))
 	})
-	// 25 rows, pageSize 10 → 3 pages. Page 1 → rows 10..19 + indicator.
 	if total != 3 {
 		t.Errorf("total = %d, want 3", total)
 	}
-	// 10 rows + 1 indicator
 	if len(rows) != 11 {
 		t.Errorf("rows = %d (want 11): %#v", len(rows), rows)
 	}
@@ -74,7 +72,6 @@ func TestRenderRowsPaged_HappyPath(t *testing.T) {
 }
 
 func TestRenderRowsPaged_LastPagePartial(t *testing.T) {
-	// 25 rows, pageSize 10, page 2 → rows 20..24 (5 rows) + indicator
 	rows, total := RenderRowsPaged(25, 0, 2, 10, 80, func(i int) string {
 		return "row"
 	})

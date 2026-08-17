@@ -20,8 +20,6 @@ func TestTodayForOrgKeysReconcilesAliasAndUsername(t *testing.T) {
 	const alias = "acme-test"
 	const username = "user@acme.test"
 
-	// Simulate: a few calls recorded under the short alias, many under the
-	// username (as /compare does).
 	for i := 0; i < 3; i++ {
 		tr.Bump(alias, []string{"GET", "/services/data/limits"}, nil, time.Millisecond)
 	}
@@ -29,7 +27,6 @@ func TestTodayForOrgKeysReconcilesAliasAndUsername(t *testing.T) {
 		tr.Bump(username, []string{"POST", "/services/Soap/m readMetadata Flow"}, nil, time.Millisecond)
 	}
 
-	// Old behaviour: looking up only one key misses the other.
 	if got := tr.TodayForOrg(alias); got != 3 {
 		t.Errorf("TodayForOrg(alias) = %d, want 3 (the alias-only rows)", got)
 	}
@@ -37,12 +34,10 @@ func TestTodayForOrgKeysReconcilesAliasAndUsername(t *testing.T) {
 		t.Errorf("TodayForOrg(username) = %d, want 20", got)
 	}
 
-	// New behaviour: both keys reconcile to the full total.
 	if got := tr.TodayForOrgKeys(alias, username); got != 23 {
 		t.Errorf("TodayForOrgKeys(alias, username) = %d, want 23", got)
 	}
 
-	// Duplicate / empty keys are ignored, not double-counted.
 	if got := tr.TodayForOrgKeys(alias, alias, "", username); got != 23 {
 		t.Errorf("TodayForOrgKeys with dupes/empty = %d, want 23", got)
 	}

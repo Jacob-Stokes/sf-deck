@@ -9,28 +9,13 @@ import (
 	"testing"
 )
 
-// captureBackend is a richer test backend than fakeBackend in
-// listener_test.go: it records every call's args, exposes per-method
-// return-value/error knobs, and can drive coded errors. Used for the
-// handler-table tests that exercise dispatch + validation + error
-// propagation.
-//
-// Methods left as inert stubs in fakeBackend (BundleList etc.) get
-// real implementations here. The two coexist: fakeBackend stays for
-// the listener-level integration tests; captureBackend backs the
-// handler-table tests.
 type captureBackend struct {
 	mu sync.Mutex
 
-	// Call counters keyed by method name. Tests assert "this verb
-	// caused exactly one call to X".
 	calls map[string]int
 
-	// Last args seen per method. Tests assert dispatch shape.
 	lastArgs map[string]any
 
-	// Knobs: per-method error + return value. The handler under
-	// test is named by the verb (e.g. "project.list").
 	errors map[string]error
 	values map[string]any
 }
@@ -65,8 +50,6 @@ func (b *captureBackend) recordList(method string, args any) ([]any, error) {
 	}
 	return v.([]any), nil
 }
-
-// --- Backend interface ---
 
 func (b *captureBackend) State() (map[string]any, error) {
 	v, err := b.record("state.get", nil)
@@ -264,8 +247,6 @@ func (b *captureBackend) OrgSafetySet(a OrgSafetySetArgs) (any, error) {
 	return b.record("org.safety.set", a)
 }
 
-// --- helpers ---
-
 // dispatch runs a request through the listener's command switch
 // directly (no socket). Captures the first response the handler
 // writes and returns it. State-subscribe-style streaming verbs
@@ -285,14 +266,10 @@ func dispatch(t *testing.T, srv *Server, req Request) Response {
 	return resp
 }
 
-// codedError is a Backend error type that surfaces a custom Code()
-// through the encodeBackendErr coded-interface path.
 type codedError struct{ code, msg string }
 
 func (e *codedError) Error() string { return e.msg }
 func (e *codedError) Code() string  { return e.code }
-
-// ------ Validation tests: missing required fields ------
 
 func TestHandler_ValidationErrors(t *testing.T) {
 	cases := []struct {
@@ -381,12 +358,8 @@ func TestHandler_ValidationErrors(t *testing.T) {
 	}
 }
 
-// ------ Malformed args (JSON-level) ------
-
 func TestHandler_MalformedArgs(t *testing.T) {
 	srv := &Server{Backend: newCapture()}
-	// Truly malformed JSON in args: a bare string where a struct is
-	// expected.
 	req := Request{Command: "tab.open", Args: json.RawMessage(`"not-a-struct"`)}
 	resp := dispatch(t, srv, req)
 	if resp.OK {
@@ -397,8 +370,6 @@ func TestHandler_MalformedArgs(t *testing.T) {
 	}
 }
 
-// ------ Dispatch + response shape ------
-
 func TestHandler_DispatchAndShape(t *testing.T) {
 	type tc struct {
 		name        string
@@ -407,13 +378,10 @@ func TestHandler_DispatchAndShape(t *testing.T) {
 		mockValue   any  // value the backend should return
 		wantChanged bool // expected Changed flag
 		wantKey     string
-		// optional: assertion on what the backend captured. Receives the
-		// args type the handler unmarshalled into.
-		assertArgs func(*testing.T, any)
+		assertArgs  func(*testing.T, any)
 	}
 
 	cases := []tc{
-		// Reads: not Changed; payload usually nested under a noun key.
 		{
 			name: "state.get returns state", command: "state.get",
 			mockValue: map[string]any{"tab": "records"},
@@ -483,7 +451,6 @@ func TestHandler_DispatchAndShape(t *testing.T) {
 			wantKey:   "safety",
 		},
 
-		// Writes: Changed=true; payload wrapped under noun key.
 		{
 			name: "project.create sets Changed", command: "project.create",
 			args:        ProjectCreateArgs{Name: "demo"},
@@ -552,8 +519,6 @@ func TestHandler_DispatchAndShape(t *testing.T) {
 			wantKey:   "result",
 		},
 
-		// More writes — these go through withWriteLock, so the
-		// success-path coverage needs a valid args struct.
 		{
 			name: "apex.run sets Changed", command: "apex.run",
 			args:        ApexRunArgs{Body: "System.debug('x');"},
@@ -775,8 +740,6 @@ func TestHandler_DispatchAndShape(t *testing.T) {
 	}
 }
 
-// ------ Error propagation ------
-
 func TestHandler_BackendErrorPropagation(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -840,8 +803,6 @@ func TestHandler_BackendErrorPropagation(t *testing.T) {
 	}
 }
 
-// ------ project.unload uses no args ------
-
 func TestHandler_ProjectUnload_Succeeds(t *testing.T) {
 	be := newCapture()
 	srv := &Server{Backend: be}
@@ -856,8 +817,6 @@ func TestHandler_ProjectUnload_Succeeds(t *testing.T) {
 		t.Errorf("expected one project.load invocation, got %d", be.calls["project.load"])
 	}
 }
-
-// ------ chip.preview returns the minted chip id ------
 
 func TestHandler_PreviewChip_ReturnsMintedID(t *testing.T) {
 	be := newCapture()
@@ -877,8 +836,6 @@ func TestHandler_PreviewChip_ReturnsMintedID(t *testing.T) {
 	}
 }
 
-// ------ decodeArgs ------
-
 func TestDecodeArgs_EmptyIsNoop(t *testing.T) {
 	var got OpenTabArgs
 	if err := decodeArgs(nil, &got); err != nil {
@@ -887,7 +844,6 @@ func TestDecodeArgs_EmptyIsNoop(t *testing.T) {
 	if err := decodeArgs(json.RawMessage{}, &got); err != nil {
 		t.Errorf("empty args should not error: %v", err)
 	}
-	// Field stays zero.
 	if got.Tab != "" {
 		t.Errorf("expected zero value, got %+v", got)
 	}
@@ -911,8 +867,6 @@ func TestDecodeArgs_PropagatesError(t *testing.T) {
 	}
 }
 
-// ------ Server.Entry exposes the registered instance entry ------
-
 func TestServer_EntryRoundtrip(t *testing.T) {
 	t.Setenv("HOME", shortHome(t))
 	srv := &Server{Backend: newCapture()}
@@ -931,7 +885,5 @@ func TestServer_EntryRoundtrip(t *testing.T) {
 		t.Errorf("Entry().Socket = %q, want %q", entry.Socket, got.Socket)
 	}
 }
-
-// ------ helpers used above ------
 
 func strPtr(s string) *string { return &s }

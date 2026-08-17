@@ -1,21 +1,5 @@
 package ui
 
-// Subtab machinery.
-//
-// A Tab can contain multiple Subtabs. The Objects tab's drill-in state
-// has (eventually) many: Schema, Records, Flows, Triggers, Validation
-// Rules, Apex, Layouts, Record Types, etc. Each Subtab owns its own
-// view chips + list + render function.
-//
-// Principles:
-//   - When a context has ≥2 subtabs, we show a pill-shaped strip below
-//     the breadcrumb. Selected one has a blue underline.
-//   - When a context has only 1 subtab, the strip is hidden entirely.
-//   - '[' / ']' cycle subtabs; '←/→' cycle views within the selected
-//     subtab.
-//   - Every tab+drill combo declares its subtabs statically (for now —
-//     future plugins will register them dynamically).
-
 import (
 	"time"
 
@@ -169,22 +153,11 @@ const (
 	SubtabCompareHistory Subtab = "compare-history"
 )
 
-// subtabInfo holds per-subtab display metadata.
 type subtabInfo struct {
 	ID    Subtab
 	Label string
 }
 
-// subtabInfosFor projects one tab's registry-declared Subtabs into
-// the strip shape. THE single source for static subtab lists — the
-// per-tab helper funcs below are thin delegations kept only for
-// call-site readability. (Before 2026-06-13 each helper duplicated
-// its registry list as a literal; the two could silently drift —
-// e.g. the meta stub cut had to edit both. Now the registry is the
-// only place a subtab set is written down. objectDrillSubtabs is
-// the one inversion: the registry derives from IT via
-// objectDrillSubtabSpecs, which is the same single-source property
-// from the other direction.)
 func subtabInfosFor(t Tab) []subtabInfo {
 	spec := lookupTabSpec(t)
 	if spec == nil || len(spec.Subtabs) == 0 {
@@ -197,12 +170,6 @@ func subtabInfosFor(t Tab) []subtabInfo {
 	return out
 }
 
-// objectDrillSubtabs returns every subtab available at the
-// TabObjectDetail level. The first objectDrillPinnedCount entries
-// are pinned to the strip; the remainder live in the More… modal
-// (slot 0 of the strip). Pinned ordering matches admin frequency:
-// Details (landing), Schema (fields), Records (data), FLS (per-
-// profile read/edit), Validation (rules), Record Types.
 func objectDrillSubtabs() []subtabInfo {
 	return []subtabInfo{
 		{ID: SubtabDetails, Label: "Details"},
@@ -224,12 +191,6 @@ func objectDrillSubtabSpecs() []SubtabSpec {
 	specs := make([]SubtabSpec, 0, len(subs))
 	for _, sub := range subs {
 		spec := SubtabSpec{ID: sub.ID, Label: sub.Label}
-		// Wire per-subtab PrimaryFetchedAt so the header age-stamp
-		// reflects each subtab's data source — Validation/RecordTypes/
-		// Triggers point at their list resource, Records at the chip
-		// records, others fall through to the tab-level describe.
-		// Help is wired in the same loop for symmetry — each subtab
-		// of /object knows its own ? modal.
 		switch sub.ID {
 		case SubtabSchema:
 			spec.Help = func(m Model) infoModalState { return helpFieldsTable() }
@@ -273,30 +234,12 @@ func objectDrillSubtabSpecs() []SubtabSpec {
 	return specs
 }
 
-// objectDrillPinnedCount is how many entries from objectDrillSubtabs
-// occupy fixed strip slots; the rest are reachable through the
-// More… modal. Pinned set was chosen by admin-task frequency:
-// landing/fields/data/permissions/rules/types are daily-use, the
-// remainder (triggers/layouts/flows) are debugging surfaces and
-// fine to dig for.
 const objectDrillPinnedCount = 6
 
-// homeSubtabs returns the subtab set for the Home tab's details box.
-// ORG + API LIMITS are pinned above the box; these populate the box.
-//
-// Recent is the first subtab — it absorbs the old standalone /recent
-// tab. The remaining subtabs (Users, Licenses, Jobs, Deploys, Packages)
-// keep their order so users with muscle memory only have to relearn
-// one position.
 func homeSubtabs() []subtabInfo { return subtabInfosFor(TabHome) }
 
-// apexSubtabs returns the subtab set for /apex — code-shaped
-// surfaces. Classes is the default; the rest cover triggers and
-// the Visualforce holdovers.
 func apexSubtabs() []subtabInfo { return subtabInfosFor(TabApex) }
 
-// componentsSubtabs returns the subtab set for /components — LWC
-// (default), Aura, plus UI surfaces that pair with components.
 func componentsSubtabs() []subtabInfo { return subtabInfosFor(TabLWC) }
 
 // metaSubtabs returns the subtab set for /meta — admin-metadata hub.
@@ -309,28 +252,14 @@ func componentsSubtabs() []subtabInfo { return subtabInfosFor(TabLWC) }
 // drilling into each project first).
 func devProjectsSubtabs() []subtabInfo { return subtabInfosFor(TabDevProjects) }
 
-// devProjectDetailSubtabs returns the per-project drill-in tab
-// strip: Items (the existing flat tree) and Bundles (sfdx project
-// directories linked to this DevProject).
 func devProjectDetailSubtabs() []subtabInfo { return subtabInfosFor(TabDevProjectDetail) }
 
 func metaSubtabs() []subtabInfo { return subtabInfosFor(TabMeta) }
 
-// reportsSubtabs returns the subtab set for /reports — Reports
-// (folder browser) plus the Dashboards / Report Types list surfaces.
 func reportsSubtabs() []subtabInfo { return subtabInfosFor(TabReports) }
 
-// systemSubtabs returns the subtab set for the unified /system tab.
-// Logs + Deploys use their renderers; API surfaces the daily call counter.
-//
-// New subtabs (Limits, Async Jobs, etc.) drop in here as their
-// renderers land — extension is one entry per subtab.
 func systemSubtabs() []subtabInfo { return subtabInfosFor(TabSystem) }
 
-// permsDashboardSubtabs returns the subtab set for the /perms top tab
-// — permset/PSG/profile management plus routing/sharing surfaces
-// (queues, public groups, sharing rules) that admins reach for in
-// the same context.
 func permsDashboardSubtabs() []subtabInfo { return subtabInfosFor(TabPerms) }
 
 // permParentDetailSubtabs returns the subtab axes inside a single
@@ -370,9 +299,6 @@ func (m Model) subtabPinSplit() (pinned, total int) {
 	all := m.tabSubtabs()
 	total = len(all)
 	if spec := lookupTabSpec(m.tab()); spec != nil && spec.SubtabPinned > 0 {
-		// The user can override how many object-drill subtabs are
-		// pinned vs relegated to the More… modal ([ui.layout]
-		// object_pinned_subtabs); the spec value is the built-in default.
 		pinCap := spec.SubtabPinned
 		if m.tab() == TabObjectDetail {
 			pinCap = m.settings.LayoutObjectPinnedSubtabs()
@@ -384,8 +310,6 @@ func (m Model) subtabPinSplit() (pinned, total int) {
 	return total, total
 }
 
-// hasSubtabOverflow reports whether the active tab has subtabs that
-// don't fit on the strip and need the More… modal.
 func (m Model) hasSubtabOverflow() bool {
 	pinned, total := m.subtabPinSplit()
 	return total > pinned
@@ -421,7 +345,6 @@ func stripSelectedFor(fullIdx int, m Model) int {
 	if fullIdx < pinned {
 		return fullIdx
 	}
-	// More… slot is at position pinned (right after the pinned set).
 	return pinned
 }
 
@@ -448,15 +371,6 @@ func (m Model) tabSubtabs() []subtabInfo {
 	return m.tabSubtabsRaw()
 }
 
-// tabSubtabsRaw is the inner full-list resolver. Three-stage lookup:
-//
-//  1. TabSpec.SubtabsResolver — for dynamic subtabs (per-bundle,
-//     per-perm-parent-kind). Highest precedence so dynamic shapes
-//     beat a stale static list.
-//  2. TabSpec.Subtabs — static-subtab tabs (most of them).
-//  3. Empty single-element fallback for tabs with no subtab story.
-//
-// Stays private; tabSubtabs is the named entry.
 func (m Model) tabSubtabsRaw() []subtabInfo {
 	spec := lookupTabSpec(m.tab())
 	if spec != nil && spec.SubtabsResolver != nil {
@@ -472,14 +386,6 @@ func (m Model) tabSubtabsRaw() []subtabInfo {
 	return []subtabInfo{{ID: "", Label: ""}}
 }
 
-// currentSubtab returns the selected Subtab ID for the current Tab
-// (defaults to "" for tabs without subtabs).
-//
-// Resolution: walk TabSpec.SubtabsResolver / Subtabs to get the list,
-// then TabSpec.GetSubtabIdx (required when subtabs exist) for the
-// cursor index. The dynamic-shape tabs (TabLWCDetail, TabPermParentDetail)
-// register both a SubtabsResolver and a GetSubtabIdx that reads from
-// per-tab state — no special-casing needed here.
 func (m Model) currentSubtab() Subtab {
 	spec := lookupTabSpec(m.tab())
 	if spec == nil {
@@ -504,13 +410,6 @@ func (m Model) currentSubtab() Subtab {
 	return subs[i].ID
 }
 
-// renderSubtabStrip draws a horizontal tab-style strip for subtabs.
-// Mirrors the top tab bar's rounded-border pills (renderTabPill) so
-// the visual language is consistent — "tabs within a tab." Hidden
-// when ≤1 subtab is declared.
-//
-// Pills are joined with lipgloss.JoinHorizontal so multi-row borders
-// align cleanly on a single visual row.
 func renderSubtabStrip(subs []subtabInfo, selectedIdx, width int) string {
 	out, _ := renderSubtabStripLayers(subs, selectedIdx, width)
 	return out
@@ -562,9 +461,6 @@ func subtabDigit(i int) string {
 	return "⇧" + digits[i]
 }
 
-// renderSubtabPill draws one subtab pill. Same shape as renderTabPill
-// (rounded border, 0/1 padding) but with a thinner border style and
-// muted accent so it reads as subordinate to the top tab bar.
 func renderSubtabPill(label string, active bool) string {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -580,11 +476,6 @@ func renderSubtabPill(label string, active bool) string {
 	return style.Render(label)
 }
 
-// permParentSubtabsResolver feeds TabPermParentDetail's dynamic
-// subtab strip: permset / PSG / profile drills expose different
-// subtab sets, so the resolver reads the active kind off orgData
-// each render rather than freezing one list on the spec (extracted
-// in the registry-purity pass).
 func permParentSubtabsResolver(m Model) []subtabInfo {
 	kind := ""
 	if len(m.orgs) > 0 {

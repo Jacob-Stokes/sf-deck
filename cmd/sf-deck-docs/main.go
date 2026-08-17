@@ -1,16 +1,5 @@
 // Command sf-deck-docs regenerates the auto-generated reference
 // pages of the docs site from the verb + keymap registries:
-//
-//	docs/user/reference/cli.md
-//	docs/user/reference/ipc.md
-//	docs/user/reference/keymap.md
-//
-// Run from the repo root:
-//
-//	go run ./cmd/sf-deck-docs
-//
-// CI runs `go run ./cmd/sf-deck-docs -check` to fail when the docs
-// would change relative to the current registry state.
 package main
 
 import (
@@ -98,8 +87,6 @@ func repoRoot() (string, error) {
 	return "", fmt.Errorf("go.mod not found")
 }
 
-// ----- CLI reference -----------------------------------------------
-
 func renderCLI() string {
 	var b strings.Builder
 	b.WriteString(`# CLI reference
@@ -141,8 +128,6 @@ stable contract; text mode is for humans.
 	}
 	return b.String()
 }
-
-// ----- IPC reference -----------------------------------------------
 
 func renderIPC() string {
 	var b strings.Builder
@@ -212,8 +197,6 @@ Response (failure):
 	return b.String()
 }
 
-// ----- Keymap reference --------------------------------------------
-
 func renderKeymap() string {
 	var b strings.Builder
 	b.WriteString(`# Keymap reference
@@ -244,8 +227,6 @@ edit the file.
 	}
 	return b.String()
 }
-
-// ----- shared --------------------------------------------------
 
 type nounIndex struct {
 	nouns  []string

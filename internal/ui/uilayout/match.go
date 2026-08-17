@@ -1,20 +1,5 @@
 package uilayout
 
-// Generic field-aware substring matcher for list-view searches.
-//
-// This helper centralises substring matching and fielded shorthand
-// (field:value) so every list view gains the same syntax:
-//
-//	`acme`            substring match across every searchable field
-//	`acme inc`        AND of two substrings (each free term)
-//	`name:acme`       substring scoped to the Name field
-//	`label:acc inc`   "label contains acc" AND "any field contains inc"
-//
-// The matcher is built from a small per-row spec that names which
-// fields the surface considers "searchable" and how to extract them.
-// Surfaces still own the spec (different lists have different
-// columns) but the parsing/AND-ing/case-folding live here.
-
 import (
 	"strings"
 )
@@ -66,9 +51,6 @@ func MakeMatcher[T any](spec MatchSpec[T]) func(T, string) bool {
 	}
 }
 
-// termMatches resolves one space-separated term against the row.
-// Fielded terms (`field:value`) scope to the named field; bare
-// terms scan the Any extractor.
 func termMatches[T any](spec MatchSpec[T], row T, term string) bool {
 	if i := strings.IndexByte(term, ':'); i > 0 && i < len(term)-1 {
 		field := resolveField(spec.Fields, term[:i])
@@ -114,7 +96,6 @@ func MakeScorer[T any](spec MatchSpec[T]) func(row T, q string) int {
 			return 1
 		}
 		if spec.Primary == "" || spec.Field == nil {
-			// No ranking signal available; just confirm a match.
 			if spec.Any != nil && strings.Contains(spec.Any(row), q) {
 				return 1
 			}
@@ -122,10 +103,6 @@ func MakeScorer[T any](spec MatchSpec[T]) func(row T, q string) int {
 		}
 
 		primary := spec.Field(row, spec.Primary)
-		// Length-ratio tiebreaker: 0..99. Q same length as primary
-		// → 99. Q tiny relative to primary → small. Folded into
-		// each band so within a band, shorter-primary rows rank
-		// higher.
 		tieBreak := 0
 		if len(primary) > 0 {
 			ratio := (len(q) * 99) / len(primary)
@@ -135,11 +112,9 @@ func MakeScorer[T any](spec MatchSpec[T]) func(row T, q string) int {
 			tieBreak = ratio
 		}
 
-		// Band 1000: exact Primary match.
 		if primary == q {
 			return 1000 + tieBreak
 		}
-		// Band 900: exact match on any other indexed field.
 		for _, f := range spec.Fields {
 			if f == spec.Primary {
 				continue
@@ -148,7 +123,6 @@ func MakeScorer[T any](spec MatchSpec[T]) func(row T, q string) int {
 				return 900 + tieBreak
 			}
 		}
-		// Band 800: Primary starts with query.
 		if strings.HasPrefix(primary, q) {
 			return 800 + tieBreak
 		}
@@ -158,7 +132,6 @@ func MakeScorer[T any](spec MatchSpec[T]) func(row T, q string) int {
 		if tokenStartsWith(primary, q) {
 			return 700 + tieBreak
 		}
-		// Band 600: any other field starts with query.
 		for _, f := range spec.Fields {
 			if f == spec.Primary {
 				continue
@@ -167,12 +140,9 @@ func MakeScorer[T any](spec MatchSpec[T]) func(row T, q string) int {
 				return 600 + tieBreak
 			}
 		}
-		// Band 500: substring of Primary.
 		if strings.Contains(primary, q) {
 			return 500 + tieBreak
 		}
-		// Band 400: any field has query as substring (the original
-		// behaviour, last-resort).
 		if spec.Any != nil && strings.Contains(spec.Any(row), q) {
 			return 400 + tieBreak
 		}
@@ -195,10 +165,6 @@ func tokenStartsWith(s, prefix string) bool {
 	return false
 }
 
-// resolveField maps a user-typed prefix (e.g. "lbl") to its canonical
-// field name from the spec's list ("Label"). Exact case-insensitive
-// match wins; falls back to a case-insensitive HasPrefix match. Empty
-// when no field qualifies.
 func resolveField(fields []string, prefix string) string {
 	lp := strings.ToLower(prefix)
 	for _, f := range fields {

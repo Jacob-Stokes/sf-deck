@@ -175,9 +175,6 @@ func intsMonotonic(in []int) bool {
 	return true
 }
 
-// identityIdx returns [0, 1, …, n-1]. The "no filter applied" case
-// uses it so callers can treat the (visible, visibleToRaw) pair
-// uniformly without special-casing.
 func identityIdx(n int) []int {
 	out := make([]int, n)
 	for i := range out {

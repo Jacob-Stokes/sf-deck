@@ -22,7 +22,6 @@ func TestLinesPureInsert(t *testing.T) {
 	if r.Added != 1 || r.Removed != 0 {
 		t.Fatalf("added=%d removed=%d, want 1/0", r.Added, r.Removed)
 	}
-	// Expect: =a, +b, =c
 	want := []Op{OpEqual, OpInsert, OpEqual}
 	if len(r.Lines) != 3 {
 		t.Fatalf("got %d lines, want 3: %+v", len(r.Lines), r.Lines)
@@ -52,7 +51,6 @@ func TestLinesReplace(t *testing.T) {
 	if r.Added != 1 || r.Removed != 1 {
 		t.Fatalf("added=%d removed=%d, want 1/1", r.Added, r.Removed)
 	}
-	// A replace shows as delete(x) then insert(y), bracketed by equals.
 	if !r.Changed() {
 		t.Fatal("replace not reported changed")
 	}

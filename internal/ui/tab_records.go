@@ -16,11 +16,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// bulkTagsAndProjectsForRecords pre-fetches tag bindings + project
-// memberships for a slice of record rows. Records are keyed as
-// "<sObject>:<Id>" matching the tag-picker / sidebar lookup shape.
-// Returns nil maps when the store is unavailable; callers feed them
-// to rowTag/Project helpers which handle empty gracefully.
 func (m Model) bulkTagsForRecords(sobject string, recs []map[string]any) map[string][]devproject.Tag {
 	if m.devProjects == nil || len(recs) == 0 {
 		return nil
@@ -51,11 +46,6 @@ func (m Model) bulkTagsForRecords(sobject string, recs []map[string]any) map[str
 	})
 }
 
-// warnTagLookupOnce logs the FIRST tag/project store failure of the
-// session. These lookups run on the render path and degrade to "no
-// tag column" by design; per-frame logging would flood the session
-// log with the same sqlite error, but zero logging made the
-// degradation invisible (review finding 2026-06-12).
 func warnTagLookupOnce(err error) {
 	if err == nil {
 		return
@@ -117,10 +107,6 @@ func (m Model) bulkTagsAndProjectsForRecords(sobject string, recs []map[string]a
 	return m.bulkTagsForRecords(sobject, recs), m.bulkProjectsForRecords(sobject, recs)
 }
 
-// bulkTagsAndProjectsForFields pre-fetches tag + project bindings for a
-// slice of fields (Schema subtab). Field refs are "<sObject>.<Name>".
-// Honors the tag/project column-visibility settings — skips the store
-// call when the gutter is hidden. nil maps when unavailable.
 func (m Model) bulkTagsAndProjectsForFields(sobject string, fields []sf.Field) (
 	map[string][]devproject.Tag, map[string][]devproject.DevProject,
 ) {
@@ -154,17 +140,6 @@ func (m Model) bulkTagsAndProjectsForFields(sobject string, fields []sf.Field) (
 	return tags, projs
 }
 
-// renderRecords is the data-browsing tab: pick an sObject, see its
-// recent records, drill into details via the sidebar. Shares the sObject
-// picker widget with /objects but forks once an sObject is chosen.
-//
-// Modes:
-//
-//	RecordsSObjectCur == "" → picker mode: sObject list + filter + search
-//	RecordsSObjectCur != "" → record mode: list of recent records for it
-//
-// Esc from record mode returns to the picker. Esc from the picker
-// itself is a no-op (top level).
 func (m Model) renderRecords(w, innerH int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -180,8 +155,6 @@ func (m Model) renderRecords(w, innerH int) string {
 	}
 	return m.renderRecordsList(d, w, innerH)
 }
-
-// --- picker mode --------------------------------------------------------
 
 func (m Model) renderRecordsPicker(d *orgData, w, innerH int) string {
 	inner := w - 4
@@ -206,8 +179,6 @@ func (m Model) renderRecordsPicker(d *orgData, w, innerH int) string {
 	}
 	dash := m.renderDashboard("VIEWS", chips, sel, inner)
 
-	// Reuse the exact same filtered list as /objects — the picker is the
-	// same widget semantically.
 	pickerCols := m.applyFlagsColumnMode(sobjectListCols())
 	pickerResolved := mustResolveColumns(sobjectColumnSchema())
 	installListViewOrderRows(&d.SObjectList, &d.ObjectsTableState, pickerCols,
@@ -240,10 +211,6 @@ func (m Model) renderRecordsPicker(d *orgData, w, innerH int) string {
 	}
 	out = append(out, header, searchLine, "")
 	if shown == 0 {
-		// Distinguish "project chip narrowed everything out" (show
-		// collect hint) from "search query filtered to zero" inside
-		// a non-empty project (show generic "no matches" so the user
-		// knows it's their query, not a missing project).
 		if m.projectChipActive() && d.SObjectList.ExtraCount() == 0 {
 			out = append(out, theme.Subtle.Render(m.projectEmptyHint("sObjects")))
 		} else {
@@ -256,26 +223,14 @@ func (m Model) renderRecordsPicker(d *orgData, w, innerH int) string {
 	return strings.Join(out, "\n")
 }
 
-// --- record-list mode ---------------------------------------------------
-
 func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 	inner := w - 4
 	sobj := d.RecordsSObjectCur
 
-	// Build the chip strip up-front so empty / loading / error
-	// states render WITH the strip visible — without it the user
-	// loses the cycle-to-broader-chip affordance exactly when they
-	// need it most.  Strip construction is cheap (just reads
-	// in-memory state); the per-chip data fetch is gated separately
-	// downstream.
 	chips := recordsChips(m, d, sobj)
 	chipSel := findChipIndex(chips, selectedRecordsChip(d, sobj))
 	dash := m.renderDashboard("VIEWS", chips, chipSel, inner)
 
-	// withStrip composes "strip + body" so every early-return path
-	// includes the chip bar.  body is the multi-line content the
-	// caller wants under the strip — empty-state hint, loading
-	// indicator, error, or the rendered table.
 	withStrip := func(body string) string {
 		if dash == "" {
 			return body
@@ -305,12 +260,6 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 			return withStrip(body)
 		}
 	}
-	// Recently viewed chip with no visits for this sObject — the
-	// chip is the default on first visit (see selectedRecordsChip)
-	// so without this the user lands on /records/X with no recents
-	// and the renderer sits on "fetching records…" forever (the
-	// dispatcher correctly doesn't fire EnsureChipRecords when
-	// visitedRecordsChip returns ok=false).
 	if selectedRecordsChip(d, sobj) == recentlyViewedChipID {
 		if _, ok := m.visitedRecordsChip(d, sobj, d.username); !ok {
 			body := theme.Subtle.Render("  no recently-viewed "+sobj+" records") + "\n\n" +
@@ -327,11 +276,6 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 	// otherwise the user sees a false "no records" flash during the
 	// initial query.
 	if selectedRecordsChip(d, sobj) == sfRecentlyViewedChipID {
-		// Not every sObject is recently-viewable: setup/metadata
-		// entities (BatchProcessJobDefinition, …) have no LastViewedDate,
-		// so the per-sObject query would throw INVALID_FIELD. Gate on the
-		// central capability (mruEnabled) and explain it in the body —
-		// under the chip strip, so the user can still switch views (L / →).
 		if recCap.DescribeLoaded && !recCap.MruEnabled {
 			body := theme.Subtle.Render("  "+sobj+" isn't recently-viewable") + "\n\n" +
 				dimLine("  Salesforce tracks no LastViewedDate for this object · press "+
@@ -364,18 +308,8 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 
 	list := r.Value()
 
-	// Per-(sobject, chip) sticky search. Filters across visible cells
-	// + the special `field:value` shorthand. Filter only kicks in when
-	// the searchState is Active (live-typing) or Committed (Enter-ed)
-	// — a stale buffer left after cancelling shouldn't narrow the list.
 	chipID := selectedRecordsChip(d, sobj)
 	search := d.RecordsSearchPtr(sobj, chipID)
-	// Reuse the per-render memo so we don't rebuild visibleIdx
-	// (10k×8 bytes = 80KB) and re-walk every record's cell on
-	// every frame. visibleRecordsAndIdx hits the cache in steady
-	// state (no refetch / search-edit / chip-switch since last
-	// call) so a scroll burst pays the O(N) cost once and then
-	// returns the same pair on every subsequent tick.
 	visible, visibleIdx := visibleRecordsAndIdx(d, sobj)
 
 	// Hard-capped: the SOQL carried a LIMIT, so list.Records IS at
@@ -392,26 +326,14 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 	title := fmt.Sprintf("%s · %s · %d / %d records · %s",
 		sobj, chips[chipSel].Label, len(visible), fetched,
 		humanAge(r.FetchedAt())+stateSuffix(r.Busy(), r.Err()))
-	// "preview" marker stays in the title — it's status, not a key
-	// hint. The key hints (ctrl+x export, ctrl+, raise default) live
-	// on the per-surface hint bar so the title stays scannable.
 	preview := hasLimitClause(list.Query)
 	if preview {
 		title += " · preview"
 	}
-	// Orchestrator owns the chip dashboard + the SOQL query line;
-	// renderListModel owns the title, search bar, table, and
-	// footer hint. Splitting it this way means pagination's
-	// title-suffix and search-pill behaviour come from the
-	// shared renderer rather than being duplicated here.
 	var lines []string
 	if dash != "" {
 		lines = append(lines, dash)
 	}
-	// The SOQL line is the literal query that drove this records
-	// fetch — informative for power users but visual noise for
-	// most. Toggle with ctrl+- (paired with ctrl+= for the chip
-	// strip — both "remove a piece of chrome" toggles).
 	if list.Query != "" && !m.queryLineHidden {
 		lines = append(lines, dimLine("  "+list.Query, inner))
 	}
@@ -426,22 +348,12 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 		return strings.Join(lines, "\n")
 	}
 	if len(visible) == 0 {
-		// Surface the active filter pill AND the live "/" search
-		// bar even on the no-matches path — this is exactly when
-		// the user most needs to see WHICH query they're typing
-		// and WHAT it's filtering against. The early return below
-		// skips renderListModel (which normally emits both), so
-		// emit them inline here.
 		lines = append(lines, headerWithSearchPill(title, *search))
 		lines = append(lines, "")
 		if bar := searchBar(*search, inner); bar != "" {
 			lines = append(lines, bar)
 		}
 		lines = append(lines, theme.Subtle.Render("  no matches"))
-		// Search-state keys (ctrl+u while typing, / and C/esc once
-		// committed) are already in the SearchBar above — no need
-		// to repeat them on a fifth line below the empty-state
-		// message.
 		return strings.Join(lines, "\n")
 	}
 
@@ -470,8 +382,6 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 			d.Cursors.Set(cursorKindRecordsRow, int(raw), 0, sobj)
 		},
 	}
-	// listRenderModel.Cursor is a display-space int; convert at the
-	// render boundary.
 	sel := int(rowAdapter.DisplayCursor())
 	tagMap := m.bulkTagsForRecords(sobj, visible)
 	projMap := m.bulkProjectsForRecords(sobj, visible)
@@ -491,12 +401,6 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 			return rowProjectGutterFromMap(devproject.KindRecord, sobj+":"+id, projMap)
 		},
 	)
-	// ctrl+x export shown on every records frame — works on any
-	// list view, not just previews. The "full" qualifier is
-	// appended only when in preview mode (chip has LIMIT) since
-	// that's the case where "full" means something different from
-	// what's visible. Non-preview lists are already the full
-	// matched set; ctrl+x just exports it.
 	footerExtras := firstPretty(Keys.RecordsExport) + " export"
 	if preview {
 		footerExtras += " full"
@@ -514,21 +418,9 @@ func (m Model) renderRecordsList(d *orgData, w, innerH int) string {
 		Gutters:      leftGutters,
 		RightGutters: rightGutters,
 		FooterExtras: footerExtras,
-		// Records doesn't drive a ListView — data lives on the
-		// chip's Resource[List]. Fold the resource's FetchedAt
-		// nanoseconds + the active chipID + the search buffer
-		// length so the cache invalidates on (1) refetch, (2)
-		// chip change, (3) search edit. Devproject generation is
-		// folded in via the standard helper for tag-edit
-		// invalidation.
-		DataVersion: listVersionWithStore(int(r.FetchedAt().UnixNano()/int64(1000))+len(chipID)*7919+len(search.Buffer())*131, m),
-		SortDataKey: sortDataKey,
+		DataVersion:  listVersionWithStore(int(r.FetchedAt().UnixNano()/int64(1000))+len(chipID)*7919+len(search.Buffer())*131, m),
+		SortDataKey:  sortDataKey,
 	}
-	// Count actual rendered lines (not slice length) — dash is a
-	// multi-line block stored as one string with embedded \n. Using
-	// len(lines) here undercounts and lets renderListModel claim more
-	// vertical budget than it actually has, which pushes the trailing
-	// hint past the pane's clipLines cap so it disappears.
 	tableBudget := innerH - usedLines(lines)
 	lines = append(lines, renderListModel(m, rmodel, m.focus, inner, tableBudget)...)
 	return strings.Join(lines, "\n")
@@ -571,9 +463,6 @@ func recordsProjectionFor(
 	visible []map[string]any,
 	search *searchState,
 ) recordsTableProjection {
-	// Key cache on Effective() so the debounce-aware buffer gates
-	// invalidation — fast typing on a slow filter collapses into
-	// one projection rebuild instead of one per keystroke.
 	searchBuf := ""
 	searchOn := false
 	if search != nil {
@@ -695,7 +584,6 @@ func recordColumnDef(field string, visible []map[string]any) tablemodel.ColumnDe
 		width = tablemodel.Width{Min: 8, Ideal: 20}
 		style = lipgloss.NewStyle().Foreground(theme.Muted)
 	case field == "CreatedBy.Name" || field == "LastModifiedBy.Name":
-		// Person columns: readable header + muted, moderate width.
 		style = lipgloss.NewStyle().Foreground(theme.Muted)
 		width = tablemodel.Width{Min: lipglossWidth(header) + 2, Ideal: 18}
 	case isDateField(field):
@@ -727,9 +615,6 @@ func recordColumnDef(field string, visible []map[string]any) tablemodel.ColumnDe
 	}
 }
 
-// recordColumnHeader renders a clean column header for a projected
-// field. Dotted audit relationships get friendly labels ("CREATED BY"
-// not "CREATEDBY.NAME"); everything else upper-cases the field name.
 func recordColumnHeader(field string) string {
 	switch field {
 	case "CreatedBy.Name":
@@ -740,8 +625,6 @@ func recordColumnHeader(field string) string {
 	return strings.ToUpper(field)
 }
 
-// isDateField reports whether a SOQL field name is date-shaped, so
-// the column gets fixed-narrow rendering and relativeTime cells.
 func isDateField(field string) bool {
 	switch field {
 	case "LastModifiedDate", "CreatedDate", "SystemModstamp":
@@ -750,17 +633,6 @@ func isDateField(field string) bool {
 	return strings.HasSuffix(field, "Date") || strings.HasSuffix(field, "DateTime__c")
 }
 
-// renderRecordCell stringifies one field value for the records table.
-// Special-cases LastModifiedDate (relative time) and nil (em-dash).
-//
-// Honours dotted relationship traversals: SF returns `Account.Name`
-// projections as nested JSON (`rec["Account"]["Name"]`), not as a
-// flat `rec["Account.Name"]` key. We walk via sf.Record.Field which
-// handles both shapes transparently.
-//
-// Nested objects (when a chip projects the whole relationship row,
-// e.g. `Owner` rather than `Owner.Alias`) flatten to a sensible
-// string — typically the .Name leaf, falling back to .Id.
 func renderRecordCell(rec map[string]any, field string) string {
 	v, ok := sf.Record(rec).Field(field)
 	if !ok || v == nil {
@@ -783,16 +655,11 @@ func renderRecordCell(rec map[string]any, field string) string {
 		}
 		return "false"
 	case float64:
-		// Salesforce JSON returns numbers as float64. Print integers
-		// without the trailing .0.
 		if t == float64(int64(t)) {
 			return fmt.Sprintf("%d", int64(t))
 		}
 		return fmt.Sprintf("%g", t)
 	case map[string]any:
-		// One registry handles every map shape SOQL returns —
-		// relationship lookups, compound address / person Name /
-		// geolocation. See compound_render.go.
 		if s, ok := renderCompound(t); ok {
 			return s
 		}
@@ -801,23 +668,6 @@ func renderRecordCell(rec map[string]any, field string) string {
 	return fmt.Sprintf("%v", v)
 }
 
-// filterRecords applies the search query to the records list and
-// returns the matching rows along with the original (unfiltered)
-// index of each. The parallel index slice lets RowSpace preserve cursor
-// identity across filter changes.
-//
-// Default mode: case-insensitive substring across every projected
-// column's stringified value. A row matches if ANY cell contains the
-// query.
-//
-// Fielded mode: if the query contains a colon (e.g. "email:foo"),
-// the prefix names a column (case-insensitive on the API name) and
-// only that column is matched. Multiple terms can appear separated
-// by whitespace and are AND-ed: `industry:tech name:acme` finds
-// rows where Industry contains "tech" AND Name contains "acme".
-//
-// Empty / whitespace query returns the input slice with identity
-// indices.
 func filterRecords(rows []map[string]any, cols []string, q string) ([]map[string]any, []int) {
 	q = strings.TrimSpace(q)
 	if q == "" {
@@ -860,12 +710,6 @@ func filterRecords(rows []map[string]any, cols []string, q string) ([]map[string
 	return outRows, outIdx
 }
 
-// matchFieldName resolves the user's typed prefix (e.g. "email") to
-// the closest projected column name (e.g. "Email" or "Email__c"),
-// case-insensitive. Falls back to the raw input if no column matches —
-// the matcher will then look for a literal field with that name and
-// find nothing, yielding zero rows. That's better than treating
-// "typo:value" as a free-text search and surprising the user.
 func matchFieldName(cols []string, prefix string) string {
 	lp := strings.ToLower(prefix)
 	for _, c := range cols {
@@ -881,9 +725,6 @@ func matchFieldName(cols []string, prefix string) string {
 	return prefix
 }
 
-// rowMatchesTerm tests one term against one row. field == "" means
-// "match any cell". Both the projected value and the query are
-// lowercased for case-insensitive substring.
 func rowMatchesTerm(rec map[string]any, cols []string, field, value string) bool {
 	if field != "" {
 		return strings.Contains(strings.ToLower(renderRecordCell(rec, field)), value)
@@ -902,7 +743,6 @@ func rowMatchesTerm(rec map[string]any, cols []string, field, value string) bool
 func relativeTime(iso string) string {
 	t, err := time.Parse(time.RFC3339, iso)
 	if err != nil {
-		// Salesforce sometimes uses .000+0000 instead of Z — try again.
 		t, err = time.Parse("2006-01-02T15:04:05.000-0700", iso)
 		if err != nil {
 			return iso

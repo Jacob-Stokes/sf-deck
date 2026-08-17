@@ -12,7 +12,6 @@ func TestItemInProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Not present before adding.
 	in, err := s.ItemInProject("p1", KindApexClass, "01p000", "alice@dev")
 	if err != nil {
 		t.Fatal(err)
@@ -28,19 +27,16 @@ func TestItemInProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Present after adding.
 	in, _ = s.ItemInProject("p1", KindApexClass, "01p000", "alice@dev")
 	if !in {
 		t.Fatal("item not reported present after add")
 	}
 
-	// Org-scoped: same item under a different org is NOT present.
 	in, _ = s.ItemInProject("p1", KindApexClass, "01p000", "bob@dev")
 	if in {
 		t.Fatal("item wrongly reported present for a different org")
 	}
 
-	// Removing clears it (round-trips the toggle path).
 	if err := s.RemoveItem("p1", "alice@dev", KindApexClass, "01p000"); err != nil {
 		t.Fatal(err)
 	}

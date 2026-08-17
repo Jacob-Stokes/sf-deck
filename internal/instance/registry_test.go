@@ -47,14 +47,10 @@ func TestClaim_FirstInstanceIsNumber1(t *testing.T) {
 
 func TestClaim_LowestFreeSlot(t *testing.T) {
 	setupHome(t)
-	// Seed with fake-alive entries at slots 1 and 3 (our PID is alive).
 	myPID := os.Getpid()
 	if _, err := Claim(myPID, "", ""); err != nil {
 		t.Fatalf("seed 1: %v", err)
 	}
-	// Manually inject a second live entry at slot 3 using the same
-	// PID — the package's de-dupe-by-PID logic would normally reject
-	// this, so write the file directly to set up the scenario.
 	path, _ := Path()
 	must := func(err error) {
 		if err != nil {
@@ -80,7 +76,6 @@ func TestClaim_LowestFreeSlot(t *testing.T) {
 func TestClaim_FillsHoleLeftByRelease(t *testing.T) {
 	setupHome(t)
 	myPID := os.Getpid()
-	// Two claims would normally collide on PID; instead inject directly.
 	path, _ := Path()
 	_ = os.MkdirAll(filepath.Dir(path), 0o755)
 	if err := os.WriteFile(path, []byte(`{"version":1,"entries":[
@@ -88,7 +83,6 @@ func TestClaim_FillsHoleLeftByRelease(t *testing.T) {
 	]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// New PID claims — slot 1 is free, slot 2 is taken.
 	e, err := Claim(1, "", "")
 	if err != nil {
 		t.Fatalf("Claim: %v", err)
@@ -124,7 +118,6 @@ func TestPrune_DropsDeadPIDs(t *testing.T) {
 	setupHome(t)
 	path, _ := Path()
 	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	// PID 0 is reserved and always not-alive; PID -1 too.
 	if err := os.WriteFile(path, []byte(`{"version":1,"entries":[
 		{"number":1,"pid":0,"started_at":"2026-01-01T00:00:00Z"},
 		{"number":2,"pid":`+itoa(os.Getpid())+`,"started_at":"2026-01-01T00:00:00Z"}

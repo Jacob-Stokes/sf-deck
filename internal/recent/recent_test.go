@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// --- Merge ----------------------------------------------------------------
-
 func TestMerge_LocalOnly(t *testing.T) {
 	now := time.Now()
 	local := []Entry{
@@ -48,7 +46,6 @@ func TestMerge_DedupesBoth(t *testing.T) {
 	if len(out) != 1 {
 		t.Fatalf("dedupe failed: got %d, want 1", len(out))
 	}
-	// Local timestamp wins; entry tagged "both".
 	if out[0].Origin != OriginBoth {
 		t.Errorf("got origin %q, want %q", out[0].Origin, OriginBoth)
 	}
@@ -86,8 +83,6 @@ func TestMerge_SkipsBlankSFRows(t *testing.T) {
 	}
 }
 
-// --- FilterByKinds --------------------------------------------------------
-
 func TestFilterByKinds(t *testing.T) {
 	in := []Entry{
 		{Kind: KindRecord},
@@ -113,8 +108,6 @@ func TestFilterByKinds_EmptyExcludedReturnsInput(t *testing.T) {
 		t.Errorf("got %d, want 1", len(out))
 	}
 }
-
-// --- Upsert ---------------------------------------------------------------
 
 func TestUpsert_NewEntryFirst(t *testing.T) {
 	now := time.Now()
@@ -161,8 +154,6 @@ func TestUpsert_CapsList(t *testing.T) {
 	}
 }
 
-// --- Formatters -----------------------------------------------------------
-
 func TestNameForRow_FallsBackToTruncatedID(t *testing.T) {
 	got := NameForRow(Entry{ID: "001DM00000TEST4AAA"})
 	if got != "001D…" {
@@ -199,8 +190,6 @@ func TestKindLabel_UnknownPassThrough(t *testing.T) {
 	}
 }
 
-// --- Field --------------------------------------------------------------
-
 func TestField(t *testing.T) {
 	e := Entry{
 		Kind: KindRecord, ID: "001A", Name: "Acme", Type: "Account", Origin: OriginBoth,
@@ -230,7 +219,6 @@ func TestField(t *testing.T) {
 }
 
 func TestField_OriginDefault(t *testing.T) {
-	// Empty Origin → "deck" default.
 	e := Entry{Kind: KindRecord, Origin: ""}
 	v, ok := e.Field("Origin")
 	if !ok || v != OriginDeck {

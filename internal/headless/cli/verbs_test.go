@@ -31,7 +31,6 @@ func TestVerbsList_BasicShape(t *testing.T) {
 	if len(verbs) == 0 {
 		t.Fatal("expected at least one verb in the registry")
 	}
-	// Spot-check the shape of one verb.
 	first := verbs[0].(map[string]any)
 	for _, k := range []string{"noun", "verb", "qualified", "summary", "stability"} {
 		if _, ok := first[k]; !ok {

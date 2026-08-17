@@ -1,10 +1,5 @@
 package ui
 
-// Actions / helpers for the /exec tab. Splits the non-render plumbing
-// from tab_exec.go so the render layer stays tight: persisting
-// history rows, opening $EDITOR for the snippet, mapping subtab IDs
-// to indices, etc.
-
 import (
 	"fmt"
 	"os"
@@ -17,11 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// execSubtabIndex returns the position of the given /exec subtab in
-// the canonical homeSubtabs-equivalent list (Editor / Output / Saved
-// / History — same order they appear in the TabExec.Subtabs spec).
-// Returns 0 (Editor) for unknown ids so a misroute fails gracefully
-// onto the always-present default subtab.
 func execSubtabIndex(s Subtab) int {
 	switch s {
 	case SubtabExecEditor:
@@ -36,8 +26,6 @@ func execSubtabIndex(s Subtab) int {
 	return 0
 }
 
-// persistExecHistory writes one apex_history row for the just-landed
-// run. Mirrors persistSOQLHistory.
 func (m *Model) persistExecHistory(msg execResultMsg) {
 	if m.devProjects == nil {
 		return
@@ -60,21 +48,13 @@ func (m *Model) persistExecHistory(msg execResultMsg) {
 		LogBody:          msg.data.LogBody,
 	})
 	if err != nil {
-		// Persistence failure is non-fatal — flash but don't bail.
 		m.flash("history: " + err.Error())
 	}
-	// History list is reloaded lazily on subtab entry; invalidate the
-	// loaded flag so the next visit refreshes.
 	if d, ok := m.activeOrgState(); ok {
 		d.ExecHistoryLoaded = false
 	}
 }
 
-// handleExecExternalEditor spawns the user's $EDITOR to compose the
-// snippet body in their real editor, then reads the file back into
-// the textarea. The cmd path uses Bubble Tea's tea.ExecProcess so
-// the terminal cedes itself cleanly to the child process and
-// returns control on exit.
 func (m Model) handleExecExternalEditor() (tea.Model, tea.Cmd) {
 	editor := os.Getenv("VISUAL")
 	if editor == "" {
@@ -85,9 +65,6 @@ func (m Model) handleExecExternalEditor() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Write current body to a temp file so the editor opens
-	// pre-populated. .apex extension hints syntax highlighting in
-	// editors that support it (most do).
 	tmp, err := os.CreateTemp("", "sf-deck-exec-*.apex")
 	if err != nil {
 		m.flash("temp file: " + err.Error())
@@ -108,9 +85,6 @@ func (m Model) handleExecExternalEditor() (tea.Model, tea.Cmd) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-		// Editor closed (or failed to launch). Read the file back
-		// either way — empty result is still valid input the user
-		// might have wanted to keep.
 		raw, readErr := os.ReadFile(path)
 		os.Remove(path)
 		if err != nil && readErr != nil {
@@ -120,16 +94,11 @@ func (m Model) handleExecExternalEditor() (tea.Model, tea.Cmd) {
 	})
 }
 
-// execEditorClosedMsg lands when $EDITOR exits. update.go applies
-// the new body to m.execInput and flashes on error.
 type execEditorClosedMsg struct {
 	body string
 	err  error
 }
 
-// execProdConfirmMsg lands when the user clicks "Run" on the
-// production-org confirmation modal. update.go calls
-// runExecConfirmed which fires the actual runExecCmd.
 type execProdConfirmMsg struct {
 	body string
 }
@@ -168,10 +137,6 @@ func (m *Model) openExecProdGate(o sfOrg, body string) tea.Cmd {
 	})
 }
 
-// sfOrg is a local alias to keep openExecProdGate's signature tight
-// without dragging the sf import into this file — Go re-uses the
-// upstream type seamlessly. The actual sf.Org type is what callers
-// pass in.
 type sfOrg = sf.Org
 
 // stringOr returns a when non-empty, otherwise b.
@@ -182,5 +147,4 @@ func stringOr(a, b string) string {
 	return b
 }
 
-// Suppress unused-import warning if msg fields are reorganised later.
 var _ = strings.TrimSpace

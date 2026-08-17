@@ -1,10 +1,5 @@
 package ui
 
-// /objects drill · Layouts subtab — the page layouts defined on the
-// drilled sObject. Names only (the layout editor is a Setup iframe,
-// so there's no in-TUI drill); o on the subtab opens Object
-// Manager's Page Layouts list for this object.
-
 import (
 	"fmt"
 	"strings"

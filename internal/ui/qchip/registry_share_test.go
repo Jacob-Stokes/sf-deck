@@ -6,8 +6,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
-// chipWithShare is shorthand for a registry-resident user chip with the
-// share field populated — keeps the test cases readable.
 func chipWithShare(id string, sh settings.ChipShare) Chip {
 	return Chip{
 		ID:     id,
@@ -17,8 +15,6 @@ func chipWithShare(id string, sh settings.ChipShare) Chip {
 	}
 }
 
-// fakeGroups makes a tiny groupMembers closure for tests: "u@a" and
-// "u@b" live in group "g1"; "u@c" lives in "g2".
 func fakeGroups(groupID, username string) bool {
 	mem := map[string]map[string]bool{
 		"g1": {"u@a": true, "u@b": true},
@@ -75,14 +71,12 @@ func TestRegistryFiltersByShareGroup(t *testing.T) {
 	})
 	r.SetGroupMembers(fakeGroups)
 
-	// u@a and u@b are in g1 → see it.
 	for _, org := range []string{"u@a", "u@b"} {
 		r.SetActiveOrg(org)
 		if !contains(chipIDs(r.ChipsFor("*")), "g1-chip") {
 			t.Errorf("org %s in g1 should see g1-chip", org)
 		}
 	}
-	// u@c is in g2 → does not see g1's chip.
 	r.SetActiveOrg("u@c")
 	if contains(chipIDs(r.ChipsFor("*")), "g1-chip") {
 		t.Error("u@c (g2 member) should NOT see g1-chip")
@@ -136,8 +130,6 @@ func TestRegistryLegacyOrgUserStillHonoured(t *testing.T) {
 		t.Error("legacy OrgUser chip should NOT appear for other orgs")
 	}
 }
-
-// chipIDs is defined in qchip_test.go (package-scoped helper).
 
 func contains(xs []string, want string) bool {
 	for _, x := range xs {

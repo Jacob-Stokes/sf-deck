@@ -7,15 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// The bulk of async updates flow through resourceUpdatedMsg in
-// resource.go. Only two view-specific messages remain:
-
-// soqlResultMsg delivers a SOQL query result. SOQL isn't a Resource —
-// results are ephemeral and not cached.
-//
-// orgUser + tookMs travel with the result so the update-loop can
-// log a soql_history row when the run lands. They're set by
-// runSOQLCmd before dispatch.
 type soqlResultMsg struct {
 	session   soqlSessionTarget
 	sessionID uint64
@@ -24,13 +15,7 @@ type soqlResultMsg struct {
 	err       error
 	orgUser   string
 	tookMs    int
-	// gen is the soqlRunGen counter that was active when this query
-	// was launched.  The reducer drops the message if m.soqlRunGen
-	// has advanced — meaning the user cancelled or started a new
-	// query while this one was in flight.  Without the gen check,
-	// a cancelled-but-still-completing query could overwrite the
-	// modal's idle state with stale results.
-	gen uint64
+	gen       uint64
 }
 
 type soqlSessionTarget string
@@ -40,10 +25,6 @@ const (
 	soqlSessionModal soqlSessionTarget = "modal"
 )
 
-// autocompleteValuesMsg carries the result of a Ctrl+Space live
-// distinct-value fetch back to the SOQL autocomplete popup. Routes
-// to whichever session (tab or modal) issued the fetch; stale
-// messages (cancelled/superseded) are dropped via the gen check.
 type autocompleteValuesMsg struct {
 	session   soqlSessionTarget
 	sessionID uint64
@@ -53,9 +34,6 @@ type autocompleteValuesMsg struct {
 	err       error
 }
 
-// execResultMsg delivers an anonymous-Apex execution result. Same
-// shape pattern as soqlResultMsg — orgUser travels with the message
-// so the update-loop can log an apex_history row when the run lands.
 type execResultMsg struct {
 	body    string
 	data    sf.ExecuteAnonymousResult
@@ -66,22 +44,15 @@ type execResultMsg struct {
 // HomeData is the aggregate cached payload for the Home view. Fetched by
 // fetchHome and stored in Resource[HomeData].
 type HomeData struct {
-	APIVersion string
-	Username   string
-	UserID     string // Salesforce user Id (18-char), used by lens substitutions
-	// UserName is the display name (FirstName + LastName, server-
-	// rendered) — used by client-side chip predicates that filter on
-	// rows whose only "by" identifier is a display string (Flow
-	// CreatedBy/LastModifiedBy, etc.). Fetched alongside UserID in
-	// one SOQL by fetchHome.
+	APIVersion    string
+	Username      string
+	UserID        string // Salesforce user Id (18-char), used by lens substitutions
 	UserName      string
 	InstanceURL   string
 	KeyLimits     []KeyLimit
 	RecentDeploys []sf.DeployRow
 	Packages      []sf.InstalledPackage
 
-	// Home-subtab data. All optional — missing fields render as
-	// "loading…" on their subtab.
 	Users        sf.UserSummary
 	UserLicenses []sf.UserLicenseRow
 	PermSetLics  []sf.PermSetLicenseRow
@@ -143,7 +114,6 @@ func (k KeyLimit) Group() string {
 	case "PermissionSets":
 		return "Identity"
 	}
-	// Best-effort fallback on substrings before giving up.
 	switch {
 	case strings.HasPrefix(k.Name, "DailyApi"), strings.HasPrefix(k.Name, "HourlyOData"):
 		return "API"
@@ -219,11 +189,6 @@ func (k KeyLimit) Field(name string) (any, bool) {
 	return nil, false
 }
 
-// homeLicenseRow merges UserLicense + PermSetLicense into a single
-// row type so the Home Licenses subtab can present one unified table
-// with a Kind discriminator. Loses some PSL-specific fields
-// (DeveloperName) — they're surfaced in the existing renderer
-// already.
 type homeLicenseRow struct {
 	Name   string
 	Kind   string // "User" or "PermSet"

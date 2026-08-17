@@ -23,14 +23,9 @@ func (m *Model) openSOQLModal(title, body string) {
 		Title:   title,
 		session: session,
 	}
-	// Populate suggestions immediately so the popup isn't empty
-	// on first paint of the modal.
 	m.autocompleteRefresh(&m.soqlModal.session)
 }
 
-// soqlModalSelectedRecord returns the cursored record in the
-// modal's result table, or false when there's nothing selectable.
-// Mirrors soqlSelectedRecord but reads from the modal's session.
 func (m Model) soqlModalSelectedRecord() (map[string]any, bool) {
 	if m.soqlModal == nil {
 		return nil, false
@@ -106,15 +101,6 @@ func (m Model) handleSOQLModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.autocompleteRefresh(s)
 		return m, nil
 	case matches(key, Keys.Drill):
-		// Drill into the cursored result row when results are
-		// showing. Pushes onto the recordDrillStack so esc on
-		// the new record detail pops BACK to the parent record
-		// the user was viewing — identical UX to Enter on a
-		// reference field inside the record detail itself.
-		//
-		// The SOQL modal closes; the user can re-spawn it via
-		// RELATED Enter on the parent if they want to browse
-		// other children.
 		if !s.soqlEditing && len(s.soqlResult.Records) > 0 {
 			rec, ok := m.soqlModalSelectedRecord()
 			if !ok {

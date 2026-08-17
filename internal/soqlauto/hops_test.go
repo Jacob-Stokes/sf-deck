@@ -6,8 +6,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// mockDescribeStore is a tiny in-memory describe source used by hops
-// + engine tests.
 type mockDescribeStore struct {
 	loaded  map[string]sf.SObjectDescribe
 	missing map[string]bool
@@ -50,8 +48,6 @@ func (m *mockDescribeStore) snapshot(query string, cursor int) Snapshot {
 	}
 }
 
-// describe helpers ----------------------------------------------------
-
 func sd(name string, fields ...sf.Field) sf.SObjectDescribe {
 	return sf.SObjectDescribe{Name: name, Label: name, Fields: fields}
 }
@@ -69,8 +65,6 @@ func refField(apiName, relName string, targets ...string) sf.Field {
 func plainField(apiName, kind string) sf.Field {
 	return sf.Field{Name: apiName, Label: apiName, Type: kind}
 }
-
-// tests ---------------------------------------------------------------
 
 func TestWalkHopsSingleHop(t *testing.T) {
 	store := newMockDescribeStore()
@@ -129,7 +123,6 @@ func TestWalkHopsPolymorphic(t *testing.T) {
 func TestWalkHopsMissingDescribeEmitsLoading(t *testing.T) {
 	store := newMockDescribeStore()
 	store.add(sd("Account", refField("OwnerId", "Owner", "User")))
-	// User describe is NOT loaded.
 
 	snap := store.snapshot("", 0)
 	got, loading := WalkHops(snap, "Account", []string{"Owner"})

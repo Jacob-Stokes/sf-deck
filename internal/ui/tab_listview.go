@@ -13,19 +13,10 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// renderListViewResult shows a Salesforce list view's results — the
-// user's actual columns as they appear in Lightning, rendered as a
-// table with the row cursor. Same chip strip + breadcrumb treatment
-// as Recent 50, but the data shape is different.
 func (m Model) renderListViewResult(d *orgData, sobject, listViewID string, w, innerH int) string {
 	inner := w - 4
 	resKey := sobject + ":" + listViewID
 
-	// Build the chip strip up-front so loading / error states render
-	// WITH the strip visible — same shape as renderRecordsList's
-	// sf-deck mode.  Without this, "fetching list view results…"
-	// hid the chip bar entirely; the user couldn't see which list
-	// view was loading or cycle to a different one.
 	chips := recordsChips(m, d, sobject)
 	chipSel := findChipIndex(chips, selectedRecordsChip(d, sobject))
 	dash := m.renderDashboard("VIEWS", chips, chipSel, inner)
@@ -54,16 +45,10 @@ func (m Model) renderListViewResult(d *orgData, sobject, listViewID string, w, i
 	}
 	result := r.Value()
 
-	// Title + subtitle (ListView name from the catalog if we have it).
 	lvName := listViewID
 	if lv, ok := findListView(d, sobject, listViewID); ok {
 		lvName = lv.Name
 	}
-	// Salesforce-mode chip is a discovery preview hard-capped at
-	// settings.ListViewPreviewLimit() (default 50). SF's "size"
-	// field is unreliable (reports rows-in-response, not unbounded
-	// total), so we detect truncation heuristically: if we got back
-	// exactly the cap, there were probably more rows.
 	previewCap := m.settings.ListViewPreviewLimit()
 	count := fmt.Sprintf("%d records", len(result.Records))
 	capped := len(result.Records) >= previewCap
@@ -95,9 +80,6 @@ func (m Model) renderListViewResult(d *orgData, sobject, listViewID string, w, i
 		return strings.Join(lines, "\n")
 	}
 
-	// Build the ListColumn spec from the SF list view's columns +
-	// rendered cell content. Same auto-fit + horizontal scroll story
-	// as the records subtab — see uilayout/listtable.go.
 	cols := visibleColumns(result.Columns)
 	if len(cols) == 0 {
 		cols = []sf.ListViewColumn{{Name: "Id", Label: "Id"}}
@@ -130,10 +112,6 @@ func (m Model) renderListViewResult(d *orgData, sobject, listViewID string, w, i
 		Gutters:      leftGutters,
 		RightGutters: rightGutters,
 		Cell:         cell,
-		// Share the sort cache slot with cursor-translation calls
-		// (line 125 above + drill/open paths).  Without a shared
-		// key, the two callers thrash each other on every wheel tick.
-		// See listrender_model.go for the same fix on the main path.
 		SortCacheKey: cursorSortCacheKey(tableState, listCols, len(result.Records), sortDataKey),
 	}
 	res := uilayout.LayoutListTable(spec, tableState, inner)
@@ -151,8 +129,6 @@ func (m Model) renderListViewResult(d *orgData, sobject, listViewID string, w, i
 			d.Cursors.Set(cursorKindRecordsRow, int(raw), len(result.Records), sobject)
 		},
 	}
-	// renderRows consumes display-space ints; convert at the render
-	// boundary.
 	sel := int(adapter.DisplayCursor())
 	lines = append(lines, uilayout.RenderListTableHeader(spec, res, tableState, inner))
 	sortPerm := uilayout.SortedIndices(spec, tableState)
@@ -174,9 +150,6 @@ func (m Model) renderListViewResult(d *orgData, sobject, listViewID string, w, i
 	return strings.Join(lines, "\n")
 }
 
-// buildListViewCols mirrors buildRecordListCols but uses the
-// SF-supplied label as the header (more user-friendly than the API
-// name) and measures cells via formatCell.
 func buildListViewCols(cols []sf.ListViewColumn, rows []map[string]any) []uilayout.ListColumn {
 	return resolveListViewColumns(cols, rows).ListColumns()
 }
@@ -224,7 +197,6 @@ func listViewColumnDef(c sf.ListViewColumn, rows []map[string]any) tablemodel.Co
 	}
 }
 
-// visibleColumns filters out hidden columns.
 func visibleColumns(cols []sf.ListViewColumn) []sf.ListViewColumn {
 	var out []sf.ListViewColumn
 	for _, c := range cols {

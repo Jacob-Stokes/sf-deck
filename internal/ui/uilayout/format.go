@@ -1,9 +1,5 @@
 package uilayout
 
-// Formatting primitives used across views + sidebar: section titles,
-// key/value lines, colored status helpers, date/age formatters,
-// limit-bar rendering, etc. No Model state here — pure functions.
-
 import (
 	"fmt"
 	"strings"
@@ -15,8 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/resource"
 )
-
-// --- text primitives ----------------------------------------------------
 
 func SectionTitle(s string) string {
 	return lipgloss.NewStyle().Foreground(theme.Blue).Bold(true).Render(s)
@@ -74,8 +68,6 @@ func StateSuffix(busy bool, err error) string {
 	return ""
 }
 
-// --- search-bar + header pill -------------------------------------------
-
 // SearchBar renders the unified search row below a view's title.
 // One line covers all three states so the layout stays compact:
 //
@@ -95,8 +87,6 @@ func SearchBar(s resource.SearchState, width int) string {
 	dim := lipgloss.NewStyle().Foreground(theme.FgDim)
 	switch {
 	case s.Active:
-		// Live-edit mode. Yellow glyph + the textinput's own
-		// cursor + a hint listing the truthful keys.
 		glyph := lipgloss.NewStyle().Foreground(theme.Yellow).Bold(true).Render("  ⌕ ")
 		inputView := ""
 		if s.Inited {
@@ -118,7 +108,6 @@ func SearchBar(s resource.SearchState, width int) string {
 		hint := dim.Render("  / edit · C clear")
 		return ansi.Truncate(glyph+hint, width, "…")
 	default:
-		// No query yet. Faint hint, no glyph.
 		return dim.Render("  press / to search")
 	}
 }

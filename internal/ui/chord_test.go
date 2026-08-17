@@ -19,12 +19,10 @@ func TestChordEnterAndCancel(t *testing.T) {
 	if !m.chordActive {
 		t.Fatal("q should enter chord mode")
 	}
-	// q again cancels.
 	m, _ = m.handleChordKey(kp("q"))
 	if m.chordActive {
 		t.Error("q in chord mode should cancel (exit)")
 	}
-	// esc cancels too.
 	m, _ = m.enterChordMode()
 	m, _ = m.handleChordKey(kp("esc"))
 	if m.chordActive {

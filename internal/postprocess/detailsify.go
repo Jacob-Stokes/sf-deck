@@ -1,35 +1,5 @@
 package postprocess
 
-// "Details-ify" transform — converts SF's "Formatted Report" xlsx into
-// a Details-Only-shaped layout client-side.
-//
-// SF's REST Analytics endpoint only emits xlsx in Formatted layout
-// (the documented endpoint is literally titled "Download Formatted
-// Excel"). The Details-Only-xlsx variant is gated by the UI's classic
-// export servlet which is session-cookie-only.
-//
-// Luckily, the formatted xlsx is structurally close to details-only:
-//   - rows 0..N: title + filter-list preamble (no cell in column A;
-//     report title in column B)
-//   - row N+1: the column header row, marked by the sort-arrow glyph
-//     "↑" / "↓" appearing on at least one header cell, AND a
-//     significantly higher non-empty cell count than the preamble
-//     rows
-//   - rows N+2..end: data rows, with column A always blank (an
-//     indent gutter) and "group leader" values left blank on
-//     subsequent rows that share the same group
-//
-// To detail-ify:
-//   1. find the header row by scanning for max-non-empty-cells in the
-//      first ~30 rows
-//   2. delete every row above it
-//   3. delete column A (the indent gutter)
-//   4. forward-fill blank cells in every column (group-leader cells
-//      cascade downwards visually in SF; we make that explicit)
-//   5. trim aggregate / total rows at the bottom (rows whose first
-//      cell is "Grand Total", "Subtotal", etc. — only when the user
-//      asked for a clean detail-only view)
-
 import (
 	"strings"
 
@@ -67,23 +37,15 @@ func detailsifySheet(wb *excelize.File, sheet string) error {
 	if len(rows) < 3 {
 		return nil // nothing useful to do on a tiny sheet
 	}
-	// Step 1: find the header row by looking for the sort-arrow
-	// glyph or the row with the most non-empty cells in the first 30.
 	headerIdx := findHeaderRow(rows)
 	if headerIdx < 0 {
-		// Couldn't identify a header — bail rather than mangle.
 		return nil
 	}
-	// Step 2: delete rows above the header (working bottom-up so the
-	// indices we still need don't shift). excelize is 1-indexed.
 	for i := headerIdx - 1; i >= 0; i-- {
 		if err := wb.RemoveRow(sheet, i+1); err != nil {
 			return err
 		}
 	}
-	// Step 3: delete column A (the indent gutter) if it's actually
-	// empty across the data block. Some report types put the leftmost
-	// grouping in column A — we only strip when it's pure whitespace.
 	rows, err = wb.GetRows(sheet)
 	if err != nil {
 		return err
@@ -97,8 +59,6 @@ func detailsifySheet(wb *excelize.File, sheet string) error {
 			return err
 		}
 	}
-	// Step 4a: scrub sort-arrow glyphs ("↑", "↓") from header cells —
-	// they're SF UI cosmetics, not data.
 	if len(rows) > 0 {
 		for col, h := range rows[0] {
 			cleaned := strings.TrimSpace(stripSortArrows(h))
@@ -192,8 +152,6 @@ func groupingColumns(rows [][]string, headerLen int) map[int]bool {
 			}
 		}
 		if !hasBlank {
-			// Fully-populated column = data column. Stop: everything to the
-			// right is beyond the leftmost grouping block.
 			break
 		}
 		out[col] = true
@@ -238,8 +196,6 @@ func findHeaderRow(rows [][]string) int {
 	return bestIdx
 }
 
-// columnIsEmpty returns true if every row's `col`th cell is whitespace.
-// Only checks data rows (skips the header at index 0).
 func columnIsEmpty(rows [][]string, col int) bool {
 	for r := 1; r < len(rows); r++ {
 		if col < len(rows[r]) && strings.TrimSpace(rows[r][col]) != "" {
@@ -249,8 +205,6 @@ func columnIsEmpty(rows [][]string, col int) bool {
 	return true
 }
 
-// stripSortArrows removes the unicode sort-arrow glyphs SF appends
-// to grouped/sorted header cells.
 func stripSortArrows(s string) string {
 	s = strings.ReplaceAll(s, "↑", "")
 	s = strings.ReplaceAll(s, "↓", "")

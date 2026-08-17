@@ -1,25 +1,6 @@
 // Package highlight wraps chroma to give every code-detail surface
 // (Apex class body, Apex trigger body, LWC / Aura resources, …) a
 // consistent syntax-highlighted render.
-//
-// Two design points worth knowing about:
-//
-//  1. The output is a slice of one styled string per source line.
-//     Callers wrap each line with a gutter, line number, truncation,
-//     etc. without having to parse ANSI escapes back out. We DO NOT
-//     return one big multi-line string because callers always need
-//     per-line control for gutters + viewport clipping.
-//
-//  2. Highlighting is cached by (sha256(body), language, themeID).
-//     Apex bodies are typically loaded once and rendered on every
-//     paint; re-tokenising the same string each redraw would burn
-//     CPU for no reason. The cache is a sync.Map (concurrent-safe;
-//     the renderer is called from the Update goroutine but multiple
-//     orgs / surfaces can interleave). Theme identity is part of the
-//     key, so switching themes never reuses stale colours. The cache
-//     is unbounded for the lifetime of the process.
-//     A 50-class org with avg 200-line classes caches at ~10MB worst
-//     case. Acceptable.
 package highlight
 
 import (
@@ -62,7 +43,6 @@ const (
 // callers don't need this — they pass LangApex directly.
 func LanguageForFilename(name string) string {
 	name = strings.ToLower(name)
-	// Strip any trailing component after the last dot.
 	dot := strings.LastIndexByte(name, '.')
 	if dot < 0 {
 		return LangPlain
@@ -77,9 +57,6 @@ func LanguageForFilename(name string) string {
 	case "css":
 		return LangCSS
 	case "xml", "cmp", "evt", "design", "auradoc", "tokens", "app":
-		// Aura uses several markup formats that all parse as XML; the
-		// .cmp / .evt etc. suffixes are Aura-specific but their syntax
-		// is XML-shaped, so the XML lexer renders them correctly.
 		return LangXML
 	case "json":
 		return LangJSON
@@ -98,8 +75,6 @@ func LanguageForFilename(name string) string {
 // "HELPER", "STYLE", "COMPONENT" …); Format is uppercase
 // ("JS", "CSS", "XML" …).
 func LanguageForAuraDefType(defType, format string) string {
-	// Format is the more reliable signal — it's the file format
-	// rather than the role within the bundle.
 	switch strings.ToLower(format) {
 	case "js":
 		return LangJavaScript
@@ -136,8 +111,6 @@ func Highlight(body, language string) []string {
 	if language == "" || language == LangPlain {
 		return strings.Split(body, "\n")
 	}
-	// Cache hit: serve the same per-line slice. The slice is read-only
-	// for callers (they compose, don't mutate), so sharing is fine.
 	themeID := theme.Current.ID
 	key := cacheKey(body, language, themeID)
 	if cached, ok := cache.Load(key); ok {
@@ -148,13 +121,9 @@ func Highlight(body, language string) []string {
 	return lines
 }
 
-// highlightUncached runs chroma without consulting the cache. Pulled
-// out so the caching path is obvious.
 func highlightUncached(body, language string) []string {
 	lexer := lexers.Get(language)
 	if lexer == nil {
-		// Unknown lexer — render plain. Don't error; the call site
-		// shouldn't have to think about lexer availability.
 		return strings.Split(body, "\n")
 	}
 	lexer = chroma.Coalesce(lexer)
@@ -173,20 +142,13 @@ func highlightUncached(body, language string) []string {
 	if err := formatter.Format(&buf, style, iterator); err != nil {
 		return strings.Split(body, "\n")
 	}
-	// chroma emits a single string with embedded newlines + ANSI
-	// resets. Split into per-line slices for caller composition.
 	out := strings.Split(buf.String(), "\n")
-	// chroma sometimes adds a trailing empty line for files that
-	// already end with \n — strip it so the gutter line count
-	// matches the source line count exactly.
 	if n := len(out); n > 0 && out[n-1] == "" && !strings.HasSuffix(body, "\n\n") {
 		out = out[:n-1]
 	}
 	return out
 }
 
-// cache is keyed by (sha256(body), language, themeID). The value is
-// []string (one styled line per source line).
 var cache sync.Map
 
 func cacheKey(body, language, themeID string) string {
@@ -194,9 +156,6 @@ func cacheKey(body, language, themeID string) string {
 	return hex.EncodeToString(sum[:8]) + "|" + language + "|" + themeID
 }
 
-// cachedStyle holds the chroma Style built from the current theme
-// palette. Rebuilt lazily on first highlight after a theme change
-// (caller signals via ThemeChanged); within a session it's stable.
 var (
 	cachedStyle        *chroma.Style
 	cachedStyleThemeID string
@@ -282,9 +241,6 @@ func chromaStyleForCurrentTheme() *chroma.Style {
 	return style
 }
 
-// hexFromColor flattens an image/color.Color to a chroma-style hex
-// string ("#rrggbb"). chroma accepts named colours too but hex is
-// the most direct representation when we already have RGB values.
 func hexFromColor(c interface {
 	RGBA() (uint32, uint32, uint32, uint32)
 }) string {

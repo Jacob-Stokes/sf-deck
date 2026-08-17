@@ -58,7 +58,6 @@ func TestBuildPaletteEntriesIncludesSubtabs(t *testing.T) {
 	defer c.Close()
 	m := New(c)
 	entries := buildPaletteEntries(m)
-	// SOQL has Editor + Saved + History subtabs.
 	wantSubstrings := []string{"/soql Saved", "/soql History"}
 	for _, want := range wantSubstrings {
 		found := false
@@ -102,7 +101,6 @@ func TestApplyPaletteFilterRanks(t *testing.T) {
 	if len(cp.Filtered) != 2 {
 		t.Errorf("query 'soql' should match 2 entries, got %d: %+v", len(cp.Filtered), cp.Filtered)
 	}
-	// Exact match wins ordering.
 	if cp.Filtered[0].Label != "/soql" {
 		t.Errorf("exact match should rank first, got %q", cp.Filtered[0].Label)
 	}

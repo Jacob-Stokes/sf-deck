@@ -35,7 +35,6 @@ func TestSerializeDeserializeCompareRun(t *testing.T) {
 		t.Fatal("empty blob")
 	}
 
-	// Round-trip through a SavedComparison shell.
 	sc := devproject.SavedComparison{
 		Source: "acme-test", Target: "acme-dev",
 		Scope: "ApexClass, Flow", Method: "Auto", Blob: blob,
@@ -59,7 +58,6 @@ func TestSerializeDeserializeCompareRun(t *testing.T) {
 	if len(got.Inv.Rows) != 2 {
 		t.Fatalf("rows = %d, want 2", len(got.Inv.Rows))
 	}
-	// Snapshots preserved → drill-in diff works offline.
 	if got.snapA["ApexClass"]["Foo"] != "class Foo {}" {
 		t.Errorf("snapA Foo lost: %q", got.snapA["ApexClass"]["Foo"])
 	}

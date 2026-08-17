@@ -1,20 +1,11 @@
 package ui
 
-// /perms list surfaces (PermSets, PSGs, Profiles, Queues, Public
-// Groups). All declared via ListViewTableSpec[T]. Each surface uses
-// kindRefGutters for the tag/project annotations (one gutter call,
-// no separate bulk-tag map per surface — kindRefGutters does the
-// store lookup internally).
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// idGutters returns a Gutters closure that wraps m.kindRefGutters
-// for the "ID-keyed" perms case. idOf extracts the row's ID
-// (varies per type — PermissionSet.ID, Profile.ID, etc.).
 func idGutters[T any](kind devproject.ItemKind, idOf func(T) string) func(m Model, items []T) ([]uilayout.GutterSpec, []uilayout.GutterSpec) {
 	return func(m Model, items []T) ([]uilayout.GutterSpec, []uilayout.GutterSpec) {
 		return m.kindRefGutters(kind, len(items),

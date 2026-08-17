@@ -10,24 +10,19 @@ func TestRedactSOQL(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		// No q= param: passes through.
 		{"/services/data/v62.0/sobjects/Account/describe", "/services/data/v62.0/sobjects/Account/describe"},
-		// q= with full SOQL: body replaced.
 		{
 			"/services/data/v62.0/query?q=SELECT+Id+FROM+Account+WHERE+Id+%3D+%270015%27",
 			"/services/data/v62.0/query?q=<redacted>",
 		},
-		// q= followed by more params: body redacted, params kept.
 		{
 			"/services/data/v62.0/query?q=SELECT+Id&pretty=true",
 			"/services/data/v62.0/query?q=<redacted>&pretty=true",
 		},
-		// q= mid-string after & : also handled.
 		{
 			"/x?other=1&q=SELECT",
 			"/x?other=1&q=<redacted>",
 		},
-		// Cursor follow has no q=: passes through.
 		{"/services/data/v62.0/query/0r8xx5S5xkLFptKACT-2000", "/services/data/v62.0/query/0r8xx5S5xkLFptKACT-2000"},
 	}
 	for _, c := range cases {
@@ -43,22 +38,18 @@ func TestRedactCLIArgs(t *testing.T) {
 		in   []string
 		want string
 	}{
-		// Standard query shell-out.
 		{
 			[]string{"data", "query", "-q", "SELECT Id FROM Account", "-o", "acme-test", "--json"},
 			"data query -q <redacted> -o acme-test --json",
 		},
-		// --query long form.
 		{
 			[]string{"data", "query", "--query", "SELECT Id FROM Account"},
 			"data query --query <redacted>",
 		},
-		// No -q: untouched.
 		{
 			[]string{"org", "list", "--json"},
 			"org list --json",
 		},
-		// Edge: -q at the end with no value — still emits the flag.
 		{
 			[]string{"data", "query", "-q"},
 			"data query -q",

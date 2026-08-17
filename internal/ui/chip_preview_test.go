@@ -9,8 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/qchip"
 )
 
-// previewChip is a small constructor for a chip we'd add to the
-// previews map — keeps the test cases short.
 func previewChip(id, label string) qchip.Chip {
 	return qchip.Chip{ID: id, Label: label, Scope: "*", Origin: qchip.OriginUser}
 }
@@ -23,19 +21,16 @@ func TestAddChipPreviewStoresAndDedupes(t *testing.T) {
 		t.Fatalf("first add not recorded: %+v", got)
 	}
 
-	// Adding the same chip at the same slot is a no-op (don't multiply).
 	m.addChipPreview(domainObjects, "*", previewChip("a", "Alpha"), "u@orig")
 	if got := m.chipPreviewsFor(domainObjects, "*"); len(got) != 1 {
 		t.Errorf("duplicate add should be a no-op, got %d previews", len(got))
 	}
 
-	// A different chip ID at the same slot accumulates.
 	m.addChipPreview(domainObjects, "*", previewChip("b", "Bravo"), "u@orig")
 	if got := m.chipPreviewsFor(domainObjects, "*"); len(got) != 2 {
 		t.Errorf("second distinct add should accumulate, got %d", len(got))
 	}
 
-	// A different slot is independent.
 	if got := m.chipPreviewsFor(domainFlows, "*"); got != nil {
 		t.Errorf("other slot should be empty, got %+v", got)
 	}
@@ -52,8 +47,6 @@ func TestRemoveChipPreview(t *testing.T) {
 		t.Errorf("after removing 'a', expected only 'b': %+v", got)
 	}
 
-	// Removing the last entry should delete the slot key (so empty
-	// slots don't accumulate forever).
 	m.removeChipPreview(domainObjects, "*", "b")
 	if got := m.chipPreviewsFor(domainObjects, "*"); got != nil {
 		t.Errorf("emptied slot should be nil, got %+v", got)

@@ -1,30 +1,5 @@
 package devproject
 
-// Tags — personal annotation layer over metadata + records.
-//
-// Tags are orthogonal to projects: a project is "what ships together,"
-// a tag is "what I'm thinking about." A single field can carry several
-// tags AND belong to several projects at once. Tags are user-scoped
-// (one namespace shared across orgs), bindings are per-(item, org).
-//
-// Schema lives in store.go's `schema` constant (tags + tag_bindings
-// tables). This file is just the API surface.
-//
-// Two-table layout rationale:
-//   - `tags`         = the definition (name, color, icon). One row per
-//                      tag, ever. Renaming = update; deleting cascades
-//                      all bindings via FK ON DELETE CASCADE.
-//   - `tag_bindings` = (tag, item_kind, item_ref, org_user). One row
-//                      per item-tag pair. Querying "all items tagged
-//                      X" is a join; querying "all tags on item Y" is
-//                      a join the other direction. Both are indexed.
-//
-// Cross-org behavior: the same tag id binds to different items across
-// orgs. The tag definition lives once; the binding rows multiply per
-// org. This is the right shape for "tag `account-merge` means the
-// same conceptual thing across multiple orgs even though it
-// resolves to different concrete flow Ids in each."
-
 import (
 	"database/sql"
 	"errors"
@@ -385,9 +360,6 @@ func (s *Store) ReconcileTagBindings(deletes []TagBindingDelete, rewrites []TagB
 		if rw.ToRef == "" || rw.ToRef == rw.FromRef {
 			continue
 		}
-		// Merge source tag ids into the target ref (ignore dup PKs),
-		// then drop the source rows. Handles both "target has no
-		// bindings" (pure move) and "target already tagged" (merge).
 		if _, e := tx.Exec(
 			`INSERT OR IGNORE INTO tag_bindings (tag_id, item_kind, item_ref, org_user, created_at)
 			 SELECT tag_id, item_kind, ?, org_user, created_at

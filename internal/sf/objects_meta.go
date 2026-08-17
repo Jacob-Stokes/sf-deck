@@ -1,10 +1,5 @@
 package sf
 
-// Object-level Tooling metadata helpers — the CustomObject sibling
-// of fields.go's CustomField helpers. Structurally identical: an Id
-// lookup with the naming-quirk fallback chain, plus a thin wrapper
-// over UpdateToolingMetadata for readability at call sites.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -79,9 +74,6 @@ func invalidateCustomObjectIDCache() {
 	customObjectIDCacheMu.Unlock()
 }
 
-// customObjectLookupCandidates returns DeveloperName variants to try
-// in order. Bare (namespace + __c stripped) first, then full API name
-// as a fallback.
 func customObjectLookupCandidates(sobject string) []string {
 	out := []string{developerNameFromAPIName(sobject)}
 	if developerNameFromAPIName(sobject) != sobject {

@@ -10,8 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// homeLandingModel returns a Model parked on /home -> Landing with one
-// connected org, ready to feed keys to onHomeDestinationsKey.
 func homeLandingModel(t *testing.T) Model {
 	t.Helper()
 	c, err := cache.Open()
@@ -54,9 +52,6 @@ func TestHomeDestCatalogHasCollisions(t *testing.T) {
 	}
 }
 
-// homeDestSectionByItemLetterElsewhere reports whether the given item
-// letter is the section letter of a DIFFERENT section than the one it
-// lives in (ownLetter). Test helper mirroring the collision audit.
 func homeDestSectionByItemLetterElsewhere(ownLetter, itemLetter string) (string, bool) {
 	for _, s := range homeDestinations {
 		if s.Letter == itemLetter && s.Letter != ownLetter {

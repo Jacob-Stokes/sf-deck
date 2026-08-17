@@ -1,21 +1,5 @@
 package sf
 
-// Anonymous Apex execution via the Tooling REST API.
-//
-// Endpoint:
-//
-//	GET /services/data/vNN/tooling/executeAnonymous?anonymousBody=<urlencoded>
-//
-// Returns a JSON envelope with compile + run status, plus pointers to
-// the line/column where any failure happened. The Apex body itself
-// can be long — we use POST-shaped GET-with-query (SF supports both
-// forms; query-string is simpler).
-//
-// Debug logs are NOT included in the executeAnonymous response — they
-// land in the user's debug-log buffer if a trace flag was active for
-// the running user when the call fired. Callers that want the log
-// run the standard log fetch (ApexLogs + LogBody) afterwards.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -29,27 +13,17 @@ import (
 // the JSON shape Salesforce returns from /tooling/executeAnonymous —
 // boolean ok flags plus problem strings + line/column on failure.
 type ExecuteAnonymousResult struct {
-	Compiled         bool   `json:"compiled"`
-	CompileProblem   string `json:"compileProblem"`
-	Success          bool   `json:"success"`
-	ExceptionMessage string `json:"exceptionMessage"`
-	ExceptionStack   string `json:"exceptionStackTrace"`
-	Line             int    `json:"line"`
-	Column           int    `json:"column"`
-	// Body is the anonymous Apex that ran. Not part of the SF
-	// response — we attach it so callers / history rows can store
-	// the source alongside the result without re-stringifying.
-	Body string `json:"-"`
-	// LogID is the ApexLog row id we fetched the body from after
-	// the run, if log capture was enabled. Empty when log capture
-	// was off or no log was produced.
-	LogID string `json:"-"`
-	// LogBody is the raw debug-log text the user would see in
-	// Setup → Debug Logs. Empty when log capture was off.
-	LogBody string `json:"-"`
-	// Took is the wall-clock duration of the executeAnonymous
-	// call (NOT including post-run log fetch).
-	Took time.Duration `json:"-"`
+	Compiled         bool          `json:"compiled"`
+	CompileProblem   string        `json:"compileProblem"`
+	Success          bool          `json:"success"`
+	ExceptionMessage string        `json:"exceptionMessage"`
+	ExceptionStack   string        `json:"exceptionStackTrace"`
+	Line             int           `json:"line"`
+	Column           int           `json:"column"`
+	Body             string        `json:"-"`
+	LogID            string        `json:"-"`
+	LogBody          string        `json:"-"`
+	Took             time.Duration `json:"-"`
 }
 
 // ExecuteAnonymous runs the given Apex body against the org. Pure
@@ -134,6 +108,4 @@ func FetchLatestApexLog(alias, userID string, since time.Time) (logID, body stri
 	return id, string(bodyBytes), nil
 }
 
-// strconv kept available in case future variants need numeric line/col
-// formatting from the response.
 var _ = strconv.Itoa

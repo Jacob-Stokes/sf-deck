@@ -8,7 +8,6 @@ import (
 )
 
 func TestInfoModalScrollClamp(t *testing.T) {
-	// Everything fits (n <= visible): always 0.
 	if got := infoModalScroll(5, 3, 10); got != 0 {
 		t.Errorf("fits: got %d, want 0", got)
 	}
@@ -31,7 +30,6 @@ func TestRecordFieldDisplayValue(t *testing.T) {
 	if got := recordFieldDisplayValue("hello"); got != "hello" {
 		t.Errorf("string -> %q", got)
 	}
-	// A nested value gets JSON-rendered (multi-line, readable).
 	got := recordFieldDisplayValue(map[string]any{"a": 1})
 	if got == "" || got[0] != '{' {
 		t.Errorf("object should JSON-render, got %q", got)
@@ -39,17 +37,14 @@ func TestRecordFieldDisplayValue(t *testing.T) {
 }
 
 func TestRecordFieldJSONDetection(t *testing.T) {
-	// A JSON-object string gets pretty-printed (multi-line, indented).
 	got := recordFieldDisplayValue(`{"group":"Name","showLabel":true}`)
 	if !strings.Contains(got, "\"group\": \"Name\"") {
 		t.Errorf("JSON object not pretty-printed:\n%q", got)
 	}
-	// A JSON array string too.
 	got = recordFieldDisplayValue(`[{"a":1},{"b":2}]`)
 	if got == "" || got[0] != '[' || !strings.Contains(got, "\"a\": 1") {
 		t.Errorf("JSON array not pretty-printed:\n%q", got)
 	}
-	// Ordinary CSV / text (not JSON) is returned verbatim.
 	csv := "FirstName,LastName,Forename2__pc"
 	if recordFieldDisplayValue(csv) != csv {
 		t.Errorf("non-JSON text should be verbatim")
@@ -58,7 +53,6 @@ func TestRecordFieldJSONDetection(t *testing.T) {
 	if recordFieldDisplayValue("123") != "123" {
 		t.Errorf("bare number string should be verbatim")
 	}
-	// Malformed JSON-ish text returns verbatim (not swallowed).
 	bad := `{not valid json`
 	if recordFieldDisplayValue(bad) != bad {
 		t.Errorf("malformed JSON should be verbatim")
@@ -69,7 +63,6 @@ func TestRecordFieldJSONDetection(t *testing.T) {
 // lags" bug: the stored Scroll must be clamped at mutation time, not
 // just at render time.
 func TestInfoModalScrollNoOverrun(t *testing.T) {
-	// 100-line body; a terminal tall enough to show ~12 lines.
 	body := strings.Repeat("x\n", 99) + "x" // 100 lines
 	m := Model{modelRuntime: modelRuntime{height: 20}}
 	m.infoModal = &infoModalState{PreRendered: body}
@@ -79,7 +72,6 @@ func TestInfoModalScrollNoOverrun(t *testing.T) {
 	}
 
 	down := tea.KeyPressMsg{Code: 'j', Text: "j"}
-	// Press down far more times than there are lines.
 	for i := 0; i < 500; i++ {
 		m, _ = m.handleInfoModalKey(down)
 	}
@@ -101,12 +93,10 @@ func TestWrapPreservingKeepsIndent(t *testing.T) {
 	if !ok {
 		t.Fatal("expected valid JSON")
 	}
-	// The pretty JSON has indented lines like `  "group": "Name",`.
 	out := wrapPreserving(pretty, 80)
 	if !strings.Contains(out, "\n  \"group\": \"Name\"") {
 		t.Errorf("indentation not preserved:\n%s", out)
 	}
-	// A line under width is untouched (no spurious breaks).
 	if strings.Contains(out, "\n\n") {
 		t.Errorf("introduced blank lines:\n%s", out)
 	}

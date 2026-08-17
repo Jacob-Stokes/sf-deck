@@ -1,18 +1,5 @@
 package ui
 
-// Fixture catalogs for the demo's operational surfaces — see
-// demo_seed.go for the seeder and demo_seed_data.go for the core
-// world (orgs, objects, flows, apex, records). This file adds the
-// /system + /users + /components lists: setup audit trail, flow
-// interviews, async + scheduled jobs, active users, recent logins,
-// LWC/Aura bundle lists, and the flow-version definition maps. Same
-// rules as demo_seed_data.go: everything fictional Northwind, nothing
-// copied from a real org, timestamps in the formats the real
-// fetchers return.
-//
-// The code-level drill-downs (apex/trigger bodies, bundle sources)
-// live in demo_seed_data_code.go.
-
 import (
 	"fmt"
 	"strings"
@@ -21,31 +8,16 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// demoUserID is the stable fake User Id for the i-th member of the
-// demo cast (demoPeople order, then the integration users appended by
-// demoActiveUsers / demoRecentLogins).
 func demoUserID(i int) string {
 	return fmt.Sprintf("005DM00000DMU%02dAAA", i+1)
 }
 
-// demoUsername derives a cast member's login ("Mara Chen" ->
-// mara.chen@northwind.example).
 func demoUsername(name string) string {
 	return strings.ToLower(strings.ReplaceAll(name, " ", ".")) + "@northwind.example"
 }
 
-// demoIntegrationUsers extends the human cast with the API identities
-// every real org accumulates. Indexes continue demoPeople's, so
-// demoUserID stays collision-free across both lists.
 var demoIntegrationUsers = []string{"EDI Gateway Integration", "Telemetry Ingest Service"}
 
-// ---------------------------------------------------------------
-// Setup audit trail
-// ---------------------------------------------------------------
-
-// demoSetupAudit backs /system's Audit subtab: a fortnight of the
-// admin actions a working org actually logs, performed by the demo
-// cast against the seeded metadata (flows, fields, permsets, classes).
 func demoSetupAudit() []sf.SetupAuditRow {
 	now := time.Now().UTC()
 	rows := []struct {
@@ -87,13 +59,6 @@ func demoSetupAudit() []sf.SetupAuditRow {
 	return out
 }
 
-// ---------------------------------------------------------------
-// Flow interviews
-// ---------------------------------------------------------------
-
-// demoFlowInterviews backs /system's Interviews subtab: paused runs of
-// the seeded screen flows plus the one errored interview that makes
-// the surface worth having. Flow labels match demoFlows().
 func demoFlowInterviews() []sf.FlowInterviewRow {
 	now := time.Now().UTC()
 	rows := []struct {
@@ -125,10 +90,6 @@ func demoFlowInterviews() []sf.FlowInterviewRow {
 	return out
 }
 
-// ---------------------------------------------------------------
-// Async + scheduled jobs
-// ---------------------------------------------------------------
-
 // demoApexClassIDs maps seeded class name -> Id so cross-referencing
 // fixtures (async jobs, drill-down bodies) can't drift from the list.
 func demoApexClassIDs() map[string]string {
@@ -140,9 +101,6 @@ func demoApexClassIDs() map[string]string {
 	return out
 }
 
-// demoAsyncJobs backs the Jobs subtab: recent AsyncApexJob rows whose
-// class Ids resolve to seeded apex classes, so o / Enter on a job row
-// lands on a real body.
 func demoAsyncJobs() []sf.AsyncJobRow {
 	ids := demoApexClassIDs()
 	now := time.Now().UTC()
@@ -191,10 +149,6 @@ func demoAsyncJobs() []sf.AsyncJobRow {
 	return out
 }
 
-// demoScheduledJobs backs the Scheduled subtab: the crons behind the
-// seeded batch classes. CronJobDetail.JobType is Salesforce's raw
-// code ("7" = scheduled Apex, "3" = dashboard refresh), matching what
-// the live fetcher returns.
 func demoScheduledJobs() []sf.CronTriggerRow {
 	now := time.Now().UTC()
 	ts := func(minsFromNow int) string {
@@ -218,10 +172,6 @@ func demoScheduledJobs() []sf.CronTriggerRow {
 			CronExpression: "0 0 6 ? * MON", TimesTriggered: 41},
 	}
 }
-
-// ---------------------------------------------------------------
-// Users: active sessions + recent logins
-// ---------------------------------------------------------------
 
 // demoActiveUsers backs /users' Active subtab: one row per cast member
 // with a live session, plus the two integration identities (API
@@ -271,9 +221,6 @@ func demoActiveUsers() []sf.ActiveUserRow {
 	return out
 }
 
-// demoRecentLogins fills HomeData.Users so /users' Recent subtab (and
-// the Home user summary) isn't empty in demo mode. Same cast + Ids as
-// demoActiveUsers, so the two views of "who's around" agree.
 func demoRecentLogins() []sf.UserRow {
 	now := time.Now().UTC()
 	rows := []struct {
@@ -312,13 +259,6 @@ func demoRecentLogins() []sf.UserRow {
 	return out
 }
 
-// ---------------------------------------------------------------
-// LWC + Aura bundle lists
-// ---------------------------------------------------------------
-
-// demoLWCSpec carries one component's identity plus the hooks the
-// source generator (demo_seed_data_code.go) needs: which seeded apex
-// class serves it, what it iterates over, what its empty state says.
 type demoLWCSpec struct {
 	dev, label, desc      string
 	icon                  string // lightning-card icon-name
@@ -427,14 +367,6 @@ func demoAuraBundles() []sf.AuraBundle {
 	return out
 }
 
-// ---------------------------------------------------------------
-// Flow version definitions
-// ---------------------------------------------------------------
-
-// demoFlowVersionDefs builds the per-version Flow metadata maps the
-// in-terminal definition viewer renders (cache key
-// "flowversiondef:<versionID>") — one small, plausible definition per
-// seeded flow version.
 func demoFlowVersionDefs() map[string]map[string]any {
 	flows := demoFlows()
 	versionsByDef := demoFlowVersionsByDef()
@@ -447,15 +379,8 @@ func demoFlowVersionDefs() map[string]map[string]any {
 	return out
 }
 
-// demoFlowAutoSuffixes mirrors the suffix set demoFlows composes its
-// autolaunched dev names from, so the definition builder can recover
-// the domain object from a DeveloperName.
 var demoFlowAutoSuffixes = []string{"_After_Save", "_Status_Sync", "_Escalation", "_Approval"}
 
-// demoFlowObjectFor recovers the triggering object from an
-// autolaunched flow's dev name ("Cold_Chain_Alert_Status_Sync" ->
-// "Cold_Chain_Alert__c"). Every autolaunched demo flow is built on a
-// custom-object domain, so __c always applies.
 func demoFlowObjectFor(devName string) string {
 	for _, sfx := range demoFlowAutoSuffixes {
 		if strings.HasSuffix(devName, sfx) {
@@ -475,8 +400,6 @@ func demoFlowVersionDef(f sf.Flow, v sf.FlowVersion) map[string]any {
 		"description":    "Northwind " + v.MasterLabel + " automation.",
 	}
 	if obj := demoFlowObjectFor(f.DeveloperName); obj != "" {
-		// Record-triggered shape: start on the object, one decision,
-		// one same-record update.
 		def["start"] = map[string]any{
 			"locationX": 50, "locationY": 50,
 			"object":            obj,
@@ -510,7 +433,6 @@ func demoFlowVersionDef(f sf.Flow, v sf.FlowVersion) map[string]any {
 		}}
 		return def
 	}
-	// Screen-flow shape: two screens and a record create.
 	def["start"] = map[string]any{
 		"locationX": 50, "locationY": 50,
 		"connector": map[string]any{"targetReference": "Intro"},

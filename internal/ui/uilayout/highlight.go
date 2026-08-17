@@ -4,20 +4,6 @@ package uilayout
 // hit" cue applied to list-view cells. Pure function; takes already-
 // truncated text + the active search terms and returns the same
 // text with ANSI escapes wrapping each match.
-//
-// Why post-truncation? If we highlighted source strings, then
-// truncated, we'd either:
-//   - cut the highlight wrapper open (mid-ANSI truncation breaks
-//     the rendering); or
-//   - over-highlight content the user can't see, wasting visual
-//     attention.
-// Operating on the already-truncated cell guarantees the highlight
-// always lands on visible characters.
-//
-// Why case-insensitive but preserve original case? Users type
-// lowercase queries reflexively; matching "acc" to "Account" is
-// the expected behaviour. The output preserves the row's original
-// case so column data still reads correctly.
 
 import (
 	"strings"
@@ -81,7 +67,6 @@ func HighlightInStyle(text string, terms []string, base lipgloss.Style) string {
 	return b.String()
 }
 
-// cleanedTerms strips empty / whitespace-only entries.
 func cleanedTerms(terms []string) []string {
 	if len(terms) == 0 {
 		return nil
@@ -97,9 +82,6 @@ func cleanedTerms(terms []string) []string {
 	return out
 }
 
-// markRanges computes a per-byte boolean mark for which positions in
-// text are inside any term's case-insensitive match. Shared by
-// Highlight + HighlightInStyle.
 func markRanges(text string, terms []string) []bool {
 	mark := make([]bool, len(text))
 	lower := strings.ToLower(text)

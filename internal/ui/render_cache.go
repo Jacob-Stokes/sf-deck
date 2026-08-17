@@ -35,12 +35,6 @@ type renderCache struct {
 	skipFrame bool
 }
 
-// pagedRowGroupKey is the "everything but the row index" portion of
-// the paged-row cache key. When this changes (page advances, search
-// committed, list mutation, focus flip, …), the entire pagedRows
-// map is dropped — the previous group's row strings are no longer
-// valid for the new context. Compared against the active group at
-// the start of each paginated render; mismatch wipes the map.
 type pagedRowGroupKey struct {
 	tab       Tab
 	subtab    Subtab
@@ -52,18 +46,9 @@ type pagedRowGroupKey struct {
 	sortKey   string
 	searchKey string
 	scopeName string
-	// renderCfg folds every render-time setting / state field that
-	// affects how a row looks — flag column mode, gutter widths,
-	// HScroll, FrozenCols, UserWidths, theme, etc. Single field so
-	// future toggles only need to be added to renderConfigVersion()
-	// without growing the key shape; the cache invalidates as soon
-	// as any such input changes.
 	renderCfg int
 }
 
-// pagedRowCacheKey is the per-row entry. rowIndex is the **filtered
-// list index** (post-Filtered, post-sort) — same `i` the rowFn
-// closure receives.
 type pagedRowCacheKey struct {
 	rowIndex int
 }
@@ -284,9 +269,6 @@ func (m Model) wrapPagedRowFn(
 		renderCfg: m.renderConfigVersion(model.State),
 	}
 	if group != m.renderCache.pagedRowsKey {
-		// Group changed — drop every entry. Cheap: maps are small
-		// (one page worth of rows, ~50 entries) and re-fill happens
-		// inline as the page renders.
 		m.renderCache.pagedRows = map[pagedRowCacheKey]string{}
 		m.renderCache.pagedRowsKey = group
 	}
@@ -317,22 +299,13 @@ func sortKey(state *uilayout.ListTableState) string {
 	return state.SortColumn + "↑"
 }
 
-// searchTermsKey concatenates the search-term slice for cache
-// keying. Terms are short (one buffer split on whitespace) so a
-// joined string is cheaper than building a more clever fingerprint.
 func searchTermsKey(terms []string) string {
 	if len(terms) == 0 {
 		return ""
 	}
-	// Strings.Join allocates one buffer; the result is one entry
-	// in the cache key, replaced (not retained per-row) on group
-	// change. Acceptable.
 	return joinSearchTerms(terms)
 }
 
-// joinSearchTerms is a tiny helper to keep the term-join out of the
-// hot path's inline expansion. Pulled out so the wrapping happens
-// once per group-key build, not once per row.
 func joinSearchTerms(terms []string) string {
 	const sep = "\x00"
 	total := 0
@@ -406,24 +379,17 @@ func (m Model) renderConfigVersion(state *uilayout.ListTableState) int {
 		mix(0xff)
 	}
 
-	// 1. User settings that affect row visuals.
 	if m.settings != nil {
 		mixStr(m.settings.FlagColumnDisplayMode())
 		mixBool(m.settings.FlagColumnVisible())
 		mixStr(m.settings.Theme())
 	}
-	// 2. Computed widths (gutters depend on settings + state).
 	mixInt(m.tagGutterWidth())
 	mixInt(m.projectGutterWidth())
-	// 3. Per-state knobs that change what each row looks like.
 	if state != nil {
 		mixInt(state.HScroll)
 		mixInt(state.FrozenCols)
 		mixBool(state.Zen)
-		// User-pinned column widths are a map; iterate sorted so
-		// the hash is deterministic across runs. Map iteration
-		// order is non-deterministic in Go, so unsorted would
-		// produce different hashes for the same config.
 		mixInt(len(state.UserWidths))
 		if len(state.UserWidths) > 0 {
 			names := make([]string, 0, len(state.UserWidths))
@@ -440,11 +406,6 @@ func (m Model) renderConfigVersion(state *uilayout.ListTableState) int {
 	return int(h)
 }
 
-// dataVersionFromStore returns the devproject store's mutation
-// generation, or 0 when the store isn't open. Folded into per-list
-// DataVersion fields so tag / project changes invalidate the
-// paged-row cache (gutters change even when the underlying list
-// itself didn't).
 func dataVersionFromStore(m Model) int {
 	if m.devProjects == nil {
 		return 0
@@ -452,27 +413,10 @@ func dataVersionFromStore(m Model) int {
 	return int(m.devProjects.Generation())
 }
 
-// listVersionWithStore is the canonical way for a listSurface's
-// BuildRenderModel to compute its DataVersion. Combines the
-// underlying ListView's version (bumps on Set / SetExtra / SetMatch)
-// with the devproject store's mutation generation (bumps on tag /
-// project edits). The constants serve as a "rotation" so the two
-// counters don't trivially collide; +1 keeps it strictly positive
-// so the cache wrapper (which treats 0 as "no cache, fall through")
-// engages.
-//
-// Surfaces whose row content depends on additional state outside
-// these two should fold that in themselves — e.g. by adding a
-// constant offset per chip selection, or by including a struct-time
-// counter. The cache treats DataVersion as opaque.
 func listVersionWithStore(listVer int, m Model) int {
 	return listVer*1_000_003 + dataVersionFromStore(m) + 1
 }
 
-// scopeKeyForRowCache returns a stable identifier for the active
-// org scope so the row cache invalidates on org switch. Cheap
-// concatenation; retained as one cache-key field across the whole
-// page render.
 func scopeKeyForRowCache(m Model) string {
 	if scope := m.activeScope(); scope != nil {
 		return scope.ProjectName

@@ -45,16 +45,6 @@ func decorateRowsWithScrollbar(rowBlock []string, cur, n, viewport, inner int) {
 	}
 }
 
-// decoratePagedRowsWithScrollbar is the paginated counterpart to
-// decorateRowsWithScrollbar. Bar position reflects the cursor's
-// position over the FULL list (not within the active page) so the
-// thumb advances continuously as pages turn — matching what the user
-// expects from a scroll bar across discrete page jumps.
-//
-// `rowBlock` is the output of RenderRowsPaged: rows for the active
-// page followed by a trailing pageIndicator. The indicator is left
-// untouched. Always decorates (no "fits on one page → hide" branch)
-// since paginated callers want a stable visual anchor.
 func decoratePagedRowsWithScrollbar(rowBlock []string, cur, n, pageSize, inner int) {
 	if len(rowBlock) == 0 || pageSize <= 0 || n <= 0 || inner < 2 {
 		return

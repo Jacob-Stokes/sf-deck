@@ -1,16 +1,5 @@
 package ui
 
-// /home → Downloads subtab.
-//
-// Compact view of recently-saved exports + anything in flight. Pairs
-// with the Ctrl+D modal — same data source (m.exports) — but here it
-// gets full main-pane real estate so it can show more rows + extra
-// columns (path, size, age) without the modal's space pressure.
-//
-// Open from any tab via Ctrl+D for a quick peek; navigate to /home →
-// Downloads when you want the list to stick around while you're doing
-// something else.
-
 import (
 	"fmt"
 	"github.com/charmbracelet/x/ansi"
@@ -23,10 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// homeDownloadsRows returns the cursor-addressable rows for the
-// /home Downloads subtab — inflight + history concatenated. Same
-// shape used by the renderer so the cursor index always points to
-// the right job.
 func (m Model) homeDownloadsRows() []*exportJob {
 	if m.exports == nil {
 		return nil
@@ -38,8 +23,6 @@ func (m Model) homeDownloadsRows() []*exportJob {
 	return out
 }
 
-// renderHomeDownloads renders the Downloads subtab body. Returns the
-// pre-joined line slice to match the rest of the subtab renderers.
 func (m Model) renderHomeDownloads(inner, budget int) []string {
 	if m.exports == nil {
 		return []string{dimLine("  exports tracker not active", inner)}
@@ -61,11 +44,6 @@ func (m Model) renderHomeDownloads(inner, budget int) []string {
 		lipgloss.NewStyle().Foreground(theme.Fg).Bold(true).Render(title))
 	lines = append(lines, "")
 
-	// On Downloads, r is rebound to "reveal in Finder" — the global
-	// r/refresh hint in the footer would be misleading here, but the
-	// surface-local hint is the place to be honest. Surface the
-	// global-refresh variant (^r) which still works as a hard reload
-	// of the active org's data.
 	hint := "  ↵/o open · " +
 		firstPretty(Keys.DownloadReveal) + " reveal · " +
 		firstPretty(Keys.DownloadYankPath) + " yank · " +
@@ -91,8 +69,6 @@ func (m Model) renderHomeDownloads(inner, budget int) []string {
 	if len(history) > 0 {
 		lines = append(lines,
 			lipgloss.NewStyle().Foreground(theme.Muted).Bold(true).Render("  RECENT"))
-		// Cap to the budget so we don't run past the available height.
-		// Reserve 6 lines for header + section labels + footer.
 		max := budget - 6 - len(inflight)
 		if max < 5 {
 			max = 5
@@ -119,9 +95,6 @@ func (m Model) renderHomeDownloads(inner, budget int) []string {
 	return lines
 }
 
-// formatHomeDownloadRow renders one job as a single-line row with the
-// status / size / when columns aligned to the right edge. `active`
-// adds the highlight bar + bold treatment matching other lists.
 func formatHomeDownloadRow(j *exportJob, active bool, inner int) string {
 	kind := string(j.Kind)
 	var rightStatus string
@@ -183,9 +156,6 @@ func homeDownloadsMoveCursor(m *Model, delta int) {
 	m.homeDownloadsCursor = c
 }
 
-// homeDownloadsActivate is Enter on /home Downloads — open the
-// cursored file with the OS default app. Mirrors the modal's
-// Enter/o behavior so muscle memory carries over.
 func homeDownloadsActivate(m *Model) tea.Cmd {
 	rows := m.homeDownloadsRows()
 	if len(rows) == 0 {
@@ -205,10 +175,6 @@ func homeDownloadsActivate(m *Model) tea.Cmd {
 	return nil
 }
 
-// onHomeDownloadsKey routes the per-subtab keys (r/y/d) for the
-// Downloads list. Returns true when the key was consumed; the
-// global handler should skip further dispatch in that case. Open
-// (Enter / o) is wired via Activate; movement via MoveCursor.
 func (m *Model) onHomeDownloadsKey(key string) bool {
 	if m.tab() != TabHome || m.homeSubtab() < 0 {
 		return false
@@ -262,9 +228,6 @@ func (m *Model) onHomeDownloadsKey(key string) bool {
 	return false
 }
 
-// prettyAgo returns "5m ago" / "2h ago" / "yesterday" / "Apr 28"
-// style relative-time strings. Tighter than prettyDate for the
-// downloads list where we want short rather than absolute times.
 func prettyAgo(t time.Time) string {
 	if t.IsZero() {
 		return "—"

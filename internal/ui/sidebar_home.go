@@ -7,12 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// Per-surface sidebars for /home, /setup, and the /system API subtab.
-// Split out of sidebar.go.
-
-// sidebarSystemAPI is the placeholder right-pane for the /system
-// API subtab — until that view gets a real list-table-shaped
-// payload, the sidebar just shows a static hint.
 func sidebarSystemAPI(_ Model, _ int) string {
 	return sideEmpty("API usage · read-only")
 }
@@ -40,9 +34,6 @@ func (m Model) sidebarHome(inner int) string {
 	}
 	d := m.data[o.Username]
 
-	// 1. Cloud banner — animates while the user is on /home unless
-	//    disabled (static) or hidden (skipped entirely). Falls back to
-	//    the local alias when OrgInfo hasn't landed yet.
 	var info sf.OrgInfo
 	if d != nil {
 		info = d.OrgInfo.Value()
@@ -79,8 +70,6 @@ func (m Model) sidebarHome(inner int) string {
 		}
 	}
 
-	// Limits live in /home → Limits; the sidebar stays focused on the
-	// org-identity card.
 	var b strings.Builder
 	if banner != "" {
 		b.WriteString(banner)

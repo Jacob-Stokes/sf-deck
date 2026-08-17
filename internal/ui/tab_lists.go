@@ -4,14 +4,6 @@ import (
 	"strings"
 )
 
-// /apex-logs, /deploys, /packages — flat list surfaces backed by
-// listSurface.BuildRenderModel + the shared renderListSurface helper.
-// Each renderXxx is a thin orchestrator that picks the surface and
-// hands off; everything visible lives on the listSurface declaration
-// in list_surface.go.
-
-// --- ApexLogs -----------------------------------------------------------
-
 func (m Model) renderApexLogs(w, innerH int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -57,10 +49,6 @@ func (m Model) renderScheduledJobs(w, innerH int) string {
 		m.ensureOrgDataRef(o.Username))
 }
 
-// renderActiveUsers draws the /users → Active subtab: a chip strip
-// (All / No MFA / Recently active / API) over a single session-derived
-// list that the chips filter client-side (deploys pattern — one
-// resource, not per-chip re-query).
 func (m Model) renderActiveUsers(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -102,8 +90,6 @@ func (m Model) renderActiveUsers(w, innerH int) string {
 	lines = append(lines, renderListModel(m, model, m.focus, inner, budget)...)
 	return strings.Join(lines, "\n")
 }
-
-// --- Deploys ------------------------------------------------------------
 
 func (m Model) renderDeploys(w, innerH int) string {
 	inner := w - 4
@@ -147,8 +133,6 @@ func (m Model) renderDeploys(w, innerH int) string {
 	lines = append(lines, renderListModel(m, model, m.focus, inner, budget)...)
 	return strings.Join(lines, "\n")
 }
-
-// --- Packages -----------------------------------------------------------
 
 func (m Model) renderPackages(w, innerH int) string {
 	o, ok := m.currentOrg()

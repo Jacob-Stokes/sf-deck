@@ -4,13 +4,6 @@ package ui
 // modelHost wiring + the dispatcher routing; the actual bulk-export
 // pipeline (goroutine, channel pump, msg types) lives in the
 // internal/exporters/bulk subpackage.
-//
-// Pattern: Model satisfies bulk.Host via a handful of small
-// methods (Flash, FlashFor, OpenPathPicker, DefaultPath,
-// ActiveUsername, Flight, SetFlight). Each of those delegates to
-// existing UI primitives. The bulk-export code never reaches into
-// Model fields directly — every interaction goes through the
-// interface.
 
 import (
 	"fmt"

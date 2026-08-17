@@ -1,17 +1,5 @@
 package ui
 
-// List-table key handling — column resize ([ / ] / { / }), horizontal
-// scroll (, / .), zen-mode toggle (z). All operate against whichever
-// list-table-shaped surface the user is on right now.
-//
-// Surfaces with a list-table:
-//   - Records subtab on TabObjectDetail (per-(sobject, chip) state)
-//   - Record-list mode on TabRecords     (per-(sobject, chip) state)
-//   - SOQL results on TabSOQL            (model-level state)
-//   - Report run on TabReportDetail      (model-level state)
-//
-// Other tabs return nil from activeListTable; key handlers no-op.
-
 import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -34,16 +22,6 @@ func (m *Model) activeListTable() (*uilayout.ListTableState, []uilayout.ListColu
 	return ctx.State, ctx.Cols
 }
 
-// activeListTableState returns only the current list-table state. Use
-// this from hot paths that need a boolean/mode flag (wheel routing,
-// status hints, zen check) but do not need columns.
-//
-// Drives off the same TabSpec.ListTable / listSurface.State machinery
-// activeListTableMeasured uses — that path already has registry hooks
-// for TabRecords, TabObjectDetail, TabSOQL, TabReportDetail plus the
-// uniform list surfaces, so the per-tab switch the previous
-// implementation carried was duplicated dispatch logic. Discarding the
-// column build keeps this cheap.
 func (m *Model) activeListTableState() *uilayout.ListTableState {
 	return m.activeListTableContext().State
 }
@@ -162,10 +140,6 @@ func (m Model) tabSpecListTableWidthScope() string {
 	return ""
 }
 
-// listTableSOQL is the SOQL result-grid resolver. Columns are
-// dynamic (depend on the query), so the Cols() route through
-// listSurface doesn't fit — we declare it here and wire it on
-// TabSpec.ListTable.
 func listTableSOQL(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	if len(m.soqlResult.Records) == 0 {
 		return nil, nil
@@ -182,10 +156,6 @@ func listTableSOQL(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	return &m.soqlTable, entry.listCols
 }
 
-// measureCellSOQL widens column `col` to the widest rendered cell in
-// the current SOQL result set. Reads the pre-measured Max from the
-// cached projection so snap-to-content matches what soqlRenderModel
-// just rendered without re-walking the rows.
 func measureCellSOQL(m *Model, col int) int {
 	if len(m.soqlResult.Records) == 0 {
 		return 0
@@ -198,8 +168,6 @@ func measureCellSOQL(m *Model, col int) int {
 	return entry.listCols[col].Max
 }
 
-// listTableReportDetail is the report-run grid resolver — columns
-// come from the run's Columns slice + per-row payload.
 func listTableReportDetail(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	if len(m.orgs) == 0 {
 		return nil, nil
@@ -219,10 +187,6 @@ func listTableReportDetail(m *Model) (*uilayout.ListTableState, []uilayout.ListC
 	return &m.reportRunTable, buildReportRunCols(run.Columns, run.Rows)
 }
 
-// measureCellReportDetail widens column `col` to the widest rendered
-// cell in the current report run. Mirrors the cell-extraction
-// reportDetailBody uses (stringifyReportCell on the per-API-name
-// payload).
 func measureCellReportDetail(m *Model, col int) int {
 	if len(m.orgs) == 0 {
 		return 0
@@ -250,10 +214,6 @@ func measureCellReportDetail(m *Model, col int) int {
 	return max
 }
 
-// listTableObjectDetailDispatch routes to the right per-subtab
-// list-table for ObjectDetail. Only the Records subtab has a
-// list-table-shaped view today; everything else returns nil so
-// column-mode / sort / scroll gestures cleanly no-op.
 func listTableObjectDetailDispatch(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	switch m.currentSubtab() {
 	case SubtabRecords:
@@ -264,10 +224,6 @@ func listTableObjectDetailDispatch(m *Model) (*uilayout.ListTableState, []uilayo
 	return nil, nil
 }
 
-// schemaListTable resolves the Schema subtab's field list-table state +
-// columns, so cursor / sort / column-nav / resize keys reach it (the
-// same machinery /records and /flows use). Returns nil when the
-// describe isn't loaded yet.
 func (m *Model) schemaListTable() (*uilayout.ListTableState, []uilayout.ListColumn) {
 	d, ok := m.activeOrgState()
 	if !ok || d.DescribeCur == "" {
@@ -281,9 +237,6 @@ func (m *Model) schemaListTable() (*uilayout.ListTableState, []uilayout.ListColu
 	return &fs.Table, mustResolveColumns(fieldColumnSchema()).ListColumns()
 }
 
-// listTableRecords resolves /records — picker mode (sObject list)
-// vs record-list mode (currently selected sObject's recent records).
-// The dispatcher branches on RecordsSObjectCur.
 func listTableRecords(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	if len(m.orgs) == 0 {
 		return nil, nil
@@ -295,9 +248,6 @@ func listTableRecords(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn
 	return m.recordsListTable()
 }
 
-// activeOrgState is a tiny helper for the boilerplate "guard m.orgs
-// non-empty, fetch the orgData pointer" check that every TabXxx
-// branch above repeats.
 func (m Model) activeOrgState() (*orgData, bool) {
 	if len(m.orgs) == 0 {
 		return nil, false
@@ -309,9 +259,6 @@ func (m Model) activeOrgState() (*orgData, bool) {
 	return d, true
 }
 
-// recordsListTable resolves the records-shaped list-table state (used
-// by both the /records record-list mode and TabObjectDetail's records
-// subtab — same data shape, same state map).
 func (m Model) recordsListTable() (*uilayout.ListTableState, []uilayout.ListColumn) {
 	d, sobj := m.activeRecordsSObject()
 	if sobj == "" {
@@ -346,44 +293,22 @@ func (m Model) recordsListTable() (*uilayout.ListTableState, []uilayout.ListColu
 	return state, projection.cols
 }
 
-// sobjectListCols is the /objects + /records-picker shared spec.
-// Mirrors what sobjectListTable builds at render time so column-mode
-// resize / sort target the same column slots the user is looking at.
 func sobjectListCols() []uilayout.ListColumn {
 	return mustResolveColumns(sobjectColumnSchema()).ListColumns()
 }
 
-// flowListCols is the /flows shared spec. Built once here so
-// activeListTable can advertise the columns to column-mode without
-// the renderer having to expose them. Stays in sync with the
-// renderer's column set in tab_flows.go's flowListTable helper.
 func flowListCols() []uilayout.ListColumn {
 	return mustResolveColumns(flowColumnSchema()).ListColumns()
 }
 
-// resizeTargetCol picks the column the resize keys (`<`, `>`,
-// `Ctrl+[`, `Ctrl+]`) operate on. With the column cursor always
-// present, the answer is straightforward: whatever column the
-// cursor highlights. The cursor defaults to the leftmost non-
-// frozen column on first paint, so resize keys always have a
-// predictable target without the user having to opt into a
-// "column mode" first.
 func resizeTargetCol(state *uilayout.ListTableState, totalCols int) int {
 	if state == nil || totalCols == 0 {
 		return 0
 	}
-	// Build a tiny cols slice just to satisfy effectiveColCursor's
-	// signature — it only reads len(cols) and FrozenCols.
 	dummy := make([]uilayout.ListColumn, totalCols)
 	return effectiveColCursor(state, dummy)
 }
 
-// ensureColCursorVisible adjusts HScroll so state.ColCursor lands in
-// the visible window. When the cursor moves into a frozen column,
-// HScroll resets to FrozenCols (no point scrolling; frozen cols are
-// always shown). When it moves past the rightmost visible non-frozen
-// column, scroll right by one. When it moves before HScroll, scroll
-// left to put the cursor at HScroll.
 func ensureColCursorVisible(state *uilayout.ListTableState, cols []uilayout.ListColumn, inner int) {
 	if state == nil || len(cols) == 0 {
 		return
@@ -391,36 +316,28 @@ func ensureColCursorVisible(state *uilayout.ListTableState, cols []uilayout.List
 	c := state.ColCursor
 	frozen := state.FrozenCols
 	if c < frozen {
-		// Cursor in a frozen column: no scrolling needed (frozens are
-		// always rendered first).
 		state.HScroll = frozen
 		return
 	}
-	// Compute the layout to see what's currently visible.
 	spec := uilayout.ListTableSpec{Cols: cols, N: 0, Cell: func(int, int) string { return "" }}
 	res := uilayout.LayoutListTable(spec, state, inner)
 	if !res.Overflow {
-		// Everything fits: nothing to scroll.
 		return
 	}
 	if c < res.HScroll {
 		state.HScroll = c
 		return
 	}
-	// Walk visible columns forward; if the cursor is past the last
-	// visible one, advance HScroll until it falls inside.
 	const gutter = 2
 	const sepW = 3
 	for state.HScroll < c {
 		used := gutter
-		// Frozen cols always rendered.
 		for i := 0; i < frozen && i < len(cols); i++ {
 			if used > gutter {
 				used += sepW
 			}
 			used += res.Widths[i]
 		}
-		// Then from HScroll onward.
 		visible := frozen - 1
 		for i := state.HScroll; i < len(cols); i++ {
 			need := res.Widths[i]
@@ -444,26 +361,18 @@ func ensureColCursorVisible(state *uilayout.ListTableState, cols []uilayout.List
 	}
 }
 
-// handleColShrink / handleColGrow apply a resize step. Use of a fresh
-// LayoutListTable call means resize math always runs against the same
-// widths the next render will produce.
 func (m Model) handleColResize(delta int) (Model, tea.Cmd, bool) {
 	ctx := (&m).activeListTableContext()
 	if ctx.State == nil || len(ctx.Cols) == 0 {
 		return m, nil, false
 	}
 	target := resizeTargetCol(ctx.State, len(ctx.Cols))
-	// Build a minimal spec for layout — the resolver only needs widths.
 	spec := uilayout.ListTableSpec{Cols: ctx.Cols, N: 0, Cell: func(int, int) string { return "" }}
 	res := uilayout.LayoutListTable(spec, ctx.State, m.contentWidth())
 	uilayout.StepResize(spec, ctx.State, res, target, delta, m.settings.LayoutColumnResizeStep())
 	return m, m.saveListTableWidthsCmd(ctx), true
 }
 
-// handleColSnap snaps the target column to its min (delta < 0) or
-// fits-to-content (delta > 0). Routes through the measurer the
-// active surface declares so snap-to-content reflects the actual
-// rows on screen rather than the column's static Ideal/Max.
 func (m Model) handleColSnap(delta int) (Model, tea.Cmd, bool) {
 	ctx := (&m).activeListTableContext()
 	if ctx.State == nil || len(ctx.Cols) == 0 {
@@ -567,20 +476,10 @@ func (m Model) handleColSort() (Model, bool) {
 	return mm, true
 }
 
-// sortByColumnName cycles the active list's sort on the named column
-// using the user's preferred first-press direction ([ui.startup]
-// default_sort; built-in ascending). Used by the s-key.
 func (m Model) sortByColumnName(name string) (Model, tea.Cmd) {
 	return m.sortByColumnNameDir(name, m.settings.StartupDefaultSortDesc())
 }
 
-// sortByColumnNameDir cycles the active list's sort on the named column:
-// first press → startDesc direction, then flips to the opposite, then
-// clears. startDesc lets callers override the first-press direction — the
-// q-s chord passes true so "sort by Last Modified" starts newest-first,
-// which is what you almost always want, regardless of the global
-// ascending default. Returns model + nil cmd; a no-op (no list / column
-// absent) still returns cleanly.
 func (m Model) sortByColumnNameDir(name string, startDesc bool) (Model, tea.Cmd) {
 	state, _ := m.activeListTable()
 	if state == nil || name == "" {
@@ -606,7 +505,6 @@ func (m Model) sortByColumnNameDir(name string, startDesc bool) (Model, tea.Cmd)
 	return *mm, nil
 }
 
-// sortArrow returns the up/down glyph for a sort direction.
 func sortArrow(desc bool) string {
 	if desc {
 		return "↓"
@@ -637,11 +535,6 @@ func effectiveColCursor(state *uilayout.ListTableState, cols []uilayout.ListColu
 	return target
 }
 
-// handleColSortClear unconditionally clears any active sort. Bound to
-// `S` (capital). Works regardless of column-mode — if you've sorted
-// somewhere and forgot, S always gets you back to the chip's natural
-// order. Same cursor-snap + flash treatment as handleColSort so the
-// reorder is visually obvious.
 func (m Model) handleColSortClear() (Model, bool) {
 	state := (&m).activeListTableState()
 	if state == nil {
@@ -658,41 +551,17 @@ func (m Model) handleColSortClear() (Model, bool) {
 	return *mm, true
 }
 
-// handlePaginateToggle flips the Paginated flag on the active
-// list-table state. Pagination is per-state, so each list remembers
-// whether it's in scroll-mode or paged-mode independently across
-// tab switches. Standard j/k/arrow nav drives both modes; in paged
-// mode the renderer recomputes which page contains the cursor and
-// shows that page (so moving the cursor across the page boundary
-// advances/reverses the page automatically).
-//
-// No-op on surfaces without a list-table state (sidebars, code
-// bodies, dashboards).
 func (m Model) handlePaginateToggle() (Model, bool) {
 	state := (&m).activeListTableState()
 	if state == nil {
 		return m, false
 	}
 	state.Paginated = !state.Paginated
-	// Page is recomputed from cursor on next render, so don't
-	// touch it here. If the cursor is off-screen on the toggle's
-	// first frame, the renderer will jump to whatever page the
-	// cursor is on.
 	return m, true
 }
 
-// handleZenToggle flips the session-global zen mode flag so the user's
-// minimal-view preference follows navigation across surfaces.
-//
-// Per-state Zen is still honoured by the renderer (the OR check in
-// viewImpl) — set programmatically by tests / settings / future
-// per-surface zen-by-default features. The toggle key only moves
-// the master flag.
 func (m Model) handleZenToggle() (Model, bool) {
 	m.zenMode = !m.zenMode
-	// Defensively clear any stale per-state Zen flags so a state
-	// flagged true by an earlier (per-state) toggle doesn't keep
-	// the renderer in zen after the user toggles off.
 	if !m.zenMode {
 		(&m).clearAllZenFlags()
 	}

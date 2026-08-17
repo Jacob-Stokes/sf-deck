@@ -1,22 +1,5 @@
 package sf
 
-// Notifications surface — what the user wants is "everything in the
-// bell" (chatter @-mentions, approvals, shares, custom notifications).
-// Salesforce serves these via TWO different endpoints depending on
-// type, despite both showing up in the same UI bell:
-//
-//   /connect/notifications      — approval requests, shares, custom
-//                                  notifications, "task assigned" pings.
-//                                  Often empty in dev orgs.
-//   /chatter/feeds/news/me/feed-elements
-//                                — chatter posts mentioning you, plus
-//                                  comments on threads you participate
-//                                  in. Where most "bell" items come
-//                                  from in practice.
-//
-// We query both and merge into a single stream sorted by timestamp.
-// Either is allowed to be empty.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -47,8 +30,6 @@ type Notification struct {
 	Image                  string `json:"image"`                  // avatar / icon URL, when SF supplies one
 	AdditionalDataAsString string `json:"additionalDataAsString"` // free-form per-type
 
-	// Synthesized by our chatter-feed parser, not part of the wire
-	// payload directly:
 	ParentID   string `json:"-"`
 	ParentType string `json:"-"`
 }
@@ -127,7 +108,6 @@ func ListNotifications(target string, limit int) (NotificationsList, error) {
 
 	out := NotificationsList{}
 
-	// Source 1: Connect notifications. Approval / share / custom.
 	connectPath := c.APIPath(fmt.Sprintf("connect/notifications?size=%d", limit))
 	if connectBody, err := c.get(connectPath, nil); err == nil {
 		var connect NotificationsList
@@ -158,10 +138,6 @@ func ListNotifications(target string, limit int) (NotificationsList, error) {
 		applog.Error("notifications.feed.fetch", map[string]any{"err": err.Error()})
 	}
 
-	// Final sort by LastModified DESC so the merged list reads as
-	// most-recent-first regardless of which endpoint each item came
-	// from. ISO-8601 strings sort lexicographically the same as
-	// chronologically.
 	sortNotificationsDescByLastModified(out.Notifications)
 
 	applog.Info("notifications.parsed", map[string]any{
@@ -226,10 +202,6 @@ func parseChatterFeed(body []byte) ([]Notification, error) {
 	}
 	out := make([]Notification, 0, len(raw.Elements))
 	for _, e := range raw.Elements {
-		// We surface every feed element — admins want to see what's
-		// happening to records they care about; the chatter feed for
-		// the running user is already filtered to what's relevant.
-		// Compose a sensible body line by joining text segments.
 		text := e.Body.Text
 		if text == "" {
 			var parts []string
@@ -272,9 +244,6 @@ func parseChatterFeed(body []byte) ([]Notification, error) {
 	return out, nil
 }
 
-// joinSegments concatenates message segments with single spaces.
-// Standalone helper so we don't pull strings into this file just for
-// strings.Join — keeps the import surface honest.
 func joinSegments(xs []string) string {
 	out := ""
 	for i, x := range xs {
@@ -286,9 +255,6 @@ func joinSegments(xs []string) string {
 	return out
 }
 
-// sortNotificationsDescByLastModified does an in-place sort of the
-// merged list. Stable so items with identical timestamps preserve
-// their source order (Connect items first, feed items second).
 func sortNotificationsDescByLastModified(ns []Notification) {
 	// Insertion sort — input is small (≤100 items typical) and we
 	// avoid pulling sort into this file's import set.
@@ -337,7 +303,4 @@ func MarkAllNotificationsRead(target string) error {
 	return nil
 }
 
-// notificationsRequestBody is a placeholder for future write paths
-// (mute, snooze) that need a typed body. Kept here so the import of
-// bytes doesn't get ripped out by goimports prematurely.
 var _ = bytes.NewReader

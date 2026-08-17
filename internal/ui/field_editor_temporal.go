@@ -1,12 +1,5 @@
 package ui
 
-// Date / datetime / time editors. Phase 1 keeps the widget simple
-// (textinput buffer) and accepts loose formats — Salesforce's PATCH
-// endpoint parses date strings flexibly. We do a light client-side
-// sanity check on Commit so obvious typos surface locally before the
-// network round-trip; anything Go's time.Parse accepts goes through
-// untouched.
-
 import (
 	"fmt"
 	"strings"
@@ -20,30 +13,18 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// dateEditor accepts ISO 8601 dates (YYYY-MM-DD) and a few loose
-// variants. Salesforce's PATCH accepts ISO; we normalise on Commit.
 type dateEditor struct{}
 
-// datetimeEditor accepts ISO 8601 datetimes (YYYY-MM-DDTHH:MM:SS+ZZ).
-// Most users type org-local time; SF returns the actual stored UTC.
-// We surface a brief hint on the cell to remind them.
 type datetimeEditor struct{}
 
-// booleanEditor handles checkbox fields. Space / "t" / "f" / arrow
-// keys all flip between true and false. The buffer always reads
-// "true" or "false" so the typed value matches what SF expects.
 type booleanEditor struct{}
 
 func init() {
 	registerFieldEditor(&dateEditor{}, "date")
 	registerFieldEditor(&datetimeEditor{}, "datetime")
 	registerFieldEditor(&booleanEditor{}, "boolean")
-	// time-only fields are rare on standard objects; same widget as
-	// date works (loose text format HH:MM:SS).
 	registerFieldEditor(&dateEditor{}, "time")
 }
-
-// ---- dateEditor -----------------------------------------------
 
 func (e *dateEditor) CanEdit(f sf.Field) bool {
 	return f.Updateable && f.CalculatedFormula == "" && !f.AutoNumber
@@ -94,7 +75,6 @@ func (e *dateEditor) Commit(s *EditState) (CommitMode, any, error) {
 		}
 		return CommitNull, nil, nil
 	}
-	// Already-ISO from a previous load is the common case.
 	if t, err := time.Parse("2006-01-02", raw); err == nil {
 		return CommitValue, t.Format("2006-01-02"), nil
 	}
@@ -106,8 +86,6 @@ func (e *dateEditor) Commit(s *EditState) (CommitMode, any, error) {
 	s.Error = "not a date"
 	return CommitNone, nil, fmt.Errorf("not a date")
 }
-
-// ---- datetimeEditor -------------------------------------------
 
 func (e *datetimeEditor) CanEdit(f sf.Field) bool {
 	return f.Updateable && f.CalculatedFormula == "" && !f.AutoNumber
@@ -137,7 +115,6 @@ func (e *datetimeEditor) HandleKey(s *EditState, msg tea.KeyMsg) (bool, tea.Cmd)
 	return handleTextKey(s, msg)
 }
 
-// datetimeZonedLayouts carry an explicit offset (or Z) — parse as-is.
 var datetimeZonedLayouts = []string{
 	"2006-01-02T15:04:05.000Z",
 	"2006-01-02T15:04:05Z",
@@ -165,7 +142,6 @@ func (e *datetimeEditor) Commit(s *EditState) (CommitMode, any, error) {
 		}
 		return CommitNull, nil, nil
 	}
-	// Normalise to the format SF returns + accepts: UTC ISO 8601 with ms.
 	for _, layout := range datetimeZonedLayouts {
 		if t, err := time.Parse(layout, raw); err == nil {
 			return CommitValue, t.UTC().Format("2006-01-02T15:04:05.000Z"), nil
@@ -179,8 +155,6 @@ func (e *datetimeEditor) Commit(s *EditState) (CommitMode, any, error) {
 	s.Error = "not a datetime"
 	return CommitNone, nil, fmt.Errorf("not a datetime")
 }
-
-// ---- booleanEditor --------------------------------------------
 
 func (e *booleanEditor) CanEdit(f sf.Field) bool {
 	return f.Updateable
@@ -242,12 +216,6 @@ func (e *booleanEditor) Commit(s *EditState) (CommitMode, any, error) {
 	return CommitValue, s.Raw == "true", nil
 }
 
-// ---- shared text key handler ----------------------------------
-
-// handleTextKey is the routing helper for the temporal editors —
-// they share textEditor's printable/backspace/clear/space semantics
-// without duplicating the switch. Pulled out so date / datetime /
-// future "loose text" types stay aligned.
 func handleTextKey(s *EditState, msg tea.KeyMsg) (bool, tea.Cmd) {
 	key := msg.String()
 	switch key {

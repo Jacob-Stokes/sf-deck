@@ -13,30 +13,22 @@ func TestTagOf_FiltersNoise(t *testing.T) {
 		in   string
 		want string // "" means filtered out as noise
 	}{
-		// Standard-library noise — always filtered.
 		{"runtime.goexit", ""},
 		{"net/http.(*Client).Do", ""},
 		{"testing.tRunner", ""},
 
-		// main package: the OnCall closure lives in cmd/sf-deck/main.go
-		// as "main.main.func1". Filtering "main." surfaces the real
-		// fetcher above it.
 		{"main.main.func1", ""},
 		{"main.main", ""},
 
-		// usage package self-frames — always filtered.
 		{"github.com/Jacob-Stokes/sf-deck/internal/usage.(*Tracker).Bump", ""},
 		{"github.com/Jacob-Stokes/sf-deck/internal/usage.captureCaller", ""},
 
-		// sf REST transport plumbing — filtered, since these are the
-		// generic verb helpers every call passes through.
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.(*Client).doOnce", ""},
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.(*Client).get", ""},
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.(*Client).post", ""},
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.QueryREST", ""},
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.fireOnCall", ""},
 
-		// Real fetchers / UI helpers — survive as attribution tags.
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.fetchHome", "sf.fetchHome"},
 		{"github.com/Jacob-Stokes/sf-deck/internal/sf.fetchFlowVersions", "sf.fetchFlowVersions"},
 		{"github.com/Jacob-Stokes/sf-deck/internal/ui.ensureActiveUsersChip", "ui.ensureActiveUsersChip"},

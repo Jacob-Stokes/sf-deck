@@ -9,9 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 )
 
-// Per-surface sidebars for dev projects, /recent, and the record-
-// detail drill. Split out of sidebar.go.
-
 func (m Model) sidebarProject(inner int) string {
 	p, ok := m.projectList.Selected()
 	if !ok {
@@ -67,10 +64,6 @@ func (m Model) sidebarRecordDetail(inner int) string {
 		rows = append(rows, kv{"owner id", v})
 	}
 	var extra []string
-	// Cursored FIELD: its full value, wrapped, so long content (JSON,
-	// CSV field lists) that gets truncated with … in the main pane is
-	// fully readable here on scroll. Press i to inspect it in a bigger,
-	// scrollable modal.
 	if fieldName := d.RecordFieldCursor[d.RecordDetailCur]; fieldName != "" {
 		extra = append(extra, "", sideSection("field"))
 		extra = append(extra, sideKV("name", fieldName, inner))
@@ -79,11 +72,6 @@ func (m Model) sidebarRecordDetail(inner int) string {
 			extra = append(extra, sideDim("  (empty)", inner))
 		} else {
 			extra = append(extra, "", sideDim("  "+firstPretty(Keys.InspectPanel)+" for a bigger, scrollable view", inner), "")
-			// Pre-formatted content (pretty-printed JSON) already carries
-			// meaningful newlines + indentation; prose-wrap would collapse
-			// the whitespace and reflow it into a paragraph, destroying the
-			// indent. Use a preserving hard-wrap for multi-line values and
-			// the prose wrap only for single-line text.
 			wrapped := val
 			if strings.Contains(val, "\n") {
 				wrapped = wrapPreserving(val, inner-2)
@@ -106,12 +94,6 @@ func (m Model) sidebarRecordDetail(inner int) string {
 		devproject.KindRecord, sobject+":"+id, o.Username, rows, extra...)
 }
 
-// cursoredRecordFieldValue returns the display value + field name for the
-// field under the cursor on TabRecordDetail, or ("","",false) when not on
-// a record drill / no field cursored / empty value. Used by the yank menu
-// to offer "copy the field's value" (the full content, not the URL). The
-// value is the RAW field content (not pretty-printed) so a paste round-
-// trips faithfully.
 func (m Model) cursoredRecordFieldValue() (value, name string, ok bool) {
 	if m.tab() != TabRecordDetail {
 		return "", "", false
@@ -149,12 +131,6 @@ func (m Model) cursoredRecordFieldValue() (value, name string, ok bool) {
 	}
 }
 
-// wrapPreserving hard-wraps only lines longer than width, keeping every
-// existing newline and each line's leading indentation. Unlike wrap()
-// (which reflows words and eats leading whitespace — a prose wrapper),
-// this is for pre-formatted content like pretty-printed JSON where the
-// indentation IS the meaning. A wrapped continuation is indented to
-// match its source line so nested structure stays visually aligned.
 func wrapPreserving(s string, width int) string {
 	if width <= 0 {
 		return s
@@ -165,7 +141,6 @@ func wrapPreserving(s string, width int) string {
 			out = append(out, line)
 			continue
 		}
-		// Preserve the line's own leading indent on continuations.
 		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
 		r := []rune(line)
 		out = append(out, string(r[:width]))
@@ -186,12 +161,6 @@ func wrapPreserving(s string, width int) string {
 	return strings.Join(out, "\n")
 }
 
-// recordFieldDisplayValue coerces a record field value (from the record
-// JSON map — string, number, bool, or a nested object/array) into a
-// display string for the sidebar / inspect modal. A string whose content
-// is itself valid JSON (common for *_JSON__c text fields that stash a
-// serialised blob) is detected and pretty-printed rather than shown as
-// one long line.
 func recordFieldDisplayValue(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -209,12 +178,6 @@ func recordFieldDisplayValue(v any) string {
 	}
 }
 
-// prettyJSONString reports whether s is (whitespace-trimmed) a JSON
-// object or array and, if so, returns it re-indented. Only objects/
-// arrays qualify — a bare number/quoted-string/bool is valid JSON too
-// but formatting it adds nothing and would wrongly reformat ordinary
-// text that merely parses (e.g. "123" or "true"). Returns ("", false)
-// when s isn't a JSON container.
 func prettyJSONString(s string) (string, bool) {
 	t := strings.TrimSpace(s)
 	if len(t) < 2 || (t[0] != '{' && t[0] != '[') {
@@ -325,10 +288,6 @@ func (m Model) sidebarDevProjectDetail(inner int) string {
 	return renderKVPanel(inner, p.Name, rows, extra...)
 }
 
-// devProjectKindHasID reports whether the given kind's Ref slot
-// holds a true Salesforce Id (or local sf-deck id) versus a
-// compound / api-name-only reference. Drives whether the sidebar
-// labels the value as "id" (canonical) or "ref" (composite).
 func devProjectKindHasID(k devproject.ItemKind) bool {
 	switch k {
 	case devproject.KindSObject, devproject.KindField:

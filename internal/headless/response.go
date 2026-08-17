@@ -1,20 +1,6 @@
 // Package headless is the wire contract for sf-deck's CLI / agent
 // surface — the JSON envelope, error codes, and exit-code policy
 // every headless command renders into.
-//
-// No command implementations live here. Domain logic for chips,
-// records, projects, etc. belongs in internal/services/<X> packages
-// (added in later phases of docs/headless-mode-plan.md). headless
-// just owns the shape every command's output takes.
-//
-// The shape is fixed because:
-//
-//   - agent / skill code parses it
-//   - shell scripts read .ok / .data / .error.code fields
-//   - exit codes drive CI / script behaviour without re-parsing JSON
-//
-// Adding a new field is OK as long as it's optional (nil/empty).
-// Removing or renaming a field is a contract break.
 package headless
 
 import (
@@ -27,24 +13,12 @@ import (
 // Response is the standard envelope every headless command renders.
 // Mirrors the shape documented in docs/headless-mode-plan.md.
 type Response struct {
-	// OK is the success flag. False when Error is non-nil.
 	OK bool `json:"ok"`
 
-	// Command is the verb that produced this response (e.g.
-	// "chip.create", "record.update"). Helps agents correlate
-	// stdout output with the request they issued, and helps logs
-	// stay scannable.
 	Command string `json:"command"`
 
-	// Org is the target org's alias-or-username (whichever the
-	// caller passed via --org). Empty when the command isn't
-	// org-scoped (e.g. tag CRUD).
 	Org string `json:"org,omitempty"`
 
-	// Target is the value passed to sf -o (alias preferred, falls
-	// back to username). Mirrors Org for now but kept separate so
-	// future routing can disambiguate when alias resolution gets
-	// more complex.
 	Target string `json:"target,omitempty"`
 
 	// Changed reports whether the command mutated any state.
@@ -53,27 +27,17 @@ type Response struct {
 	// surface a "changed N items" line based on this.
 	Changed bool `json:"changed,omitempty"`
 
-	// Warnings is a list of non-fatal advisories. Skills may
-	// surface them; scripts can ignore.
 	Warnings []string `json:"warnings,omitempty"`
 
-	// Data is the command-specific payload. Shape varies per
-	// command; each service package documents its own.
 	Data any `json:"data,omitempty"`
 
-	// Error is set when OK is false. Carries a typed code so
-	// callers can branch without string-matching the message.
 	Error *Error `json:"error,omitempty"`
 }
 
 // Error is the typed failure envelope.
 type Error struct {
-	// Code is the machine-readable error tag. Stable across versions
-	// — callers branch on this, not on Message.
 	Code string `json:"code"`
 
-	// Message is the human-readable summary. Format is free-form;
-	// agents should display verbatim.
 	Message string `json:"message"`
 
 	// Details carries structured context (the required safety

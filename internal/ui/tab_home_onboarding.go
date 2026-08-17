@@ -1,19 +1,5 @@
 package ui
 
-// Empty-state / first-launch onboarding for /home.
-//
-// Two branches:
-//
-//   - `sf` binary missing on $PATH — show install instructions.
-//     Detected via errors.Is(m.orgsRes.Err(), sf.ErrSFNotFound).
-//   - `sf` present, no orgs connected — show login instructions.
-//
-// Renders centered with a generous top margin so the panel reads
-// as "welcome, here's the next step" rather than buried text in a
-// dense table. No interactive UI here; the user follows the
-// instructions and re-launches (or the existing add-org modal at
-// `'` does the work without leaving sf-deck).
-
 import (
 	"errors"
 	"strings"
@@ -76,7 +62,6 @@ func (m Model) renderHomeOnboarding(inner, budget int) string {
 			mutedStyle.Render("   ·   Quit: ") + cmdStyle.Render("Ctrl+C"),
 	}
 
-	// Compose centered.
 	lines := []string{
 		"",
 		"",
@@ -91,8 +76,6 @@ func (m Model) renderHomeOnboarding(inner, budget int) string {
 		lines = append(lines, centerOnboardingLine(h, inner))
 	}
 
-	// Pad to fill the vertical budget so the centered block reads as
-	// a real panel rather than collapsing to the top of an empty pane.
 	for len(lines) < budget {
 		lines = append(lines, "")
 	}
@@ -102,20 +85,10 @@ func (m Model) renderHomeOnboarding(inner, budget int) string {
 	return strings.Join(lines, "\n")
 }
 
-// noOrgPlaceholder is the shared empty-state line every non-/home
-// tab renders when no org is connected. It points the user back to
-// /home where renderHomeOnboarding lives, so the welcome panel is
-// the one place that owns the install-or-login messaging.
-//
-// One helper means future copy changes touch one file instead of
-// twenty.
 func noOrgPlaceholder() string {
 	return theme.Subtle.Render("  No orgs connected. Press 1 for Home to set one up.")
 }
 
-// centerOnboardingLine prepends padding so `s` (after stripping ANSI) sits
-// roughly in the middle of an `inner`-wide column. lipgloss.Width
-// handles ANSI escape sequences correctly.
 func centerOnboardingLine(s string, inner int) string {
 	w := lipgloss.Width(s)
 	if w >= inner {

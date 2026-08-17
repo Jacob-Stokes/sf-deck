@@ -14,11 +14,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// newSOQLTestApp builds an app with a single fake org. The actual
-// query against Salesforce is mocked at the boundary: sf.Query goes
-// through RESTClient → falls back to runSF, both of which would fail
-// in tests. These tests cover the *parser* and the *error-mapping*
-// layers, not the network call.
 func newSOQLTestApp() *app.App {
 	return &app.App{
 		Settings: &settings.Settings{},
@@ -122,7 +117,6 @@ func TestResolveSOQL_BothRejected(t *testing.T) {
 }
 
 func TestResolveSOQL_EmptyOK(t *testing.T) {
-	// Both empty returns "" + nil — caller decides what to do.
 	got, err := resolveSOQL("", "")
 	if err != nil || got != "" {
 		t.Errorf("got=%q err=%v", got, err)
@@ -169,8 +163,6 @@ func TestSOQLRun_UnknownVerb(t *testing.T) {
 
 func TestSOQLRun_DefaultsToRunVerb(t *testing.T) {
 	a := newSOQLTestApp()
-	// No verb + no query → should hit `run` verb's missing-query
-	// branch, not "unknown verb".
 	code, got := runSOQLCLI(t, a, "--json", "soql", "--org", "dev")
 	if code != headless.ExitInvalidArg {
 		t.Errorf("exit = %d", code)
@@ -180,7 +172,6 @@ func TestSOQLRun_DefaultsToRunVerb(t *testing.T) {
 	}
 }
 
-// errSimple is a tiny error type for the writeSOQLErr table test.
 type errSimple string
 
 func (e errSimple) Error() string { return string(e) }

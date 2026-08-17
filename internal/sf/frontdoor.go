@@ -1,19 +1,6 @@
 package sf
 
 // frontdoor.jsp session bridge.
-//
-// The Analytics REST API is JSON-only and capped at 2000 detail rows;
-// the only "give me the full xlsx" endpoint Salesforce ships is the
-// classic export URL (<instance>/<reportId>?export=1&xf=xlsx). That
-// URL authenticates by UI session cookie, not Bearer token. frontdoor
-// is the SF-blessed bridge: POST your access token as `sid` and SF
-// hands back a `Set-Cookie: sid=<permanent>` we can use on the next
-// hop.
-//
-// Requires the connected app's OAuth scopes to include `web` (or
-// `full`). sf-cli's default `sf org login web` flow has it; pure-JWT
-// or `api`-only apps won't, and this path will return the login page
-// instead. classicExportViaFrontdoor surfaces that as a clearer error.
 
 import (
 	"fmt"
@@ -41,10 +28,6 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cookie jar: %w", err)
 	}
-	// Don't auto-follow — frontdoor's 302 carries the Set-Cookie we need;
-	// once the cookies are in the jar we issue the export request
-	// directly. CheckRedirect returning ErrUseLastResponse stops at the
-	// first redirect without erroring.
 	httpc := &http.Client{
 		Timeout: c.http.Timeout,
 		Jar:     jar,
@@ -79,7 +62,6 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 		applog.Error("frontdoor.post", map[string]any{"err": err.Error()})
 		return nil, fmt.Errorf("frontdoor POST: %w", err)
 	}
-	// Read the body (small; just for diagnostics) before closing.
 	var fdBody []byte
 	if resp.Body != nil {
 		fdBody, _ = io.ReadAll(resp.Body)
@@ -94,12 +76,8 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 		"content_type":       resp.Header.Get("Content-Type"),
 		"bytes":              len(fdBody),
 	})
-	// Frontdoor's success path is 302; an unauthenticated/missing-scope
-	// response is 200 + login HTML. Also accept 303/307 just in case
-	// SF changes behaviour.
 	switch resp.StatusCode {
 	case http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusOK:
-		// Continue.
 	default:
 		applog.Dump([]string{"frontdoor", "unexpected", fmt.Sprintf("%d", resp.StatusCode)},
 			"html", fdBody)
@@ -115,10 +93,6 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 		return nil, fmt.Errorf("frontdoor didn't return a session cookie — the connected app's OAuth scopes likely don't include 'web'. sf org login web typically grants it; api-only or jwt-only apps won't")
 	}
 
-	// Step 2: follow the frontdoor redirect chain ourselves so we can
-	// see every hop (frontdoor often issues 2-3 redirects under
-	// Lightning, each setting another cookie). Use the jar throughout.
-	// Allow auto-follow this time.
 	httpc.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 {
 			return fmt.Errorf("too many redirects")
@@ -164,8 +138,6 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 		dump := applog.Dump([]string{"export", "http-error"}, "bin", body)
 		return nil, fmt.Errorf("export HTTP %d (Content-Type %s, dump: %s)", gresp.StatusCode, ct, dump)
 	}
-	// Sanity check the body — xlsx is a zip ("PK"); HTML means we
-	// somehow ended up at a login page anyway.
 	if len(body) < 2 || body[0] != 'P' || body[1] != 'K' {
 		ext := "bin"
 		if strings.Contains(ct, "html") {
@@ -192,24 +164,14 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 	return body, nil
 }
 
-// isVerificationChallenge reports whether the response is SF's identity
-// verification page (the "We need to verify your identity" challenge
-// shown for unrecognized devices). The page is HTML that redirects to
-// /_ui/identity/verification/policy/VerificationStartUi — both the body
-// and the final URL carry that path.
 func isVerificationChallenge(body []byte, finalURL string) bool {
 	if strings.Contains(finalURL, "/_ui/identity/verification/") {
 		return true
 	}
-	// Body may be the redirect-shim HTML rather than the final page.
 	return strings.Contains(string(body), "VerificationStartUi") ||
 		strings.Contains(string(body), "/_ui/identity/verification/")
 }
 
-// jarHasSession reports whether the cookie jar contains an sid cookie
-// for the instance host. The SF cookie domain is the instance hostname,
-// not the org's My Domain — http.cookiejar returns cookies the next
-// request to that URL would carry, which is exactly what we want.
 func jarHasSession(jar *cookiejar.Jar, base string) bool {
 	u, err := url.Parse(base)
 	if err != nil {

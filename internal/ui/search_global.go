@@ -1,29 +1,5 @@
 package ui
 
-// Global search modal — a Force-Navigator-style "start typing to jump
-// anywhere" overlay.
-//
-// Opens on ctrl+k (configurable via Keys.GlobalSearch). Indexes what's
-// currently loaded for the active org: sObject list (always cached),
-// per-sobject fields (cached after the user visits an object), flows,
-// validation rules, record types, and triggers (cached after their
-// subtabs load).
-//
-// Each match is typed so the result row shows what it is:
-//   [object]      Account
-//   [field]       Account.Name
-//   [validation]  Account / Required_Region
-//   [trigger]     Account / AccountTrigger
-//   [flow]        MyFlow
-//
-// Enter drills to that entity's normal view (the same tab + drill-in
-// path used outside of search).
-//
-// Tab on an object-scoped result pushes it as a search scope: results
-// from then on are restricted to children of that scope. The scope
-// chain renders as breadcrumbs above the input, e.g.
-// "All > Account >". Esc peels one scope level; esc at root closes.
-
 import (
 	"fmt"
 	"image/color"
@@ -54,10 +30,6 @@ import (
 // scoreEntry's match weights would be confusing.
 const recentBoostMax = 1.5
 
-// recentBoostFor returns a decayed boost — fresh visits get the
-// full recentBoostMax, older ones decay linearly to 0 over
-// `decayWindow`. Caller computes decayWindow from
-// settings.RecentBoostDecayHours().
 func recentBoostFor(visitedAt time.Time, decayWindow time.Duration) float64 {
 	age := time.Since(visitedAt)
 	if age <= 0 {
@@ -70,9 +42,6 @@ func recentBoostFor(visitedAt time.Time, decayWindow time.Duration) float64 {
 	return recentBoostMax * frac
 }
 
-// globalSearchKind names one result category. Drives the badge label
-// that appears on every row and gates which scope pushes are
-// meaningful (only objects/flows can be scoped into).
 type globalSearchKind string
 
 const (
@@ -95,18 +64,9 @@ const (
 	gsKindRecent      globalSearchKind = "recent"
 	gsKindDevProject  globalSearchKind = "dev_project"
 	gsKindTag         globalSearchKind = "tag"
-	// gsKindRecord is the badge for hits coming from records mode
-	// (live SOSL search across the org).  Sobject API name lives
-	// in entry.Secondary so the modal row reads:
-	//   [record]  Acme Corp                       Account
-	gsKindRecord globalSearchKind = "record"
+	gsKindRecord      globalSearchKind = "record"
 )
 
-// globalSearchMode selects how globalSearchState.hits is populated:
-// the local fuzzy index (metadata mode, default) or a live SOSL
-// query against the active org (records mode).  Toggled by
-// Keys.SearchToggleMode while the modal is open.  See
-// docs/global-record-search-plan.md.
 type globalSearchMode int
 
 const (
@@ -122,12 +82,6 @@ func (m globalSearchMode) String() string {
 	return "metadata"
 }
 
-// globalSearchEntry is one searchable thing in the index. `Key` is
-// what we match against — the caller folds lowercased name / label /
-// apiname into it.  `Enter` is called when the user presses enter;
-// it typically mutates the Model and returns a tea.Cmd to kick a
-// navigation. `ScopeInto`, when non-nil, installs a new scope layer
-// when the user presses Tab on this entry.
 type globalSearchEntry struct {
 	Kind      globalSearchKind
 	Label     string // primary display label
@@ -136,80 +90,39 @@ type globalSearchEntry struct {
 	Enter     func(m *Model) tea.Cmd
 	ScopeInto *globalSearchScope // non-nil for drill-in-capable rows
 
-	// Openable wraps the underlying sf domain type so ctrl+o on
-	// the row pops the same open-menu the row would show when
-	// cursored elsewhere in the app. The shape is defined ONCE per
-	// type via sf.Openable.Targets() in internal/sf/openable.go;
-	// global search just exposes the existing destination set
-	// rather than declaring its own. Nil = ctrl+o is a no-op on
-	// this row (synthetic entries like the "[recent]" header).
 	Openable sf.Openable
 
-	// RefKind + Ref identify the underlying domain item so the row
-	// can pull tag / project bindings via the devproject store. Same
-	// (Kind, Ref) shape that the tag picker + sidebar pills use, so
-	// a Tag applied via t lands consistently on the search row.
-	// Empty = no tag/project lookup (e.g. for a "[recent]" entry
-	// whose ref is implicit).
 	RefKind devproject.ItemKind
 	Ref     string
 
-	// Tags + Projects are the resolved bindings, populated once at
-	// index-build time so per-row render is a no-store-call render
-	// of pre-cached strings. Empty slices = unbound or store
-	// unavailable.
 	Tags     []devproject.Tag
 	Projects []devproject.DevProject
 
-	// Boost is a silent score-bump applied at rank time. Used by the
-	// post-build pass to push entries the user is likely working on
-	// right now (loaded-project members, recently-visited records)
-	// to the top of relevant matches, without surfacing an explicit
-	// "Recents" or "In project" header in the modal. Zero = no
-	// boost; multiple sources stack.
 	Boost float64
 }
 
-// globalSearchScope describes one level of restriction applied to the
-// search space. A chain of these narrows what the index emits.
 type globalSearchScope struct {
 	Kind  globalSearchKind // object or flow, today
 	Key   string           // the scope's identifier (sobject api name, flow dev name)
 	Label string           // display label in the breadcrumb
 }
 
-// globalSearchHit is a scored result row ready for rendering.
 type globalSearchHit struct {
 	Entry globalSearchEntry
 	Score float64
 }
 
-// globalSearchState is the active modal. Scope chain + input widget +
-// scored hits + cursor. Nil on m.globalSearch = not visible.
 type globalSearchState struct {
 	input  textinput.Model
 	scopes []globalSearchScope
 	hits   []globalSearchHit
 	cursor int
-	// cached index for the current scope chain. Rebuilt when scopes
-	// change; filtered on every keystroke.
-	index []globalSearchEntry
+	index  []globalSearchEntry
 
-	// urlMode is non-nil when the current input parses as a Salesforce
-	// URL or bare Id. Enter then jumps to the parsed resource instead
-	// of opening the cursored search hit. Recomputed on every keystroke
-	// in handleGlobalSearchKey.
 	urlMode *globalSearchURL
 
-	// mode selects how hits is populated.  Default = metadata (local
-	// index, instant).  Records mode = live SOSL against the active
-	// org.  Toggled in-modal by Keys.SearchToggleMode.
 	mode globalSearchMode
 
-	// recordsLastTerm caches the last term records-mode queried with
-	// so the modal doesn't re-fire SOSL when the user moves the
-	// cursor or toggles back into records mode without changing the
-	// term.  Empty when no records query has happened yet.
 	recordsLastTerm string
 
 	// recordsDebounceGen increments on every keystroke in records
@@ -220,28 +133,14 @@ type globalSearchState struct {
 	// cancellable timers.
 	recordsDebounceGen uint64
 
-	// recordsCache memoises (term → hits) for the current session.
-	// Cursor moves and mode toggles within the same term reuse the
-	// cached slice.  Cleared on modal close + on org switch (the
-	// modal lives on Model so org changes wipe state implicitly).
 	recordsCache map[string][]globalSearchHit
 
-	// recordsLoading flags an in-flight SOSL fetch so the renderer
-	// can show a "searching…" hint.  Cleared when the result lands.
 	recordsLoading bool
 
-	// recordsErr captures the most recent SOSL failure so the
-	// renderer can surface it instead of silently showing zero
-	// hits.  Cleared on each new fetch attempt.
 	recordsErr error
 }
 
-// globalSearchURL is the resolved-paste state for the URL/Id detection
-// path. nil → fuzzy search; non-nil → render a recognition pill and
-// dispatch its Enter on enter.
 type globalSearchURL struct {
-	// Label is what the recognition pill shows ("RECORD · Account" or
-	// "FLOW" or "UNKNOWN ID 0011…").
 	Label string
 	// Enter is the navigation closure. Non-nil when the parser
 	// resolved to a kind sf-deck can navigate to. Nil when we
@@ -251,15 +150,6 @@ type globalSearchURL struct {
 	Enter func(m *Model) tea.Cmd
 }
 
-// openGlobalSearch installs a fresh modal at the root scope.
-//
-// Also kicks the underlying Resources (sObjects + Flows for the
-// active org) so a cold-launched user typing into ctrl+space sees
-// real entries appear as the data lands. Without this, the index
-// builds from whatever happens to be cached at modal-open time —
-// often empty after a fresh start. The rebuild-on-resource-update
-// hook (see globalSearchRebuildOnResourceUpdate) populates the
-// modal as ensures resolve.
 func (m *Model) openGlobalSearch() tea.Cmd {
 	ti := textinput.New()
 	ti.Prompt = ""
@@ -272,8 +162,6 @@ func (m *Model) openGlobalSearch() tea.Cmd {
 		input:  ti,
 		scopes: nil,
 	}
-	// Default mode is user-configurable ([ui.startup] global_search_mode);
-	// built-in default is metadata (local index).
 	if m.settings.StartupGlobalSearchRecordsMode() {
 		s.mode = gsModeRecords
 	}
@@ -320,8 +208,6 @@ func (m *Model) warmGlobalSearchResources(d *orgData) []tea.Cmd {
 	}
 }
 
-// renderGlobalSearch draws the modal — breadcrumb, input, result
-// list. Layout mirrors the other overlays (info/edit/choice).
 func (m Model) renderGlobalSearch() string {
 	if m.globalSearch == nil {
 		return ""
@@ -364,9 +250,6 @@ func (m Model) renderGlobalSearch() string {
 	if maxShown < 5 {
 		maxShown = 5
 	}
-	// Absolute cap to keep the list scannable on huge terminals;
-	// users with > 40 visible rows should refine the query rather
-	// than drown.
 	if rowCap := m.settings.LayoutGlobalSearchRows(); maxShown > rowCap {
 		maxShown = rowCap
 	}
@@ -376,7 +259,6 @@ func (m Model) renderGlobalSearch() string {
 	tagsW := 28
 	projectsW := 20
 	if inner < 80 {
-		// Tiny modal: shrink the right side, give label more room.
 		tagsW = 16
 		projectsW = 12
 	}
@@ -386,10 +268,6 @@ func (m Model) renderGlobalSearch() string {
 	}
 
 	var lines []string
-	// Title sits in the body (above the mode label) so the modal
-	// matches the other overlays' visual rhythm. The mode label + toggle
-	// hint stays as a separate body line so it tracks state (search
-	// count, error, etc.).
 	titleStyle := lipgloss.NewStyle().Foreground(theme.Yellow).Bold(true)
 	lines = append(lines, titleStyle.Render("global search"))
 	modeLabel := s.mode.String()
@@ -409,9 +287,6 @@ func (m Model) renderGlobalSearch() string {
 	}
 	lines = append(lines, strings.Join(headerParts, ""))
 
-	// Scope breadcrumb line — "All > Account >".  Append a "fetching…"
-	// tag when any scope-in Ensure is in flight so the user knows more
-	// results are on the way.
 	scopeLine := renderGlobalSearchScope(s, inner)
 	if m.globalSearchBusy() {
 		scopeLine += "  " + lipgloss.NewStyle().
@@ -419,15 +294,12 @@ func (m Model) renderGlobalSearch() string {
 	}
 	lines = append(lines, scopeLine)
 
-	// Input. Size to inner so cursor scrolls if the query gets long.
 	inputW := inner - 4
 	if inputW < 10 {
 		inputW = 10
 	}
 	s.input.SetWidth(inputW)
 	lines = append(lines, "  "+lipgloss.NewStyle().Foreground(theme.BorderHi).Render("> ")+s.input.View())
-	// URL/Id recognition pill, or a blank gap when no detection. Same
-	// height either way so the modal's chrome count stays fixed.
 	if s.urlMode != nil {
 		pillStyle := lipgloss.NewStyle().Foreground(theme.Bg).
 			Background(theme.Cyan).Bold(true).Padding(0, 1)
@@ -442,18 +314,10 @@ func (m Model) renderGlobalSearch() string {
 		lines = append(lines, "")
 	}
 
-	// Render exactly maxShown result rows so the modal's height
-	// doesn't jump as the user types and the result count changes.
-	// Empty rows pad to the bottom; the "no matches" row sits in the
-	// first slot so the user sees feedback at the same eye line.
 	rendered := 0
 	overflowLine := ""
 	switch {
 	case s.urlMode != nil:
-		// URL/Id paste: the recognition pill above IS the result.
-		// Show a subtle confirmation line in the results area instead
-		// of "(no matches)" — pressing Enter is what the user wants
-		// here, not refining the query.
 		hint := "  press ↵ to open"
 		if s.urlMode.Enter == nil {
 			hint = "  recognised but not navigable — refine the query to fuzzy-search instead"
@@ -461,11 +325,6 @@ func (m Model) renderGlobalSearch() string {
 		lines = append(lines, theme.Subtle.Render(hint))
 		rendered = 1
 	case s.mode == gsModeRecords && s.recordsErr != nil:
-		// Records-mode SOSL failure — surface the SF error text so
-		// the user can tell what went wrong (typically one of the
-		// requested sObjects isn't present in this org).  Without
-		// this the modal just shows "(no matches)" which is wrong
-		// AND undiagnosable.
 		errStyle := lipgloss.NewStyle().Foreground(theme.Red)
 		lines = append(lines, "  "+errStyle.Render(s.recordsErr.Error()))
 		rendered = 1
@@ -530,9 +389,6 @@ func (m Model) renderGlobalSearch() string {
 	lines = append(lines,
 		lipgloss.NewStyle().Foreground(theme.FgDim).Render(hint))
 
-	// Double border distinguishes global search from the other
-	// overlays (info/edit/choice) at a glance — it's the "search
-	// anywhere" surface so it earns a stronger frame.
 	return lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(theme.BorderHi).
@@ -541,8 +397,6 @@ func (m Model) renderGlobalSearch() string {
 		Render(strings.Join(lines, "\n"))
 }
 
-// renderGlobalSearchScope draws the scope breadcrumb — "All > X > Y >".
-// Dims "All" and separators so the active scope name reads.
 func renderGlobalSearchScope(s *globalSearchState, inner int) string {
 	dim := lipgloss.NewStyle().Foreground(theme.FgDim)
 	scope := lipgloss.NewStyle().Foreground(theme.Cyan).Bold(true)
@@ -575,18 +429,14 @@ func renderGlobalSearchRow(e globalSearchEntry, selected bool, inner, labelW, ta
 		labelStyle = labelStyle.Bold(true)
 	}
 
-	// LEFT column: badge + label (+ secondary if it fits).
 	leftCol := prefix + badge + " " + labelStyle.Render(e.Label)
 	if e.Secondary != "" {
 		leftCol += "  " + secondaryStyle.Render(e.Secondary)
 	}
 	leftCol = padOrTrunc(leftCol, labelW)
 
-	// MIDDLE column: tag pills, space-joined, truncated to tagsW.
 	tagCol := joinTruncated(tagPillSlice(e.Tags), tagsW)
 
-	// RIGHT column: project pills, space-joined, truncated to
-	// projectsW.
 	projParts := make([]string, 0, len(e.Projects))
 	for _, p := range e.Projects {
 		projParts = append(projParts, lipgloss.NewStyle().
@@ -598,8 +448,6 @@ func renderGlobalSearchRow(e globalSearchEntry, selected bool, inner, labelW, ta
 	}
 	projCol := joinTruncated(projParts, projectsW)
 
-	// Total = labelW + 2 + tagsW + 2 + projectsW + (any rounding
-	// slack) ≤ inner. Trim trailing whitespace defensively.
 	row := leftCol + "  " + tagCol + "  " + projCol
 	if w := lipgloss.Width(row); w > inner {
 		// Last-resort truncation; should never fire if the column
@@ -610,10 +458,6 @@ func renderGlobalSearchRow(e globalSearchEntry, selected bool, inner, labelW, ta
 	return row
 }
 
-// tagPillSlice renders the tag list as a slice of styled pill
-// strings (one per tag). Distinct from renderTagPills (which
-// space-joins them into a single string) — this caller wants the
-// granularity to truncate the LAST pill cleanly.
 func tagPillSlice(tags []devproject.Tag) []string {
 	out := make([]string, 0, len(tags))
 	for _, t := range tags {
@@ -622,20 +466,15 @@ func tagPillSlice(tags []devproject.Tag) []string {
 	return out
 }
 
-// joinTruncated joins parts with a single space and truncates the
-// result to width cells with a "…" suffix. Returns the original
-// joined string padded to width if it fits.
 func joinTruncated(parts []string, width int) string {
 	joined := strings.Join(parts, " ")
 	w := lipgloss.Width(joined)
 	if w <= width {
-		// Pad on the right.
 		if w < width {
 			joined += strings.Repeat(" ", width-w)
 		}
 		return joined
 	}
-	// Drop parts from the end until it fits, with "…" suffix.
 	for keep := len(parts) - 1; keep >= 0; keep-- {
 		candidate := strings.Join(parts[:keep], " ")
 		if keep < len(parts) {
@@ -650,12 +489,9 @@ func joinTruncated(parts []string, width int) string {
 			return candidate
 		}
 	}
-	// Even zero parts + "…" doesn't fit — empty pad.
 	return strings.Repeat(" ", width)
 }
 
-// padOrTrunc pads a styled string to exactly width cells, or
-// truncates with a "…" suffix when too wide.
 func padOrTrunc(s string, width int) string {
 	w := lipgloss.Width(s)
 	if w == width {
@@ -667,9 +503,6 @@ func padOrTrunc(s string, width int) string {
 	return ansi.Truncate(s, width, "…")
 }
 
-// renderKindBadge is a small color-coded "[kind]" tag. Fixed-width so
-// labels align vertically across rows. Width fits the longest kind
-// name we emit ("[public_group]" = 14 chars).
 func renderKindBadge(k globalSearchKind) string {
 	var c color.Color
 	switch k {
@@ -706,18 +539,12 @@ func renderKindBadge(k globalSearchKind) string {
 	return lipgloss.NewStyle().Foreground(c).Render(label)
 }
 
-// recordsSearchResultMsg carries the result of a records-mode SOSL
-// fetch back to the modal.  Includes the term that was queried so
-// late-arriving results don't overwrite hits from a newer term.
 type recordsSearchResultMsg struct {
 	term string
 	hits []sf.GlobalSearchHit
 	err  error
 }
 
-// recordsDebounceTickMsg is the tick callback for the records-mode
-// debounce.  Carries the generation it was scheduled under so stale
-// ticks (newer keystrokes since) discard themselves.
 type recordsDebounceTickMsg struct {
 	gen uint64
 }
@@ -727,10 +554,6 @@ type recordsDebounceTickMsg struct {
 // short enough that a deliberate keystroke feels immediate.
 const recordsSearchDebounce = 200 * time.Millisecond
 
-// handleGlobalSearchKey is the reducer for the modal while it's open.
-// Special keys: esc (peel scope / close), enter (open), tab (scope
-// in), up/down (cursor), Keys.SearchToggleMode (metadata/records
-// flip). Everything else goes to the textinput.
 func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.globalSearch == nil {
 		return m, nil
@@ -743,42 +566,28 @@ func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			s.mode = gsModeMetadata
 		}
 		s.cursor = 0
-		// Re-resolve hits for the new mode.  Metadata mode uses the
-		// existing local index; records mode either re-uses cached
-		// hits for the current term or kicks a fresh SOSL.
 		s.urlMode = nil
 		if s.mode == gsModeMetadata {
 			s.hits = rankGlobalSearch(s.index, s.input.Value())
 			return m, nil
 		}
-		// Records mode: clear local hits so the modal doesn't
-		// briefly show metadata hits while SOSL is in flight.
 		s.hits = nil
 		s.recordsErr = nil
 		term := strings.TrimSpace(s.input.Value())
 		if len(term) < 2 {
-			// Empty / very short term: show recently-visited records
-			// as warm-up suggestions.  Costs zero API calls and
-			// matches user intent ("things I was just working on")
-			// without waiting for them to type.
 			s.hits = m.recordsWarmupHits()
 			return m, nil
 		}
-		// Cache hit — reuse without another SOSL.
 		if hits, ok := s.recordsCache[term]; ok {
 			s.hits = hits
 			s.recordsLastTerm = term
 			s.recordsLoading = false
 			return m, nil
 		}
-		// Toggling into records is an explicit user action — fire
-		// the SOSL immediately rather than waiting for the
-		// keystroke-debounce window.
 		return m, m.startRecordsSearch(term)
 	}
 	switch msg.String() {
 	case "esc":
-		// Peel one scope level; at root, close.
 		if len(s.scopes) == 0 {
 			m.globalSearch = nil
 			return m, nil
@@ -792,16 +601,6 @@ func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.globalSearch = nil
 		return m, nil
 	case "ctrl+o":
-		// Surface the cursored hit's standard open menu without
-		// leaving global search. The menu is built from the row's
-		// Openable (populated at index-build time); rows whose
-		// underlying type doesn't implement Openable are no-ops.
-		//
-		// Hide global search while the open menu is up so the user
-		// sees a single focused overlay (esc on the open menu
-		// restores the search state verbatim — input value, scope
-		// chain, cursor position — so the user resumes where they
-		// were).
 		if len(s.hits) == 0 {
 			return m, nil
 		}
@@ -831,13 +630,6 @@ func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
-		// URL/Id pre-empts the fuzzy-search Enter path: if the input
-		// parsed as a Salesforce URL or bare Id, jump straight to
-		// the recognised resource. Falls through to the normal hit
-		// path when there's no urlMode or its Enter is nil
-		// (recognised-but-not-routable, e.g. a setup page sf-deck
-		// doesn't model — let the user refine instead of silently
-		// no-op'ing).
 		if s.urlMode != nil && s.urlMode.Enter != nil {
 			cmd := s.urlMode.Enter(&m)
 			m.globalSearch = nil
@@ -865,10 +657,6 @@ func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		s.index = m.buildGlobalSearchIndex(s.scopes)
 		s.hits = rankGlobalSearch(s.index, "")
 		s.cursor = 0
-		// Lazily kick Ensure* for un-cached children so the index
-		// fills without the user having to visit each subtab. Returns
-		// cmds for Bubble Tea to schedule; applyResourceMsg will
-		// re-rebuild our index when each resource lands.
 		return m, m.kickScopeInFetches(*entry.ScopeInto)
 	case "up":
 		if s.cursor > 0 {
@@ -887,29 +675,19 @@ func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	s.input = newInput
 	if s.input.Value() != before {
 		s.cursor = 0
-		// URL/Id detection runs in both modes — pasting a Salesforce
-		// URL or bare Id is a valid shortcut even from records mode.
 		s.urlMode = recognizeURL(s.input.Value())
 		if s.mode == gsModeRecords {
 			term := strings.TrimSpace(s.input.Value())
 			if len(term) < 2 {
-				// Too short to be useful for SOSL; fall back to the
-				// warm-up suggestions (recently-visited records)
-				// rather than an empty list.
 				s.hits = m.recordsWarmupHits()
 				s.recordsErr = nil
 				s.recordsLoading = false
 			} else if hits, ok := s.recordsCache[term]; ok {
-				// Cache hit — same term was fetched recently in this
-				// session.  Reuse the hits without another SOSL.
 				s.hits = hits
 				s.recordsLastTerm = term
 				s.recordsLoading = false
 				s.recordsErr = nil
 			} else if term != s.recordsLastTerm {
-				// New term — schedule a debounced tick.  Generation
-				// bump invalidates any in-flight tick from earlier
-				// keystrokes so only the most recent pause fires.
 				s.recordsDebounceGen++
 				s.recordsLoading = true
 				s.recordsErr = nil
@@ -925,14 +703,6 @@ func (m Model) handleGlobalSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// startRecordsSearch kicks an async SOSL fetch for the given term
-// against the active org's curated target set + the user's recently-
-// visited objects.  Returns a tea.Cmd that produces a
-// recordsSearchResultMsg when the SOSL response lands.
-//
-// Sets s.recordsLoading + s.recordsLastTerm synchronously so the
-// renderer can show a "searching…" hint and so the input-change
-// handler doesn't re-fire the same term.
 func (m *Model) startRecordsSearch(term string) tea.Cmd {
 	if m.globalSearch == nil {
 		return nil
@@ -946,8 +716,6 @@ func (m *Model) startRecordsSearch(term string) tea.Cmd {
 		return nil
 	}
 	if Demo {
-		// SOSL needs a live org; substring-scan the seeded records
-		// instead so the records tier of global search demos too.
 		return func() tea.Msg {
 			return recordsSearchResultMsg{term: term, hits: demoRecordHits(term)}
 		}
@@ -961,22 +729,6 @@ func (m *Model) startRecordsSearch(term string) tea.Cmd {
 	}
 }
 
-// globalSearchTargetsForActiveOrg composes the SOSL target list from
-// the curated default set + any sObjects the user has recently
-// visited (pulled from the local visit log).  Caps the total at 30
-// to stay safely under SF's RETURNING-clause limit.
-//
-// Critical filter: only includes sObjects that are actually present
-// in this org's cached SObjects list.  Without that, a developer-
-// edition org without (say) Quote or Asset gets a SOSL that fails
-// the entire query with INVALID_TYPE rather than just dropping the
-// missing target.  Curated defaults skew toward standard objects
-// most orgs have, but Quote / Order / Asset / Contract / Campaign
-// are gated by org edition + licences.
-//
-// If the SObjects list isn't loaded yet, falls back to the curated
-// defaults unfiltered — the user will see the error if any target
-// is missing, but that's better than blocking the modal entirely.
 func (m Model) globalSearchTargetsForActiveOrg() []sf.GlobalSearchTarget {
 	defaults := sf.DefaultGlobalSearchTargets()
 	if len(m.orgs) == 0 {
@@ -986,9 +738,6 @@ func (m Model) globalSearchTargetsForActiveOrg() []sf.GlobalSearchTarget {
 	if d == nil {
 		return defaults
 	}
-	// Build the org's present-sObjects set from the cached SObjects
-	// describe.  Empty when not yet loaded — fall through to the
-	// unfiltered defaults (best-effort).
 	present := make(map[string]bool)
 	for _, so := range d.SObjects.Value() {
 		if so.Name != "" {
@@ -1010,8 +759,6 @@ func (m Model) globalSearchTargetsForActiveOrg() []sf.GlobalSearchTarget {
 		targets = append(targets, t)
 		seen[t.Sobject] = true
 	}
-	// Walk the local visit log in MRU order, adding any sObjects we
-	// haven't already covered AND that the org actually has.
 	for _, e := range d.Recent {
 		if e.Kind != RecentKindRecord || e.Type == "" {
 			continue
@@ -1031,10 +778,6 @@ func (m Model) globalSearchTargetsForActiveOrg() []sf.GlobalSearchTarget {
 	return targets
 }
 
-// applyRecordsSearchResult merges a landed SOSL response into the
-// modal state.  Stale results (term no longer matches the current
-// input) are discarded so a fast typist's older queries don't
-// overwrite newer ones.
 func (m *Model) applyRecordsSearchResult(msg recordsSearchResultMsg) {
 	if m.globalSearch == nil {
 		return
@@ -1082,9 +825,6 @@ func (m *Model) applyRecordsSearchResult(msg recordsSearchResultMsg) {
 	s.recordsCache[msg.term] = hits
 }
 
-// applyRecordsDebounceTick fires the actual SOSL when the debounce
-// window has elapsed without a newer keystroke.  Stale ticks (older
-// generation than the current state) discard themselves.
 func (m *Model) applyRecordsDebounceTick(msg recordsDebounceTickMsg) tea.Cmd {
 	if m.globalSearch == nil {
 		return nil
@@ -1094,8 +834,6 @@ func (m *Model) applyRecordsDebounceTick(msg recordsDebounceTickMsg) tea.Cmd {
 		return nil
 	}
 	if msg.gen != s.recordsDebounceGen {
-		// User typed more characters since this tick was scheduled
-		// — let the newer tick handle it.
 		return nil
 	}
 	term := strings.TrimSpace(s.input.Value())
@@ -1104,11 +842,8 @@ func (m *Model) applyRecordsDebounceTick(msg recordsDebounceTickMsg) tea.Cmd {
 		return nil
 	}
 	if term == s.recordsLastTerm && !s.recordsLoading {
-		// Already showing results for this term (rare — happens if
-		// the user types and then un-types in <200ms).
 		return nil
 	}
-	// Cache hit?  Skip the network entirely.
 	if hits, ok := s.recordsCache[term]; ok {
 		s.hits = hits
 		s.recordsLastTerm = term
@@ -1118,10 +853,6 @@ func (m *Model) applyRecordsDebounceTick(msg recordsDebounceTickMsg) tea.Cmd {
 	return m.startRecordsSearch(term)
 }
 
-// openRecordHitFromSOSL builds the Enter closure for a records-mode
-// hit.  Routes through drillByKind so Esc returns to the tab the
-// user was on before opening the modal — same return-tab plumbing
-// the metadata-mode entries already use.
 func openRecordHitFromSOSL(sobject, id, name string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		cmd, _ := drillByKind(m, "record", id, sobject, name, m.tab())
@@ -1129,12 +860,6 @@ func openRecordHitFromSOSL(sobject, id, name string) func(m *Model) tea.Cmd {
 	}
 }
 
-// recordRefForSearchHit wraps a (sObject, id) pair from global search
-// as a sf.RecordRef so its standard open menu (Record detail / Edit /
-// Inspector / list / Object Manager) becomes available via ctrl+o on
-// the search row. Builds a synthetic attributes block since the SOSL
-// hit doesn't carry one — RecordRef.Targets() consults
-// attributes.type to identify the sObject.
 func recordRefForSearchHit(sobject, id string) sf.RecordRef {
 	return sf.RecordRef{
 		Record: map[string]any{
@@ -1146,13 +871,6 @@ func recordRefForSearchHit(sobject, id string) sf.RecordRef {
 	}
 }
 
-// recordsWarmupHits returns the user's local visit log (records
-// only) shaped as globalSearchHit so records mode has something to
-// show on first entry / empty input.  Zero network calls — purely
-// local data the user has already seen.
-//
-// Returns an empty slice when no visits exist (fresh org); the
-// renderer's empty-state hint covers that.
 func (m Model) recordsWarmupHits() []globalSearchHit {
 	if len(m.orgs) == 0 {
 		return nil
@@ -1190,7 +908,6 @@ func (m Model) recordsWarmupHits() []globalSearchHit {
 func rankGlobalSearch(index []globalSearchEntry, query string) []globalSearchHit {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
-		// Lexical by Label, capped to keep the idle state snappy.
 		entries := make([]globalSearchEntry, len(index))
 		copy(entries, index)
 		sort.SliceStable(entries, func(i, j int) bool {
@@ -1236,15 +953,10 @@ func scoreEntry(e globalSearchEntry, terms []string, fullQuery string) float64 {
 	if strings.HasPrefix(key, fullQuery) {
 		score += 2
 	}
-	// Whole-word bonus: " <query>" or "<query>" at start.
 	if strings.HasPrefix(" "+key, " "+fullQuery) {
 		score += 1
 	}
-	// Silent context boost — loaded project membership + recency.
-	// See applySilentBoosts; entry carries the value pre-computed so
-	// scoring stays a pure function on the entry.
 	score += e.Boost
-	// Kind weight — objects feel like a "front door" so rank them up.
 	switch e.Kind {
 	case gsKindObject:
 		score += 0.5
@@ -1254,22 +966,15 @@ func scoreEntry(e globalSearchEntry, terms []string, fullQuery string) float64 {
 	return score
 }
 
-// buildGlobalSearchIndex walks orgData caches to build the current
-// search space under the given scope chain. Empty scope = everything;
-// scope[0] Kind=Object restricts to that object's children (fields,
-// validation rules, record types, triggers).
 func (m Model) buildGlobalSearchIndex(scopes []globalSearchScope) []globalSearchEntry {
 	d := m.activeOrgData()
 	if d == nil {
 		return nil
 	}
 	var entries []globalSearchEntry
-	// Root scope: sobject list + flows + any already-loaded children
-	// across every object.
 	if len(scopes) == 0 {
 		entries = m.buildRootIndex(d)
 	} else {
-		// Scoped: dispatch by the current (outermost) scope's kind.
 		top := scopes[len(scopes)-1]
 		switch top.Kind {
 		case gsKindObject:
@@ -1284,11 +989,6 @@ func (m Model) buildGlobalSearchIndex(scopes []globalSearchScope) []globalSearch
 	return entries
 }
 
-// hydrateTagsAndProjects bulk-resolves tag + project bindings for
-// every entry that carries (RefKind, Ref). Done once at index-build
-// time so the per-row render is a no-store-call paint of the
-// pre-cached slices. Mirrors the bulk-fetch pattern used by list-
-// table gutters.
 func hydrateTagsAndProjects(m Model, d *orgData, entries []globalSearchEntry) {
 	if m.devProjects == nil || d == nil {
 		return
@@ -1377,7 +1077,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  f,
 		})
 	}
-	// Apex Classes — searchable when the cache is loaded.
 	for _, a := range d.ApexClasses.Value() {
 		a := a
 		out = append(out, globalSearchEntry{
@@ -1391,7 +1090,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  a,
 		})
 	}
-	// Apex Triggers (cross-sObject flat list).
 	for _, t := range d.ApexTriggersFlat.Value() {
 		t := t
 		out = append(out, globalSearchEntry{
@@ -1402,11 +1100,8 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Secondary: t.Table,
 			Key:       strings.ToLower(t.Name + " " + t.Table + " trigger"),
 			Enter:     openApexTriggerCmd(t.Table, t.ID),
-			// TriggerRow doesn't implement Openable; the row's
-			// ctrl+o is a no-op until we add Targets() on it.
 		})
 	}
-	// LWC bundles.
 	for _, b := range d.LWCBundles.Value() {
 		b := b
 		label := b.MasterLabel
@@ -1424,7 +1119,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  b,
 		})
 	}
-	// Aura bundles.
 	for _, b := range d.AuraBundles.Value() {
 		b := b
 		label := b.MasterLabel
@@ -1460,7 +1154,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  p,
 		})
 	}
-	// PSGs.
 	for _, g := range d.PSGs.Value() {
 		g := g
 		label := g.MasterLabel
@@ -1478,7 +1171,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  g,
 		})
 	}
-	// Profiles.
 	for _, p := range d.Profiles.Value() {
 		p := p
 		out = append(out, globalSearchEntry{
@@ -1492,7 +1184,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  p,
 		})
 	}
-	// Queues.
 	for _, q := range d.Queues.Value() {
 		q := q
 		out = append(out, globalSearchEntry{
@@ -1506,7 +1197,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  q,
 		})
 	}
-	// Public Groups.
 	for _, g := range d.PublicGroups.Value() {
 		g := g
 		out = append(out, globalSearchEntry{
@@ -1520,7 +1210,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  g,
 		})
 	}
-	// Reports.
 	for _, r := range d.Reports.Value() {
 		r := r
 		secondary := r.FolderName
@@ -1538,10 +1227,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 			Openable:  r,
 		})
 	}
-	// Records mode (ctrl+r) is the canonical surface for recently visited
-	// records, keeping metadata-mode results scoped to metadata.
-	//
-	// Dev Projects (global — store-backed, not per-org).
 	if m.devProjects != nil {
 		if projects, err := m.devProjects.ListDevProjects(); err == nil {
 			for _, p := range projects {
@@ -1555,7 +1240,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 				})
 			}
 		}
-		// Tags.
 		if tags, err := m.devProjects.ListTags(); err == nil {
 			for _, t := range tags {
 				t := t
@@ -1576,11 +1260,6 @@ func (m Model) buildRootIndex(d *orgData) []globalSearchEntry {
 	return out
 }
 
-// buildObjectScopedIndex emits every cached child entity of the given
-// sobject: fields (from the describe, if cached), validation rules,
-// record types, triggers. Nothing is fetched here — a scope-in that
-// has no cache yet simply returns nothing until the user loads it
-// via the normal drill navigation. Future: lazy Tooling SOQL here.
 func (m Model) buildObjectScopedIndex(d *orgData, sobject string) []globalSearchEntry {
 	var out []globalSearchEntry
 
@@ -1646,8 +1325,6 @@ func (m Model) buildObjectScopedIndex(d *orgData, sobject string) []globalSearch
 		}
 	}
 
-	// Always include an "Open object" row at the top so users can
-	// scope in then open without extra keystrokes.
 	header := globalSearchEntry{
 		Kind:      gsKindObject,
 		RefKind:   devproject.KindSObject,
@@ -1660,14 +1337,6 @@ func (m Model) buildObjectScopedIndex(d *orgData, sobject string) []globalSearch
 	return append([]globalSearchEntry{header}, out...)
 }
 
-// kickScopeInFetches triggers async Ensure* calls for every child-
-// entity type we index under a scope. For an Object scope that's
-// describe (fields), validation rules, record types, triggers. The
-// resource layer debounces — if something's already cached and
-// fresh, the Ensure returns nil and nothing else happens.
-//
-// Each fetch returns a resourceUpdatedMsg that applyResourceMsg
-// dispatches + rebuildGlobalSearchIndexIfActive re-ranks.
 func (m Model) kickScopeInFetches(scope globalSearchScope) tea.Cmd {
 	if scope.Kind != gsKindObject {
 		return nil
@@ -1719,9 +1388,6 @@ var globalSearchIndexKeys = map[string]bool{
 	"queues_v2": true, "reports": true,
 }
 
-// rebuildGlobalSearchIndexForKey rebuilds only when the landed resource
-// feeds the index (or key=="" for an unconditional rebuild, e.g. on
-// modal open / scope change).
 func (m *Model) rebuildGlobalSearchIndexForKey(key string) {
 	if key != "" && !globalSearchIndexKeys[key] {
 		return
@@ -1748,9 +1414,6 @@ func (m *Model) rebuildGlobalSearchIndexIfActive() {
 	}
 }
 
-// globalSearchBusy reports whether any scope-in fetch is still in
-// flight. Used by the render to show a small hint so the user knows
-// more results are on the way.
 func (m Model) globalSearchBusy() bool {
 	if m.globalSearch == nil {
 		return false
@@ -1779,12 +1442,6 @@ func (m Model) globalSearchBusy() bool {
 	}
 	return false
 }
-
-// --- Enter-action helpers ----------------------------------------------
-//
-// Each returns a closure that performs the equivalent of manually
-// navigating to the target. Reuses existing setTab / tab-change hooks
-// so refresh + caching works just like a manual drill.
 
 func openObjectCmd(apiName string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
@@ -1863,9 +1520,6 @@ func openFlowCmd(definitionID string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openApexClassCmd drills straight into the class detail (the code),
-// matching what Enter on the /apex list does. The list cursor + subtab
-// are positioned first so esc-back lands on the right row.
 func openApexClassCmd(id string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		d := m.activeOrgData()
@@ -1883,9 +1537,6 @@ func openApexClassCmd(id string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openApexTriggerCmd routes through the existing trigger-detail
-// drill so opening behaves identically to clicking from the
-// Triggers list.
 func openApexTriggerCmd(sobject, id string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		if sobject == "" || id == "" {
@@ -1895,9 +1546,6 @@ func openApexTriggerCmd(sobject, id string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openLWCBundleCmd drills straight into the bundle detail (the code),
-// matching what Enter on the /components list does. The list cursor +
-// subtab are positioned first so esc-back lands on the right row.
 func openLWCBundleCmd(id string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		d := m.activeOrgData()
@@ -1915,7 +1563,6 @@ func openLWCBundleCmd(id string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openAuraBundleCmd — same pattern, Aura drill.
 func openAuraBundleCmd(id string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		d := m.activeOrgData()
@@ -1933,11 +1580,6 @@ func openAuraBundleCmd(id string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openPermSetCmd / openPSGCmd / openProfileCmd / openQueueCmd /
-// openPublicGroupCmd drill straight into the row's detail tab (perm
-// parent / queue members / group members), matching what Enter on the
-// /perms lists does. The subtab + cursor are positioned first so the
-// stem list is right when navigating back.
 func openPermSetCmd(id string) func(m *Model) tea.Cmd {
 	return openPermsRowCmd(0, recent.KindPermSet, id, "", func(d *orgData) []string {
 		ids := make([]string, 0, d.PermSetList.Len())
@@ -1958,10 +1600,6 @@ func openPSGCmd(id string) func(m *Model) tea.Cmd {
 	}, func(d *orgData, idx int) { d.PSGList.SetCursor(idx) })
 }
 
-// permSetID is the profile's implicit PermissionSet Id — the perm
-// parent detail reads FLS/object/system perms through it. Callers that
-// don't have it (URL paste) pass "" and it back-fills from the loaded
-// Profiles list at drill time.
 func openProfileCmd(id, permSetID string) func(m *Model) tea.Cmd {
 	return openPermsRowCmd(2, recent.KindProfile, id, permSetID, func(d *orgData) []string {
 		ids := make([]string, 0, d.ProfileList.Len())
@@ -1992,11 +1630,6 @@ func openPublicGroupCmd(id string) func(m *Model) tea.Cmd {
 	}, func(d *orgData, idx int) { d.PublicGroupList.SetCursor(idx) })
 }
 
-// openPermsRowCmd is the shared shape for all five /perms helpers —
-// positions the subtab + cursor (so the stem list is right on the way
-// back), then drills into the row's detail via drillByKind, which also
-// records the search-origin tab for esc-return. Unknown kind falls
-// back to landing on the /perms list.
 func openPermsRowCmd(subtabIdx int, kind, id, typeField string,
 	idsOf func(*orgData) []string,
 	setCursor func(*orgData, int)) func(m *Model) tea.Cmd {
@@ -2022,12 +1655,6 @@ func openPermsRowCmd(subtabIdx int, kind, id, typeField string,
 	}
 }
 
-// openReportCmd jumps to /reports and opens the cursored row's
-// report-detail (the cached run). Falls back to /reports landing
-// when the id isn't in cache yet.
-// openReportCmd drills into the report detail (which runs the report)
-// — same as Enter on the /reports row. Cursor positioned first for the
-// way back.
 func openReportCmd(id string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		d := m.activeOrgData()
@@ -2047,7 +1674,6 @@ func openReportCmd(id string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openDevProjectCmd jumps to TabDevProjectDetail for the project.
 func openDevProjectCmd(projectID string) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		m.setActiveDevProject(projectID)
@@ -2056,9 +1682,6 @@ func openDevProjectCmd(projectID string) func(m *Model) tea.Cmd {
 	}
 }
 
-// openTagCmd opens the tag manager and positions the cursor on the
-// chosen tag. Useful for "I want to manage / rename / delete this
-// tag" flow that starts from a search.
 func openTagCmd(tagID int64) func(m *Model) tea.Cmd {
 	return func(m *Model) tea.Cmd {
 		if m.devProjects != nil {
@@ -2077,8 +1700,6 @@ func openTagCmd(tagID int64) func(m *Model) tea.Cmd {
 	}
 }
 
-// --- silent boost computation ---------------------------------------
-
 // applySilentBoosts walks the index once and bumps the Boost field on
 // any entry that should rank higher because of recent context. Two
 // signals stack additively:
@@ -2096,7 +1717,6 @@ func openTagCmd(tagID int64) func(m *Model) tea.Cmd {
 // having to think about why.
 func applySilentBoosts(d *orgData, store *devproject.Store, entries []globalSearchEntry, projectBoost float64, decayWindow time.Duration) {
 	scope := d.LoadedScope
-	// Build a recency map keyed by "<sObject>:<Id>" for fast lookup.
 	recency := map[string]float64{}
 	for _, r := range d.RecentList.Items() {
 		if r.Type == "" || r.ID == "" {
@@ -2120,10 +1740,6 @@ func applySilentBoosts(d *orgData, store *devproject.Store, entries []globalSear
 				e.Boost += projectBoost
 			}
 		case gsKindFlow:
-			// Flow entries' Secondary is the DeveloperName; we don't
-			// have the DefinitionID handy at boost time. Skip the
-			// project boost for flows for now — the recency boost
-			// still applies once flows land in /recent.
 		case gsKindRecent:
 			// Recents always get a recency boost; lookup is the
 			// label/secondary combo. Use the entry's Label + Secondary
@@ -2133,15 +1749,8 @@ func applySilentBoosts(d *orgData, store *devproject.Store, entries []globalSear
 			// because they ARE the recent list, so the recency map
 			// hit covers it.)
 		}
-		// Recency lookup — works for any record-shaped entry whose
-		// Label is the record name and whose underlying ref is
-		// "<sObject>:<Id>". We approximate via the Secondary +
-		// (when available) the per-record key carried elsewhere.
-		// For now, hit the recency map for kinds that map cleanly:
 		switch e.Kind {
 		case gsKindRecent:
-			// Recent provider already encodes the visit; a generic
-			// recency boost on top would double-count. Skip.
 		}
 		// All entries: if any recency key matches a token in their
 		// search Key (broad heuristic), bump. Cheap and avoids
@@ -2156,10 +1765,6 @@ func applySilentBoosts(d *orgData, store *devproject.Store, entries []globalSear
 	_ = store // reserved for future tag-based boosts
 }
 
-// profilePermSetID resolves a profile's implicit PermissionSet Id from
-// the loaded Profiles list. "" when the list isn't loaded or the id is
-// unknown — the perm parent detail's Overview still renders; the
-// perms subtabs fill in once the id is known.
 func profilePermSetID(d *orgData, profileID string) string {
 	for _, p := range d.Profiles.Value() {
 		if p.ID == profileID {

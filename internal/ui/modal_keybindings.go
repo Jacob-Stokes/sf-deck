@@ -1,32 +1,5 @@
 package ui
 
-// Keybindings settings modal — user-editable list of every command
-// in the keymap registry. Reachable via the command palette
-// ("Edit keybindings…") or the global settings modal.
-//
-// UX shape:
-//
-//   ┌─ Keybindings ─────────────────────────────────────────────┐
-//   │ /  filter                                                  │
-//   │                                                            │
-//   │   Process                                                  │
-//   │ ▶ Quit                                          q · ctrl+c │
-//   │   Focus orgs panel                                       0 │
-//   │   Back / cancel                                        esc │
-//   │                                                            │
-//   │   Navigation                                               │
-//   │   Move up                                          k · up  │
-//   │   Move down                                        j · down│
-//   │ ...                                                        │
-//   │                                                            │
-//   │ ↑↓ navigate · ↵ edit · esc close                           │
-//   └────────────────────────────────────────────────────────────┘
-//
-// Editing a row opens a small input below it; the user types a
-// space-separated list of keys, presses Enter to apply. Conflict
-// warnings appear inline. Save-on-apply persists to
-// ~/.sf-deck/keybindings.toml so changes survive restart.
-
 import (
 	"fmt"
 	"sort"
@@ -40,43 +13,24 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/keymap"
 )
 
-// keybindingsModalState is the live state of the modal.
 type keybindingsModalState struct {
-	// Filter narrows the visible rows by Label substring.
 	Filter string
 
-	// Cursor is the highlighted row index in the (filtered) list.
 	Cursor int
 
-	// EditingID, when non-empty, is the command currently being
-	// rebound. EditBuffer is the user's in-progress key list
-	// (space-separated).
 	EditingID  string
 	EditBuffer string
 
-	// Err is the non-fatal error from the last apply attempt.
 	Err string
 
-	// SuccessMsg flashes briefly after a successful save.
 	SuccessMsg string
 
-	// FooterHints is the active surface's footer hint set, captured
-	// at open time — pinned as the first section of the Keys page so
-	// "what does the footer show (including what got truncated)" is
-	// answerable at a glance. Read-only rows; rebinding happens on
-	// the command rows below.
 	FooterHints []footerHint
 
-	// Page selects between the Keys list (0) and the About page (1).
-	// Tab toggles. About is captured at open time so the content
-	// reflects the surface the user pressed ? on.
 	Page  int
 	About infoModalState
 }
 
-// openKeybindingsModal initialises and shows the modal on the Keys
-// page. The per-view help rides along as the About page (Tab) so ?
-// serves both "what can I press" and "what is this view".
 func (m *Model) openKeybindingsModal() tea.Cmd {
 	m.keybindingsModal = &keybindingsModalState{
 		About:       helpForCurrentView(*m),
@@ -85,24 +39,16 @@ func (m *Model) openKeybindingsModal() tea.Cmd {
 	return nil
 }
 
-// closeKeybindingsModal dismisses the modal.
 func (m *Model) closeKeybindingsModal() {
 	m.keybindingsModal = nil
 }
 
-// keybindingsRow is one row in the rendered list. Either a category
-// header (Header non-empty, Cmd nil) or an actual command row.
 type keybindingsRow struct {
 	Header string
 	Cmd    *keymap.Command
-	// Hint is a read-only footer-shortcut row (the "Footer · this
-	// view" section). Mutually exclusive with Cmd.
-	Hint *footerHint
+	Hint   *footerHint
 }
 
-// visibleKeybindingRows produces the row slice for the current
-// filter. Rows are grouped by Category, with category headers
-// inserted between groups.
 func visibleKeybindingRows(filter string, footer []footerHint) []keybindingsRow {
 	q := strings.ToLower(strings.TrimSpace(filter))
 
@@ -125,8 +71,6 @@ func visibleKeybindingRows(filter string, footer []footerHint) []keybindingsRow 
 		out = append(out, hintRows...)
 	}
 
-	// Group commands by category, preserving registry order within
-	// each group.
 	type catGroup struct {
 		name string
 		cmds []keymap.Command
@@ -167,7 +111,6 @@ func visibleKeybindingRows(filter string, footer []footerHint) []keybindingsRow 
 	return out
 }
 
-// renderKeybindingsModal draws the modal; "" when not active.
 func (m Model) renderKeybindingsModal() string {
 	km := m.keybindingsModal
 	if km == nil {
@@ -202,18 +145,15 @@ func (m Model) renderKeybindingsModal() string {
 			append(lines, renderKeybindingsAbout(km, m.height, inner)...), "\n"), w)
 	}
 
-	// Filter / search bar.
 	filterPrefix := lipgloss.NewStyle().Foreground(theme.FgDim).Render("/ ")
 	caretStyle := lipgloss.NewStyle().Foreground(theme.BorderHi)
 	if km.EditingID == "" {
-		// Filter typing is the default mode when not editing a row.
 		lines = append(lines, filterPrefix+km.Filter+caretStyle.Render("│"))
 	} else {
 		lines = append(lines, filterPrefix+km.Filter)
 	}
 	lines = append(lines, "")
 
-	// Body — windowed slice around cursor.
 	maxRows := 18
 	bodyStart := 0
 	if km.Cursor >= maxRows {
@@ -233,8 +173,6 @@ func (m Model) renderKeybindingsModal() string {
 			continue
 		}
 		if row.Hint != nil {
-			// Footer-shortcut row: read-only, same label/key column
-			// layout as command rows so the section scans uniformly.
 			labelW := inner - 30
 			if labelW < 20 {
 				labelW = 20
@@ -247,7 +185,6 @@ func (m Model) renderKeybindingsModal() string {
 			continue
 		}
 		c := row.Cmd
-		// Edit mode for this specific row.
 		if km.EditingID == c.ID {
 			editLine := fmt.Sprintf("  %-40s ", c.Label) +
 				lipgloss.NewStyle().Foreground(theme.BorderHi).Render("[ ") +
@@ -257,7 +194,6 @@ func (m Model) renderKeybindingsModal() string {
 			lines = append(lines, editLine)
 			continue
 		}
-		// Normal display.
 		keys := Keys.KeysByID(c.ID)
 		keyDisplay := strings.Join(keys, " · ")
 		if keyDisplay == "" {
@@ -302,8 +238,6 @@ func (m Model) renderKeybindingsModal() string {
 	return modalBox(strings.Join(lines, "\n"), w)
 }
 
-// handleKeybindingsModalKey processes input while the modal is
-// open. Returns (handled, cmd).
 func (m *Model) handleKeybindingsModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if m.keybindingsModal == nil {
 		return false, nil
@@ -318,9 +252,6 @@ func (m *Model) handleKeybindingsModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return m.handleKeybindingsEdit(press)
 	}
 
-	// Tab flips between the Keys list and the About page from
-	// either side; the About page consumes everything else except
-	// esc (no filter, no edit there).
 	if press.Code == tea.KeyTab {
 		km.Page = 1 - km.Page
 		km.Err = ""
@@ -338,23 +269,17 @@ func (m *Model) handleKeybindingsModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 		m.closeKeybindingsModal()
 		return true, nil
 	case tea.KeyEnter:
-		// Open edit on the cursored row.
 		rows := visibleKeybindingRows(km.Filter, km.FooterHints)
 		if km.Cursor < 0 || km.Cursor >= len(rows) || rows[km.Cursor].Cmd == nil {
-			// Footer-hint rows are read-only; the same action is
-			// rebindable from its command row further down.
 			return true, nil
 		}
 		c := rows[km.Cursor].Cmd
 		km.EditingID = c.ID
-		// Pre-fill with current bindings so the user edits in
-		// place rather than starting from blank.
 		km.EditBuffer = strings.Join(Keys.KeysByID(c.ID), " ")
 		km.Err = ""
 		return true, nil
 	case tea.KeyUp:
 		rows := visibleKeybindingRows(km.Filter, km.FooterHints)
-		// Step backwards over headers.
 		for km.Cursor > 0 {
 			km.Cursor--
 			if km.Cursor < len(rows) && rows[km.Cursor].Header == "" {
@@ -387,9 +312,6 @@ func (m *Model) handleKeybindingsModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	return true, nil
 }
 
-// handleKeybindingsEdit handles the per-row edit input. Enter
-// applies, Esc cancels, Backspace deletes a char, anything else
-// appends.
 func (m *Model) handleKeybindingsEdit(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	km := m.keybindingsModal
 	switch msg.Code {
@@ -399,17 +321,12 @@ func (m *Model) handleKeybindingsEdit(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		km.Err = ""
 		return true, nil
 	case tea.KeyEnter:
-		// Apply the buffer. Empty buffer means "unbind" (set to nil).
-		// Mutate ui.Keys directly — that's the global the
-		// dispatcher reads, so changes take effect immediately.
 		keys := strings.Fields(km.EditBuffer)
 		if err := Keys.SetByID(km.EditingID, keys); err != nil {
 			km.Err = err.Error()
 			return true, nil
 		}
 		m.clearRenderCache()
-		// Persist to disk. On error, surface but leave the change in
-		// memory so the user can retry without retyping.
 		if err := Keys.SaveTOML(); err != nil {
 			km.Err = "applied in memory; disk write failed: " + err.Error()
 			return true, nil
@@ -431,10 +348,6 @@ func (m *Model) handleKeybindingsEdit(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	return true, nil
 }
 
-// keybindingsPageStrip renders the two-page header: Keybindings ·
-// About. Active page bold in the accent colour; the About label
-// borrows the captured help page's title when it has one so users
-// see what's behind the tab ("About · Field detail · actions").
 func keybindingsPageStrip(km *keybindingsModalState, inner int) string {
 	active := lipgloss.NewStyle().Foreground(theme.BorderHi).Bold(true)
 	idle := lipgloss.NewStyle().Foreground(theme.FgDim)

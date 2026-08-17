@@ -39,10 +39,6 @@ func Suggest(snap Snapshot, c *Classification) []Suggestion {
 	return nil
 }
 
-// suggestNumericLiterals offers a small set of common row counts
-// after LIMIT / OFFSET. Users almost always want round numbers
-// (20, 50, 100, 200, 500, 1000, 2000) so the popup nudges them
-// toward those instead of leaving them to guess.
 func suggestNumericLiterals(c *Classification) []Suggestion {
 	values := []string{"10", "20", "50", "100", "200", "500", "1000", "2000"}
 	out := make([]Suggestion, 0, len(values))
@@ -81,11 +77,6 @@ func suggestSObjects(snap Snapshot, c *Classification) []Suggestion {
 	return SortByRank(out)
 }
 
-// suggestFields walks hops from the active sObject, unions field
-// lists across the resulting describe set, filters by context-
-// specific capability (Filterable/Sortable/Groupable), tags
-// reference fields with a "RelationshipName." companion entry,
-// and includes SOQL functions when context is SELECT.
 func suggestFields(snap Snapshot, c *Classification) []Suggestion {
 	if c.Sobject == "" {
 		// No FROM yet — can't suggest fields without a target.
@@ -97,10 +88,6 @@ func suggestFields(snap Snapshot, c *Classification) []Suggestion {
 	describes, loading := WalkHops(snap, c.Sobject, hops)
 	c.LoadingFor = loading
 
-	// Subquery case: when we're inside `(SELECT ... FROM Contacts)`
-	// the Sobject is "Contacts" — a relationshipName, not an API
-	// name. Need to resolve it to the actual child sObject via the
-	// outer query's parent describe.
 	if c.InSubquery && len(describes) == 0 && len(loading) > 0 {
 		// Best-effort: WalkHops failed because "Contacts" isn't a
 		// real sObject. Find the outer FROM, resolve child relname.
@@ -156,7 +143,6 @@ func suggestFields(snap Snapshot, c *Classification) []Suggestion {
 		}
 	}
 
-	// SELECT context also surfaces SOQL functions.
 	if c.Context == ContextAfterSelectKeyword && len(hops) == 0 {
 		for _, fn := range soqlFunctions {
 			if r := Rank(fn.Value, c.SearchToken); r > 0 {
@@ -175,15 +161,9 @@ func suggestFields(snap Snapshot, c *Classification) []Suggestion {
 	return SortByRank(out)
 }
 
-// suggestValues produces RHS suggestions for an operator. Resolves
-// the WHERE field (which can be dotted) to a sf.Field, then per
-// type generates the right vocabulary: picklist values, booleans,
-// date literals, null.
 func suggestValues(snap Snapshot, c *Classification) []Suggestion {
 	field, ok := resolveWhereField(snap, c)
 	if !ok {
-		// Unknown field — emit a generic "null" + boolean as
-		// fallbacks so the popup isn't completely empty.
 		return fallbackValueSuggestions(c)
 	}
 
@@ -229,8 +209,6 @@ func suggestValues(snap Snapshot, c *Classification) []Suggestion {
 			}
 		}
 	case "string", "email", "phone", "url", "textarea", "reference", "id":
-		// No static vocabulary — Ctrl+Space triggers a live
-		// distinct-value fetch (handled by the UI wrapper).
 	}
 
 	if field.Nillable {
@@ -247,14 +225,6 @@ func suggestValues(snap Snapshot, c *Classification) []Suggestion {
 	return SortByRank(out)
 }
 
-// suggestKeywords is the top-level fallback. Emits SOQL clause
-// keywords. In the special case where the buffer has no FROM yet
-// (i.e. the user is starting a fresh query), it ALSO offers sObject
-// starter-queries — typing `Account` from an empty editor expands
-// into `SELECT Id, Name FROM Account LIMIT 20`.
-//
-// Once a FROM exists, sObject suggestions are suppressed — they'd
-// be noise after the user is typing LIMIT / ORDER BY / OFFSET.
 func suggestKeywords(snap Snapshot, c *Classification) []Suggestion {
 	out := make([]Suggestion, 0, len(soqlKeywords)+len(snap.SObjects))
 	for _, kw := range soqlKeywords {
@@ -269,9 +239,6 @@ func suggestKeywords(snap Snapshot, c *Classification) []Suggestion {
 			})
 		}
 	}
-	// Only offer the sObject starter-query shortcut when the buffer
-	// has NO FROM yet — i.e. we're still in fresh-query territory.
-	// resolveSObject returns "" when no FROM is in the buffer.
 	if c.Sobject == "" {
 		for _, name := range snap.SObjects {
 			if r := Rank(name, c.SearchToken); r > 0 {
@@ -297,9 +264,6 @@ func suggestKeywords(snap Snapshot, c *Classification) []Suggestion {
 // override later when describes are loaded — we can swap to the
 // describe's actual NameField flag.
 var NameFieldHint = func(sobject string) string {
-	// Default: Name. Caller wiring can replace this var at startup
-	// with sf.NameFieldFor for the curated registry of standard
-	// sObjects that lack a Name field (Task→Subject, etc.).
 	return "Name"
 }
 
@@ -322,10 +286,6 @@ func fallbackValueSuggestions(c *Classification) []Suggestion {
 	return SortByRank(out)
 }
 
-// resolveWhereField walks the (possibly dotted) field path captured
-// in Classification.WhereField down through describes to find the
-// terminal sf.Field. Returns false when any hop's describe isn't
-// loaded — in which case suggestions fall back to generic options.
 func resolveWhereField(snap Snapshot, c *Classification) (sf.Field, bool) {
 	if c.WhereField == "" || c.Sobject == "" {
 		return sf.Field{}, false
@@ -344,9 +304,6 @@ func resolveWhereField(snap Snapshot, c *Classification) (sf.Field, bool) {
 	return sf.Field{}, false
 }
 
-// contextAllowsField gates per-context capability checks: WHERE
-// needs Filterable, ORDER BY needs Sortable, GROUP BY needs
-// Groupable. SELECT has no restriction.
 func contextAllowsField(ctx ContextKind, f sf.Field) bool {
 	switch ctx {
 	case ContextWhereField:
@@ -359,8 +316,6 @@ func contextAllowsField(ctx ContextKind, f sf.Field) bool {
 	return true
 }
 
-// fieldDetail builds the secondary text for a field row in the
-// popup. Format: "Label · type" or just "type" when label == name.
 func fieldDetail(f sf.Field) string {
 	if f.Label != "" && f.Label != f.Name {
 		return f.Label + " · " + f.Type
@@ -368,15 +323,8 @@ func fieldDetail(f sf.Field) string {
 	return f.Type
 }
 
-// fieldSuffix picks the post-insertion suffix based on context.
-// SELECT lists get ", " (comma-separated); WHERE/ORDER/GROUP get
-// " " (operator/direction comes next); after a relationship hop
-// the suffix is "" so the user keeps dotting.
 func fieldSuffix(ctx ContextKind, hops []string) string {
 	if len(hops) > 0 {
-		// User is completing a relationship traversal — they may
-		// dot again or break out into the next clause. Single
-		// space is the safest default.
 		return ""
 	}
 	switch ctx {
@@ -395,5 +343,4 @@ func escapeSOQL(s string) string {
 	return s
 }
 
-// _ swallows unused fmt import warnings if any helpers get removed.
 var _ = fmt.Sprintf

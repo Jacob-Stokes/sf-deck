@@ -1,13 +1,5 @@
 package control
 
-// handlers_project.go — IPC verb handlers for the project.*
-// mutation/read surface. Mirrors the CLI flag shape so an agent
-// uses the same vocabulary in either transport.
-//
-// All routes bypass the TUI tea.Cmd channel: project ops only
-// touch devprojects.db. Writes go through withWriteLock for
-// single-writer semantics.
-
 import (
 	"encoding/json"
 )

@@ -1,14 +1,5 @@
 package sf
 
-// Tooling-API helpers scoped to CustomField: ID lookup (naming is
-// quirky across namespaces + custom/standard/CMT entities, so we
-// centralise the strip-and-retry logic here) and the metadata update
-// shim (delegates to the generic UpdateToolingMetadata).
-//
-// Everything else Tooling-write that operates on CustomField.Metadata
-// lives in field_actions.go in the ui package — this file is purely
-// sobject plumbing.
-
 import (
 	"fmt"
 	"strings"
@@ -36,12 +27,6 @@ func CustomFieldID(target, sobject, fieldAPIName string) (string, error) {
 		return "", err
 	}
 
-	// TableEnumOrId behaves inconsistently across org types for
-	// namespaced / custom objects. We try the most likely candidates
-	// in order: bare developer name, full API name, and finally look
-	// up the CustomObject row by DeveloperName and use its Id.
-	//
-	// Once one returns a row, we take it.
 	candidates := []string{developerNameFromAPIName(sobject)}
 	if developerNameFromAPIName(sobject) != sobject {
 		candidates = append(candidates, sobject)
@@ -64,8 +49,6 @@ func CustomFieldID(target, sobject, fieldAPIName string) (string, error) {
 		}
 	}
 
-	// Last resort: resolve TableEnumOrId → CustomObject.Id, then
-	// query CustomField by that Id.
 	objDev := developerNameFromAPIName(sobject)
 	objSOQL := fmt.Sprintf(
 		"SELECT Id FROM CustomObject WHERE DeveloperName = '%s'",
@@ -90,27 +73,13 @@ func CustomFieldID(target, sobject, fieldAPIName string) (string, error) {
 		sobject, fieldAPIName, fieldDev)
 }
 
-// developerNameFromAPIName strips a namespace prefix ("ns__") and a
-// "__c" suffix from a Salesforce API name. Standard objects/fields
-// (no namespace, no __c) are returned unchanged.
-//
-// Examples:
-//
-//	pkgdemo__Test_Object__c → Test_Object
-//	MyField__c                   → MyField
-//	Account                      → Account
-//	pkgdemo__MyThing        → MyThing  (managed-package standard)
 func developerNameFromAPIName(name string) string {
-	// __c suffix (or __mdt for custom metadata types — treat the
-	// same way since CustomField.DeveloperName drops both).
 	for _, suf := range []string{"__c", "__mdt", "__e", "__b"} {
 		if strings.HasSuffix(name, suf) {
 			name = name[:len(name)-len(suf)]
 			break
 		}
 	}
-	// Namespace prefix: the first "__" split leaves <ns, rest>. The
-	// "rest" is what the Tooling API keys on.
 	if i := strings.Index(name, "__"); i > 0 {
 		name = name[i+2:]
 	}

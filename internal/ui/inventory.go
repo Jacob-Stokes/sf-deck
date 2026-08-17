@@ -1,30 +1,5 @@
 package ui
 
-// inventory.go — generates the human-readable docs/development/surfaces.md
-// reference by walking the tabRegistry. Called from
-// cmd/inventory/main.go.
-//
-// Output shape: nested per top-level tab. Each tab block lists:
-//   - top-level surface (List/Open/Chips/Activate hooks present?)
-//   - subtabs (when applicable) with the same hook breakdown
-//   - drill targets (which TabSomethingDetail Enter goes to)
-//
-// What's auto-derived:
-//   - tab + subtab presence and labels
-//   - whether a list / open / chips / activate hook is wired
-//   - openable Targets() per row type when introspectable
-//
-// What's NOT auto-derived (and gets a "TODO" or hand-filled in
-// docs/development/surfaces.md after generation):
-//   - the human description of what each surface IS
-//   - drill destinations (closures aren't introspectable)
-//   - sidebar contents
-//
-// Re-running this overwrites the file; manual notes go in a
-// separate Notes section per tab if we want them to survive
-// re-generation. For now, the generator emits a single fully
-// auto block and the user hand-edits afterwards.
-
 import (
 	"fmt"
 	"sort"
@@ -51,8 +26,6 @@ func BuildSurfaceInventoryMarkdown() string {
 
 	specs := tabSpecs()
 
-	// Order: top-level tabs first (in registry order via Stem ==
-	// self), then drill tabs grouped under their stem.
 	tops := []Tab{}
 	drills := map[Tab][]Tab{}
 	for t, s := range specs {
@@ -281,8 +254,6 @@ func BuildQAChecklistMarkdown() string {
 	return b.String()
 }
 
-// specForQA resolves which hooks are effective for a (tab, subtab)
-// pair — subtab shadows tab, mirroring tabspec_resolve.go.
 type specForQA struct {
 	spec  *TabSpec
 	sub   *SubtabSpec

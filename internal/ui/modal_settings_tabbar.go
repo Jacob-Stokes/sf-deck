@@ -4,16 +4,6 @@ package ui
 // tabs occupy number slots 1-8 (the same set the "0 More…" overflow
 // picker could already reorder, now editable from Settings → Startup
 // & defaults → Tab bar slots).
-//
-// UX: a submenu lists slots 1-8, each showing its current tab. Picking
-// a slot opens a tab picker (every pinnable tab + "empty"); the pick
-// replaces that slot, persists, and rebuilds the live number bar so
-// the strip updates immediately. A "Reset to defaults" row clears the
-// override.
-//
-// Slots are edited in place rather than via drag-reorder because the
-// choiceModal primitive is a flat picker — a slot-at-a-time model maps
-// onto it cleanly and needs no new widget.
 
 import (
 	"fmt"
@@ -24,10 +14,6 @@ import (
 
 const tabBarSlots = 8
 
-// tabBarPinnedIDs returns the current slot assignment as a fixed-length
-// (tabBarSlots) slice of tab id strings, padding trailing empties with
-// "". Resolves from the live TabsForNumbers() so it reflects defaults
-// when the user hasn't set an override yet.
 func tabBarPinnedIDs() []string {
 	out := make([]string, tabBarSlots)
 	cur := TabsForNumbers()
@@ -37,8 +23,6 @@ func tabBarPinnedIDs() []string {
 	return out
 }
 
-// openTabBarModal lists the 8 slots plus reset. Each slot row shows the
-// tab currently assigned (or "empty").
 func (m *Model) openTabBarModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -110,10 +94,8 @@ func (m *Model) openTabBarSlotPicker(slot int) tea.Cmd {
 		OnSuccessTyped: func(val any) tea.Cmd {
 			id, _ := val.(string)
 			m.applyTabBarSlot(slot, id)
-			// Re-open the slot list so the user can keep editing.
 			return func() tea.Msg { return openSettingsSubmenuMsg{pick: "startup.tab_bar"} }
 		},
-		// Esc returns to the slot list rather than closing settings.
 		OnCancel: func() tea.Cmd {
 			return func() tea.Msg { return openSettingsSubmenuMsg{pick: "startup.tab_bar"} }
 		},
@@ -121,17 +103,11 @@ func (m *Model) openTabBarSlotPicker(slot int) tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// applyTabBarSlot sets slot to id (empty id clears it), strips any
-// duplicate of id from the other slots (a tab occupies at most one
-// number key), drops trailing empties, persists, and rebuilds the live
-// number bar.
 func (m *Model) applyTabBarSlot(slot int, id string) {
 	if m.settings == nil {
 		return
 	}
 	ids := tabBarPinnedIDs()
-	// Remove id from any slot it already holds so assigning it here
-	// moves it rather than duplicating.
 	if id != "" {
 		for i := range ids {
 			if i != slot && ids[i] == id {
@@ -146,30 +122,20 @@ func (m *Model) applyTabBarSlot(slot int, id string) {
 	m.persistTabBar("tab bar updated")
 }
 
-// applyTabBarReset clears the user override so the bar falls back to
-// the default 8, and rebuilds.
 func (m *Model) applyTabBarReset() {
 	if m.settings == nil {
 		return
 	}
-	// Clearing the stored slice with UserSetPinned=false would be ideal,
-	// but SetPinnedTabs always marks it user-set; writing the default
-	// ids explicitly gives the same visible result and is simplest.
 	m.settings.SetPinnedTabs(defaultPinnedTabIDs())
 	m.persistTabBar("tab bar reset to defaults")
 }
 
-// persistTabBar saves settings and rebuilds the number-bar cache so the
-// strip reflects the new slots without a restart.
 func (m *Model) persistTabBar(msg string) {
 	RebuildTabsForNumbers(m.settings.PinnedTabs())
 	_ = m.settings.Save()
 	m.flash(msg)
 }
 
-// compactTabIDs drops empty ("") entries, preserving order — so a
-// cleared middle slot closes the gap rather than leaving a hole that
-// would shift the number keys confusingly.
 func compactTabIDs(ids []string) []string {
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -180,8 +146,6 @@ func compactTabIDs(ids []string) []string {
 	return out
 }
 
-// defaultPinnedTabIDs is the id-string form of defaultPinnedTabs, used
-// by the reset path.
 func defaultPinnedTabIDs() []string {
 	def := defaultPinnedTabs()
 	out := make([]string, 0, len(def))

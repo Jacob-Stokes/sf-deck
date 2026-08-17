@@ -8,9 +8,6 @@ import (
 	"testing"
 )
 
-// findRepoRoot walks up from the test file to find the go.mod
-// boundary. Used by the drift tests to grep the source tree
-// without hard-coding paths that break on contributor machines.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -94,10 +91,6 @@ func TestIPCBindingsHaveBackendMethod(t *testing.T) {
 		if method == "" {
 			continue // intentional skip — convention doesn't apply
 		}
-		// Look for "MethodName(" — the leading paren proves
-		// it's a method decl or call site rather than a comment
-		// referencing the name. Both arg-bearing (Foo(args …))
-		// and arg-free (Foo()) methods qualify.
 		needle := method + "("
 		if !grepFile(t, listenerFile, needle) {
 			t.Errorf("%s expects Backend method %q but it's missing from listener.go",
@@ -132,18 +125,13 @@ func commandToMethod(command string) string {
 	return b.String()
 }
 
-// camelSegment uppercases the first rune of a segment, handles
-// known acronyms (SOQL, IPC, SOAP, REST, etc.), and CamelCases
-// kebab-case segments.
 func camelSegment(s string) string {
 	if s == "" {
 		return ""
 	}
-	// Known acronym shortcut.
 	if upper, ok := acronyms[strings.ToLower(s)]; ok {
 		return upper
 	}
-	// Split on dashes; CamelCase each sub-segment.
 	subs := strings.Split(s, "-")
 	var b strings.Builder
 	for _, sub := range subs {

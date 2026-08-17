@@ -1,19 +1,5 @@
 package ui
 
-// chip_surface_spec.go — typed builder that collapses chipSurface
-// closure repetition.
-//
-// Before: every chipped surface declared 20-40 lines of identical
-// closures wiring SetExtra(chipMatcherFor[T]), applyVisitedListOrder,
-// clearVisitedListOrder, and the ScopeCount lookup. The variation
-// per surface was just the ListView field, the qchip.Registry
-// pointer, the visit-RecentKind, the optional scope predicate, and
-// the ID extractor.
-//
-// After: each surface declares a typed ListChipSurfaceSpec[T] with
-// just that variation. newListChipSurface(spec) produces the full
-// chipSurface value with all closures pre-wired.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/query"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/orgproject"
@@ -72,8 +58,6 @@ type ListChipSurfaceSpec[T query.Row] struct {
 	ImportFromSF bool
 }
 
-// newListChipSurface compiles a ListChipSurfaceSpec[T] into the
-// type-erased chipSurface value that the registry expects.
 func newListChipSurface[T query.Row](spec ListChipSurfaceSpec[T]) chipSurface {
 	cs := chipSurface{
 		Domain:     spec.Domain,

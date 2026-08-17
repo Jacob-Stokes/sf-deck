@@ -1,25 +1,6 @@
 package ui
 
 // Per-domain RowMark builders + per-item pill renderers.
-//
-// RowMarks live in two places:
-//   - On a ListTableSpec.Marks slice — evaluated per row index at
-//     render time, applied as inline tints/badges on the row body.
-//   - On a detail surface — evaluated against one specific item,
-//     rendered as a row of pills below the title so the user sees
-//     the same metadata-shape labels they saw in the list.
-//
-// Same conceptual rule, two different surfaces. To avoid duplicating
-// the predicates, this file exposes:
-//
-//   - marksFor<Domain>(items): a closure-driven []RowMark used by
-//     list-tables (matches against a row index)
-//   - markPillsFor<Domain>(item): a static-form list of {label, color}
-//     used by detail renderers (matches against one specific item)
-//
-// Both share the underlying predicate (e.g. "non-empty namespace
-// prefix means managed package") so adding a new domain mark only
-// requires updating one predicate plus exposing it via both forms.
 
 import (
 	"image/color"
@@ -33,10 +14,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// flagsCellMode resolves the user's Ctrl+F cycle state to the
-// MarksCellMode the renderer should use. Hidden mode is handled by
-// the column-inclusion check (flagsColumnVisible), not here, so this
-// only ever returns Full or Letter.
 func (m Model) flagsCellMode() uilayout.MarksCellMode {
 	if m.settings == nil {
 		return uilayout.MarksCellModeFull
@@ -47,8 +24,6 @@ func (m Model) flagsCellMode() uilayout.MarksCellMode {
 	return uilayout.MarksCellModeFull
 }
 
-// flagsColumnVisible reports whether the FLAGS column should be
-// rendered at all. Drives surfaces' col-inclusion logic.
 func (m Model) flagsColumnVisible() bool {
 	if m.settings == nil {
 		return true
@@ -56,23 +31,10 @@ func (m Model) flagsColumnVisible() bool {
 	return m.settings.FlagColumnVisible()
 }
 
-// renderFlagsCell is the surface-level helper. Each list_surface's
-// Cell closure calls this for the FLAGS column instead of the
-// generic uilayout.RenderMarksCell so the user's Ctrl+F mode flows
-// through transparently.
 func (m Model) renderFlagsCell(marks []uilayout.RowMark, row int) string {
 	return uilayout.RenderMarksCellMode(marks, row, m.flagsCellMode())
 }
 
-// applyFlagsColumnMode rewrites a list-surface's columns slice for
-// the user's current Ctrl+F mode. Surfaces declare the FLAGS column
-// at the tail of their Cols spec; this helper either drops it
-// (hidden mode) or tightens its Min/Ideal/Max (letter mode) so the
-// user's pick flows through to the renderer without each surface
-// duplicating the logic.
-//
-// Returns the slice unchanged when the trailing column isn't named
-// "Marks" — defensive against future col-order changes.
 func (m Model) applyFlagsColumnMode(cols []uilayout.ListColumn) []uilayout.ListColumn {
 	if len(cols) == 0 {
 		return cols
@@ -83,9 +45,6 @@ func (m Model) applyFlagsColumnMode(cols []uilayout.ListColumn) []uilayout.ListC
 	}
 	switch m.flagsCellMode() {
 	case uilayout.MarksCellModeLetter:
-		// Compact: one cell per matching mark, no separator. Header
-		// floor of 5 keeps the "FLAGS" label intact even when no row
-		// in view has any flags.
 		cols[last].Min = 5
 		cols[last].Ideal = 5
 		cols[last].Max = 8
@@ -96,23 +55,11 @@ func (m Model) applyFlagsColumnMode(cols []uilayout.ListColumn) []uilayout.ListC
 	return cols
 }
 
-// markPill is one rendered annotation pill in a detail pane. Mirrors
-// the Treatment shape on a RowMark but flattened to "this is what
-// appears under the title for this specific item."
 type markPill struct {
-	Label string
-	// PillColor tints both the badge bracket characters and the
-	// label inside. Nil falls back to muted — but every caller in
-	// this codebase sets it.
+	Label     string
 	PillColor color.Color
 }
 
-// renderMarkPills formats a slice of pills as a single space-separated
-// row. Each pill renders as `[label]` with its color. Returns "" when
-// the slice is empty so callers can drop the line cleanly.
-//
-// No subheading text — the pills' visual style + their match with
-// what users already see in the list view carries the meaning.
 func renderMarkPills(pills []markPill) string {
 	if len(pills) == 0 {
 		return ""
@@ -130,8 +77,6 @@ func renderMarkPills(pills []markPill) string {
 	return strings.Join(parts, " ")
 }
 
-// --- sObject marks ----------------------------------------------------
-
 // markPredicateCustomSObject reports whether an sObject API name is
 // custom-shaped (one of the user-creatable suffixes). Single source
 // of truth — both the list-table mark and the per-item pill list
@@ -140,17 +85,10 @@ func markPredicateCustomSObject(name string) bool {
 	return sf.IsCustom(name)
 }
 
-// markPredicateManagedSObject reports whether an sObject's API name
-// has a managed-package namespace prefix. Delegates to sf.IsManagedName
-// so the marks column and the Managed/Unmanaged chips share one source
-// of truth.
 func markPredicateManagedSObject(name string) bool {
 	return sf.IsManagedName(name)
 }
 
-// marksForSObjectList builds the RowMark slice for an sObject
-// list-table. The closures index into the items slice the caller
-// passes — typical pattern for list-table marks.
 func marksForSObjectList(items []sf.SObject) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -180,9 +118,6 @@ func marksForSObjectList(items []sf.SObject) []uilayout.RowMark {
 	}
 }
 
-// markPillsForSObject returns the per-item pills shown in a detail
-// pane. Routes through the same predicates as marksForSObjectList
-// so list view and detail view always agree.
 func markPillsForSObject(name string) []markPill {
 	var out []markPill
 	if markPredicateCustomSObject(name) {
@@ -194,15 +129,10 @@ func markPillsForSObject(name string) []markPill {
 	return out
 }
 
-// --- Apex class marks -------------------------------------------------
-
 func markPredicateManagedApex(namespace string) bool {
 	return namespace != ""
 }
 
-// marksForApexClassList builds the RowMark slice for the /apex
-// classes list. Today there's only the managed badge; more rules
-// (deprecated, generated, etc.) drop in here as they're added.
 func marksForApexClassList(items []sf.ApexClassRow) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -221,8 +151,6 @@ func marksForApexClassList(items []sf.ApexClassRow) []uilayout.RowMark {
 	}
 }
 
-// markPillsForApexClass renders pills for one ApexClassRow. Used by
-// the /apex detail sidebar.
 func markPillsForApexClass(row sf.ApexClassRow) []markPill {
 	var out []markPill
 	if markPredicateManagedApex(row.NamespacePrefix) {
@@ -235,10 +163,6 @@ func markPillsForApexClass(row sf.ApexClassRow) []markPill {
 	return out
 }
 
-// --- Apex trigger marks ----------------------------------------------
-
-// marksForApexTriggerList is the trigger-list equivalent of
-// marksForApexClassList. Same managed-package rule.
 func marksForApexTriggerList(items []sf.TriggerRow) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -257,7 +181,6 @@ func marksForApexTriggerList(items []sf.TriggerRow) []uilayout.RowMark {
 	}
 }
 
-// markPillsForApexTrigger renders pills for one TriggerRow.
 func markPillsForApexTrigger(t sf.TriggerRow) []markPill {
 	var out []markPill
 	if markPredicateManagedApex(t.NamespacePrefix) {
@@ -274,16 +197,10 @@ func markPillsForApexTrigger(t sf.TriggerRow) []markPill {
 	return out
 }
 
-// --- Flow marks ------------------------------------------------------
-
-// markPredicateManagedFlow reports whether a flow row carries a
-// managed-package namespace prefix. EntityDefinition stores the
-// prefix on FlowDefinition; we cache it on Flow.Namespace.
 func markPredicateManagedFlow(f sf.Flow) bool {
 	return f.Namespace != ""
 }
 
-// marksForFlowList builds the RowMark slice for /flows.
 func marksForFlowList(items []sf.Flow) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -311,7 +228,6 @@ func marksForFlowList(items []sf.Flow) []uilayout.RowMark {
 	}
 }
 
-// markPillsForFlow renders pills for one Flow row in the detail pane.
 func markPillsForFlow(f sf.Flow) []markPill {
 	var out []markPill
 	if markPredicateManagedFlow(f) {
@@ -324,11 +240,8 @@ func markPillsForFlow(f sf.Flow) []markPill {
 	return out
 }
 
-// --- LWC bundle marks ------------------------------------------------
-
 func markPredicateManagedLWC(b sf.LWCBundle) bool { return b.NamespacePrefix != "" }
 
-// marksForLWCList badges managed bundles + exposed bundles.
 func marksForLWCList(items []sf.LWCBundle) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -356,11 +269,8 @@ func marksForLWCList(items []sf.LWCBundle) []uilayout.RowMark {
 	}
 }
 
-// --- Aura bundle marks -----------------------------------------------
-
 func markPredicateManagedAura(b sf.AuraBundle) bool { return b.NamespacePrefix != "" }
 
-// marksForAuraList badges managed bundles. Aura has no IsExposed flag.
 func marksForAuraList(items []sf.AuraBundle) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -377,11 +287,8 @@ func marksForAuraList(items []sf.AuraBundle) []uilayout.RowMark {
 	}
 }
 
-// --- PermSet marks ---------------------------------------------------
-
 func markPredicateManagedPermSet(p sf.PermissionSet) bool { return p.NamespacePrefix != "" }
 
-// marksForPermSetList badges managed PSes + session-based PSes.
 func marksForPermSetList(items []sf.PermissionSet) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -420,7 +327,6 @@ func marksForPermSetList(items []sf.PermissionSet) []uilayout.RowMark {
 	}
 }
 
-// markPillsForPermSet renders pills for one PermissionSet detail pane.
 func markPillsForPermSet(p sf.PermissionSet) []markPill {
 	var out []markPill
 	if markPredicateManagedPermSet(p) {
@@ -436,12 +342,8 @@ func markPillsForPermSet(p sf.PermissionSet) []markPill {
 	return out
 }
 
-// --- PermSet Group marks --------------------------------------------
-
 func markPredicateManagedPSG(g sf.PermissionSetGroup) bool { return g.NamespacePrefix != "" }
 
-// marksForPSGList badges managed PSGs and surfaces non-Updated status
-// (Outdated/Failed/Updating) so admins can spot rebuild work at a glance.
 func marksForPSGList(items []sf.PermissionSetGroup) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -470,7 +372,6 @@ func marksForPSGList(items []sf.PermissionSetGroup) []uilayout.RowMark {
 	}
 }
 
-// markPillsForPSG renders pills for one PermissionSetGroup detail pane.
 func markPillsForPSG(g sf.PermissionSetGroup) []markPill {
 	var out []markPill
 	if markPredicateManagedPSG(g) {
@@ -484,12 +385,6 @@ func markPillsForPSG(g sf.PermissionSetGroup) []markPill {
 	return out
 }
 
-// --- Profile marks ---------------------------------------------------
-
-// marksForProfileList badges custom profiles (non-standard UserType).
-// Standard profiles have UserType == "Standard"; everything else is
-// either a license-driven profile (Partner / Customer Portal) or a
-// custom built by an admin — both worth flagging.
 func marksForProfileList(items []sf.Profile) []uilayout.RowMark {
 	return []uilayout.RowMark{
 		{
@@ -506,7 +401,6 @@ func marksForProfileList(items []sf.Profile) []uilayout.RowMark {
 	}
 }
 
-// markPillsForProfile renders pills for one Profile detail pane.
 func markPillsForProfile(p sf.Profile) []markPill {
 	var out []markPill
 	if p.UserType != "" && p.UserType != "Standard" {

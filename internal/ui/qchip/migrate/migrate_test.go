@@ -60,7 +60,6 @@ func TestRunLegacyFlowFilters(t *testing.T) {
 		t.Fatal("missing chip")
 	}
 	q := qchip.QueryFromConfig(chips[0].Query)
-	// Eval against a representative row.
 	row := mapRow{
 		"Status":      "Active",
 		"ProcessType": "Flow",
@@ -87,8 +86,6 @@ func TestRunIdempotent(t *testing.T) {
 	}
 }
 
-// mapRow is a minimal query.Row impl for tests that don't want to drag
-// in the sf package types.
 type mapRow map[string]any
 
 func (m mapRow) Field(name string) (any, bool) {

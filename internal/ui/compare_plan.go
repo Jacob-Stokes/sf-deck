@@ -32,8 +32,6 @@ var compareObjectRootedTypes = func() map[string]bool {
 	return m
 }()
 
-// compareObjectChildTypes are served by the parent CustomObject retrieve
-// (their bodies are extracted from the object's XML), not standalone.
 var compareObjectChildTypes = func() map[string]bool {
 	m := map[string]bool{}
 	for _, t := range compareObjectRootedTypeOrder {
@@ -93,9 +91,6 @@ func estimateSnapshotPlanCalls(plan comparePlan) int {
 		}
 	}
 
-	// This mirrors the current runner: every non-Apex type performs one
-	// listMetadata call, then at least one readMetadata batch. Component
-	// counts add more readMetadata calls, so this remains a floor.
 	listing := soapTypes
 	retrieve := soapTypes
 	objects := 0

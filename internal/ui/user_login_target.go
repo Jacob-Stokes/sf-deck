@@ -1,14 +1,5 @@
 package ui
 
-// user_login_target.go — "Log in as user" ^O menu entry for any User
-// row (in /users, in SOQL results, anywhere a User record appears).
-//
-// Mirrors the existing User-detail action menu entry (openLoginAs in
-// tab_user_actions.go) but plumbed through the open menu so it works
-// from any surface. The URL is /servlet/servlet.su with
-// suorgadminid + targetuserid params — distinct from the community
-// variant which uses sunetwork* params.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
@@ -62,8 +53,6 @@ func (m Model) userLoginAsTargets(rec map[string]any, o sf.Org) []sf.OpenTarget 
 	if o.OrgID == "" {
 		return nil
 	}
-	// Skip self-impersonation. Compare on the 15-char prefix so a
-	// caller passing the 18-char form still matches.
 	d := m.data[o.Username]
 	if d != nil {
 		adminID := d.Home.Value().UserID

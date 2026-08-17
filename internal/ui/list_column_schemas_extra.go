@@ -335,8 +335,6 @@ func asyncJobColumnSchema() tablemodel.Schema[sf.AsyncJobRow] {
 	}
 }
 
-// asyncJobProgressCell renders JobItemsDone/JobItemsTotal ("3/10");
-// jobs with no batch items (future/queueable) show a dash.
 func asyncJobProgressCell(j sf.AsyncJobRow) string {
 	if j.JobItemsTotal == 0 {
 		return "—"
@@ -373,9 +371,6 @@ func setupAuditColumnSchema() tablemodel.Schema[sf.SetupAuditRow] {
 		return r.CreatedDate.Format("2006-01-02 15:04")
 	}
 	by := func(r sf.SetupAuditRow) string {
-		// Surface delegate ("acted as") when present — the actor of
-		// record is CreatedBy, but a login-as session shows who was
-		// impersonating.
 		if r.Delegate != "" {
 			return r.CreatedBy + " (as " + r.Delegate + ")"
 		}
@@ -388,10 +383,9 @@ func setupAuditColumnSchema() tablemodel.Schema[sf.SetupAuditRow] {
 		Columns: map[string]tablemodel.ColumnDef[sf.SetupAuditRow]{
 			"When":    textColumnDef[sf.SetupAuditRow]("WHEN", tablemodel.Width{Min: 14, Ideal: 16}, when),
 			"Section": textColumnDef[sf.SetupAuditRow]("SECTION", tablemodel.Width{Min: 12, Ideal: 20}, func(r sf.SetupAuditRow) string { return r.Section }),
-			// The Display sentence is the payload — give it the room.
-			"Change": textColumnDef[sf.SetupAuditRow]("CHANGE", tablemodel.Width{Min: 24, Ideal: 60}, func(r sf.SetupAuditRow) string { return r.Display }),
-			"By":     textColumnDef[sf.SetupAuditRow]("BY", tablemodel.Width{Min: 12, Ideal: 22}, by),
-			"Action": textColumnDef[sf.SetupAuditRow]("ACTION", tablemodel.Width{Min: 12, Ideal: 24}, func(r sf.SetupAuditRow) string { return r.Action }),
+			"Change":  textColumnDef[sf.SetupAuditRow]("CHANGE", tablemodel.Width{Min: 24, Ideal: 60}, func(r sf.SetupAuditRow) string { return r.Display }),
+			"By":      textColumnDef[sf.SetupAuditRow]("BY", tablemodel.Width{Min: 12, Ideal: 22}, by),
+			"Action":  textColumnDef[sf.SetupAuditRow]("ACTION", tablemodel.Width{Min: 12, Ideal: 24}, func(r sf.SetupAuditRow) string { return r.Action }),
 		},
 	}
 }
@@ -440,8 +434,6 @@ func deployColumnSchema() tablemodel.Schema[sf.DeployRow] {
 	}
 }
 
-// deployDurationLabel renders Start→Completed compactly ("16s",
-// "4m12s"); in-flight rows show an ellipsis instead of a span.
 func deployDurationLabel(r sf.DeployRow) string {
 	if r.InFlight() {
 		return "…"
@@ -642,9 +634,6 @@ func withColumnStyle[T any](def tablemodel.ColumnDef[T], style lipgloss.Style) t
 	return def
 }
 
-// withSortKey attaches a SortKey to an existing column def so a
-// column whose rendered cell is a human label (e.g. "1.5 KB") still
-// orders by its raw underlying value.
 func withSortKey[T any](def tablemodel.ColumnDef[T], key func(T) string) tablemodel.ColumnDef[T] {
 	def.SortKey = key
 	return def
@@ -730,7 +719,6 @@ func dashboardColumnSchema() tablemodel.Schema[sf.DashboardRow] {
 			"Title":  textColumnDef[sf.DashboardRow]("TITLE", tablemodel.Width{Min: 22, Ideal: 40}, func(d sf.DashboardRow) string { return d.Title }),
 			"Folder": textColumnDef[sf.DashboardRow]("FOLDER", tablemodel.Width{Min: 16, Ideal: 30}, func(d sf.DashboardRow) string { return dashIfEmpty(d.FolderName) }),
 			"RunAs": textColumnDef[sf.DashboardRow]("RUN AS", tablemodel.Width{Min: 10, Ideal: 14}, func(d sf.DashboardRow) string {
-				// Type is the running-user mode; LoggedInUser = dynamic.
 				switch d.Type {
 				case "LoggedInUser":
 					return "viewer"

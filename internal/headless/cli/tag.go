@@ -163,8 +163,6 @@ func tagDelete(a *app.App, rest []string, stdout io.Writer, mode headless.WriteM
 	return headless.ExitCodeFor(r)
 }
 
-// tagApply / tagRemove / tagSet all bind a tag to an item — they
-// share the (kind, ref, org_user) input shape via parseBindingFlags.
 type bindingFlags struct {
 	kind, ref, orgUser string
 }
@@ -259,8 +257,6 @@ func tagSet(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode
 	return headless.ExitCodeFor(r)
 }
 
-// tagItems lists every item bound to one tag (the "show me everything
-// tagged X" query). Read-only.
 func tagItems(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	fs := newFlagSet("tag items")
 	id := fs.Int64("id", 0, "Tag id (required)")
@@ -286,7 +282,6 @@ func tagItems(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMo
 	return headless.ExitCodeFor(r)
 }
 
-// tagOf is the inverse: list every tag bound to one item.
 func tagOf(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	fs := newFlagSet("tag of")
 	b := parseBindingFlags(fs)
@@ -312,9 +307,6 @@ func tagOf(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode)
 	return headless.ExitCodeFor(r)
 }
 
-// writeTagErr maps service errors to typed headless codes. Mirrors
-// chip.go's writeChipErr — same three categories (not_found,
-// already_exists → invalid_argument, validation → invalid_argument).
 func writeTagErr(command string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	var notFound tags.ErrNotFound
 	if errors.As(err, &notFound) {

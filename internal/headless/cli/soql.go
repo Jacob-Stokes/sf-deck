@@ -17,9 +17,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// dispatchSOQL routes `sf-deck soql <verb>`. Read-only in Phase 2 —
-// no `--export` flag yet, no Bulk API, no saved-query CRUD (those are
-// Phase 3 + their own service package).
 func dispatchSOQL(a *app.App, args Args, stdout io.Writer, mode headless.WriteMode) int {
 	verb := args.Verb
 	if verb == "" {
@@ -88,10 +85,6 @@ func soqlRun(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMod
 		return writeSOQLErr("soql.run", o.Username, qerr, stdout, mode)
 	}
 
-	// truncated reports whether the client cap kicked in. The server
-	// always pages; SF returns totalSize as the full count even when
-	// it streamed only a partial first page, so cap < TotalSize is the
-	// right signal.
 	truncated := *limit > 0 && len(result.Records) < result.TotalSize
 	r := headless.Success("soql.run", o.Username, app.TargetArg(o), false,
 		map[string]any{
@@ -140,9 +133,6 @@ func soqlExport(a *app.App, rest []string, stdout io.Writer, mode headless.Write
 			errors.New("--output is required"), stdout, mode)
 	}
 	if *bulk && *tooling {
-		// Bulk API 2.0 doesn't support Tooling — fail fast rather
-		// than letting the network round-trip return a confusing
-		// error.
 		return writeArgErr("soql.export",
 			errors.New("--bulk and --tooling are mutually exclusive"), stdout, mode)
 	}
@@ -155,8 +145,6 @@ func soqlExport(a *app.App, rest []string, stdout io.Writer, mode headless.Write
 		return writeOrgErr("soql.export", *target, err, stdout, mode)
 	}
 
-	// Fetch records. Either REST (with no client-side cap — exports
-	// are explicitly "give me everything") or Bulk.
 	var (
 		result sf.QueryResult
 		qerr   error
@@ -171,9 +159,6 @@ func soqlExport(a *app.App, rest []string, stdout io.Writer, mode headless.Write
 		return writeSOQLErr("soql.export", o.Username, qerr, stdout, mode)
 	}
 
-	// Shape + write. Columns slice is nil — soql.Shape will discover
-	// columns from the records. Discovery preserves the SF response's
-	// natural ordering plus alphabetical for extras.
 	headers, rows := exsoql.Shape(result.Records, nil)
 	if werr := securefile.Write(*output, *force, func(w io.Writer) error {
 		return exporters.Write(w, format, headers, rows, "SOQL")
@@ -197,15 +182,8 @@ func soqlExport(a *app.App, rest []string, stdout io.Writer, mode headless.Write
 	return headless.ExitCodeFor(r)
 }
 
-// pickExportFormat resolves the export format. --format wins; the
-// output file's extension is the fallback. Returns an error for
-// formats that aren't exportable from SOQL (bundle formats like
-// sfdx-project — those need a metadata source, not query rows).
 func pickExportFormat(output, raw string) (exporters.Format, error) {
 	if raw != "" {
-		// Map the abbreviated flag values (csv|xlsx|json) to Format
-		// constants. Don't go through FormatFromExtension since the
-		// user typed a format, not an extension.
 		switch strings.ToLower(strings.TrimSpace(raw)) {
 		case "csv":
 			return exporters.FormatCSV, nil
@@ -224,8 +202,6 @@ func pickExportFormat(output, raw string) (exporters.Format, error) {
 	return f, nil
 }
 
-// resolveSOQL pulls the query from --query or --query-file. Special-
-// cases "-" as stdin so scripts can pipe.
 func resolveSOQL(inline, path string) (string, error) {
 	if inline != "" && path != "" {
 		return "", errors.New("--query and --query-file are mutually exclusive")

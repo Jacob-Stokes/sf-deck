@@ -1,17 +1,5 @@
 package devproject
 
-// SOQL execution history. Every executed query lands here scoped
-// to (org_user, executed_at). The history table is INSERT-heavy
-// and almost always read with a small limit ("last 50 queries"),
-// so the index on (org_user, executed_at DESC) carries every
-// query path.
-//
-// History rows are NOT linked to saved_queries by ID — a saved
-// query and a typed-by-hand query produce equivalent history
-// rows. The Body string is the source of truth; if the user
-// later wants to re-save a one-off, they pull the body from
-// history into the editor and CreateSavedQuery from there.
-
 import (
 	"fmt"
 	"time"

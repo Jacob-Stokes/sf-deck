@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-// Bundles attach to DevProjects 1:N. All operations are SQLite
-// CRUD against the in-temp-dir devprojects.db; no FS work beyond
-// the on-disk directory presence-check in Stale().
-
 func newBundleStore(t *testing.T) (*Store, string) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
@@ -20,15 +16,12 @@ func newBundleStore(t *testing.T) (*Store, string) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
-	// Every test needs at least one DevProject to link bundles to.
 	dp := DevProject{ID: "test-project", Name: "Test", CreatedAt: time.Now(), TouchedAt: time.Now()}
 	if err := s.CreateDevProject(dp); err != nil {
 		t.Fatal(err)
 	}
 	return s, dp.ID
 }
-
-// ----- CreateBundle ----------------------------------------------
 
 func TestCreateBundle_HappyPath(t *testing.T) {
 	s, projectID := newBundleStore(t)
@@ -75,8 +68,6 @@ func TestCreateBundle_AbsolutisesPath(t *testing.T) {
 	}
 }
 
-// ----- Get / List ------------------------------------------------
-
 func TestGetBundle_ReturnsCreated(t *testing.T) {
 	s, projectID := newBundleStore(t)
 	b, _ := s.CreateBundle(projectID, t.TempDir(), "")
@@ -102,7 +93,6 @@ func TestListBundlesFor_Project(t *testing.T) {
 	_, _ = s.CreateBundle(projectID, t.TempDir(), "")
 	_, _ = s.CreateBundle(projectID, t.TempDir(), "")
 
-	// Second project should not see the first's bundles.
 	other := DevProject{ID: "other", Name: "Other", CreatedAt: time.Now(), TouchedAt: time.Now()}
 	_ = s.CreateDevProject(other)
 	_, _ = s.CreateBundle(other.ID, t.TempDir(), "")
@@ -123,8 +113,6 @@ func TestListBundlesFor_Project(t *testing.T) {
 		t.Errorf("len = %d, want 3", len(all))
 	}
 }
-
-// ----- Stale -----------------------------------------------------
 
 func TestStale_EmptyPath(t *testing.T) {
 	b := Bundle{}
@@ -159,8 +147,6 @@ func TestStale_FullSfdxProjectNotStale(t *testing.T) {
 	}
 }
 
-// ----- MarkRetrieved / MarkDeployed ------------------------------
-
 func TestMarkRetrieved_SetsTimestamp(t *testing.T) {
 	s, projectID := newBundleStore(t)
 	b, _ := s.CreateBundle(projectID, t.TempDir(), "")
@@ -188,8 +174,6 @@ func TestMarkDeployed_SetsTimestamp(t *testing.T) {
 	}
 }
 
-// ----- SetDefaultOrgAlias / SetBundlePath -----------------------
-
 func TestSetDefaultOrgAlias_Updates(t *testing.T) {
 	s, projectID := newBundleStore(t)
 	b, _ := s.CreateBundle(projectID, t.TempDir(), "dev")
@@ -215,8 +199,6 @@ func TestSetBundlePath_Updates(t *testing.T) {
 	}
 }
 
-// ----- DeleteBundle ---------------------------------------------
-
 func TestDeleteBundle_RemovesRow(t *testing.T) {
 	s, projectID := newBundleStore(t)
 	b, _ := s.CreateBundle(projectID, t.TempDir(), "")
@@ -227,8 +209,6 @@ func TestDeleteBundle_RemovesRow(t *testing.T) {
 		t.Error("bundle still exists after delete")
 	}
 }
-
-// ----- newBundleID ----------------------------------------------
 
 func TestNewBundleID_IsUnique(t *testing.T) {
 	seen := map[string]bool{}

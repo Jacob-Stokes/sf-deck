@@ -12,8 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
-// newSavedQueryTestApp opens devproject under a temp HOME. soql.saved
-// is local-only — no orgs needed.
 func newSavedQueryTestApp(t *testing.T) *app.App {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
@@ -50,7 +48,6 @@ func runSavedCLI(t *testing.T, a *app.App, argv ...string) (int, map[string]any)
 func TestSavedQuery_FullLifecycle(t *testing.T) {
 	a := newSavedQueryTestApp(t)
 
-	// Create.
 	code, got := runSavedCLI(t, a, "--json", "soql", "saved", "create",
 		"--name", "recent-accounts",
 		"--query", "SELECT Id, Name FROM Account LIMIT 10")
@@ -67,7 +64,6 @@ func TestSavedQuery_FullLifecycle(t *testing.T) {
 		t.Errorf("id = %q, want sq_ prefix", id)
 	}
 
-	// List.
 	code, got = runSavedCLI(t, a, "--json", "soql", "saved", "list")
 	if code != headless.ExitOK {
 		t.Fatalf("list exit = %d", code)
@@ -76,21 +72,18 @@ func TestSavedQuery_FullLifecycle(t *testing.T) {
 		t.Errorf("list count = %v", got["data"].(map[string]any)["count"])
 	}
 
-	// Update.
 	code, got = runSavedCLI(t, a, "--json", "soql", "saved", "update",
 		"--id", id, "--name", "renamed")
 	if code != headless.ExitOK {
 		t.Fatalf("update exit = %d (%+v)", code, got)
 	}
 
-	// Delete.
 	code, _ = runSavedCLI(t, a, "--json", "soql", "saved", "delete",
 		"--id", id)
 	if code != headless.ExitOK {
 		t.Fatalf("delete exit = %d", code)
 	}
 
-	// Show now not_found.
 	code, _ = runSavedCLI(t, a, "--json", "soql", "saved", "show", "--id", id)
 	if code != headless.ExitNotFound {
 		t.Errorf("post-delete show exit = %d, want %d", code, headless.ExitNotFound)

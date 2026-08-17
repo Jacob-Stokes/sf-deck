@@ -1,25 +1,6 @@
 package verbs
 
-// registry is the canonical list of every sf-deck verb. Sorted by
-// hand into noun groups for legibility; Specs() returns it sorted
-// alphabetically by qualified name.
-//
-// Adding a verb:
-//
-//   1. Append a Spec to this slice.
-//   2. Implement the CLI handler (when CLI != nil) and add it to
-//      the CLI dispatch switch.
-//   3. Implement the IPC handler (when IPC != nil) and add it to
-//      the listener dispatch + Backend interface.
-//   4. Run `go test ./internal/verbs/...` — the drift test checks
-//      that every CLI binding has a dispatch arm and every IPC
-//      binding has a Backend method.
-//
-// Keep summaries to one line. Long-form notes go in the Notes
-// field; that's what skill docs render under each verb.
-
 var registry = []Spec{
-	// ===== state / nav (mostly IPC-only) ============================
 	{
 		Noun: "state", Verb: "get",
 		Summary:   "Read the live TUI state snapshot (tab, org, drilldown ids).",
@@ -50,7 +31,6 @@ var registry = []Spec{
 		},
 	},
 
-	// ===== org ======================================================
 	{
 		Noun: "org", Verb: "list",
 		Summary:   "List sf CLI-known orgs with their connection status.",
@@ -125,7 +105,6 @@ var registry = []Spec{
 		Notes: "Does not deactivate the Salesforce user or revoke other sessions.",
 	},
 
-	// ===== project ==================================================
 	{
 		Noun: "project", Verb: "list",
 		Summary:   "List all DevProjects.",
@@ -228,7 +207,6 @@ var registry = []Spec{
 		IPC:       &IPCBinding{Command: "project.unload"},
 	},
 
-	// ===== bundle ===================================================
 	{
 		Noun: "bundle", Verb: "list",
 		Summary:   "List bundles (optionally for one DevProject).",
@@ -301,7 +279,6 @@ var registry = []Spec{
 		IPC:       &IPCBinding{Command: "bundle.delete"},
 	},
 
-	// ===== soql =====================================================
 	{
 		Noun: "soql", Verb: "run",
 		Summary:   "Execute a SOQL query and return records.",
@@ -383,7 +360,6 @@ var registry = []Spec{
 		IPC:       &IPCBinding{Command: "soql.saved.delete"},
 	},
 
-	// ===== apex =====================================================
 	{
 		Noun: "apex", Verb: "execute",
 		Summary:   "Run anonymous Apex.",
@@ -405,7 +381,6 @@ var registry = []Spec{
 		CLI:       &CLIBinding{Usage: "sf-deck apex snippet list --json"},
 	},
 
-	// ===== record ===================================================
 	{
 		Noun: "record", Verb: "get",
 		Summary:   "Fetch one record by sobject + id.",
@@ -470,7 +445,6 @@ var registry = []Spec{
 		},
 	},
 
-	// ===== metadata =================================================
 	{
 		Noun: "metadata", Verb: "get",
 		Summary:   "Read a Tooling sobject row's Metadata map.",
@@ -503,7 +477,6 @@ var registry = []Spec{
 		IPC:       &IPCBinding{Command: "metadata.delete"},
 	},
 
-	// ===== object ===================================================
 	{
 		Noun: "object", Verb: "describe",
 		Summary:   "Return the cached SObjectDescribe for an sobject.",
@@ -512,7 +485,6 @@ var registry = []Spec{
 		IPC:       &IPCBinding{Command: "object.describe"},
 	},
 
-	// ===== report ===================================================
 	{
 		Noun: "report", Verb: "list",
 		Summary:   "List reports (with optional name/folder filters).",
@@ -535,7 +507,6 @@ var registry = []Spec{
 		Notes:     "Refuses to overwrite an existing output unless --force is supplied.",
 	},
 
-	// ===== chip =====================================================
 	{
 		Noun: "chip", Verb: "list",
 		Summary:   "List all defined chips.",
@@ -604,7 +575,6 @@ var registry = []Spec{
 		IPC:       &IPCBinding{Command: "chip.preview.dismiss"},
 	},
 
-	// ===== tag ======================================================
 	{
 		Noun: "tag", Verb: "list",
 		Summary:   "List all tags (optionally only ones in use).",
@@ -674,7 +644,6 @@ var registry = []Spec{
 		CLI:       &CLIBinding{Usage: "sf-deck tag of --kind flow --ref <name> --json"},
 	},
 
-	// ===== instance =================================================
 	{
 		Noun: "instance", Verb: "list",
 		Summary:   "List running sf-deck instances + their control sockets.",
@@ -688,7 +657,6 @@ var registry = []Spec{
 		CLI:       &CLIBinding{Usage: "sf-deck instance kill --number <n> --json"},
 	},
 
-	// ===== privacy + local data =====================================
 	{
 		Noun: "legal", Verb: "status",
 		Summary:   "Show the current privacy/user-terms revision and acceptance status.",
@@ -726,7 +694,6 @@ var registry = []Spec{
 		Notes: "Requires all sf-deck instances to be closed. Custom export/bundle paths and Salesforce CLI credentials are not deleted.",
 	},
 
-	// ===== update ===================================================
 	{
 		Noun: "update", Verb: "check",
 		Summary:   "Check GitHub Releases for a newer stable sf-deck version.",
@@ -740,7 +707,6 @@ var registry = []Spec{
 		Notes: "Read-only and notification-only: it never downloads or installs a release.",
 	},
 
-	// ===== notification =============================================
 	{
 		Noun: "notification", Verb: "send",
 		Summary:   "Send a desktop notification via the configured backend.",
@@ -748,7 +714,6 @@ var registry = []Spec{
 		CLI:       &CLIBinding{Usage: "sf-deck notification send --title <t> --body <b> --json"},
 	},
 
-	// ===== verbs (introspection) ====================================
 	{
 		Noun: "verbs", Verb: "list",
 		Summary:   "Return the full verb registry — single source of truth.",

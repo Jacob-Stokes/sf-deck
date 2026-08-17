@@ -1,15 +1,6 @@
 // Package soql shapes SOQL result rows into the shared
 // exporters.ExportRow form so the standard CSV / XLSX / JSON writers
 // can serialise them without further per-format work.
-//
-// SOQL projections are dynamic — the column set comes from the query,
-// not from a fixed schema. The shape function takes a list of records
-// (map[string]any from sf.QueryResult) and the column order observed
-// at render time, and walks each record producing one ExportRow per.
-//
-// Cell formatting matches what the TUI shows: nil → "", numbers via
-// %v, strings preserved, nested maps (relationship traversal) flattened
-// to dotted keys (e.g. Owner.Name).
 package soql
 
 import (
@@ -42,13 +33,6 @@ func Shape(records []map[string]any, columns []string) (headers []string, rows [
 	return headers, rows
 }
 
-// flattenRecords walks each record and folds nested maps into dotted
-// keys. SF subqueries surface as nested maps under
-// "attributes.type"-bearing values; this recursion turns those into
-// "Account.Owner.Name"-style keys, matching how the TUI renders them.
-//
-// Skips Salesforce's "attributes" envelope at every level — it's
-// metadata, not user data.
 func flattenRecords(records []map[string]any) []map[string]any {
 	out := make([]map[string]any, 0, len(records))
 	for _, r := range records {
@@ -78,8 +62,6 @@ func flatten(prefix string, in map[string]any) map[string]any {
 	return out
 }
 
-// discoverColumns returns the union of keys across records, sorted
-// alphabetically. Used to fill in columns the caller didn't pre-list.
 func discoverColumns(records []map[string]any) []string {
 	seen := map[string]struct{}{}
 	for _, r := range records {
@@ -95,9 +77,6 @@ func discoverColumns(records []map[string]any) []string {
 	return out
 }
 
-// mergeColumns returns the user-supplied order followed by any
-// discovered columns the user didn't already list. Preserves order
-// of the first list, dedupes against it.
 func mergeColumns(preferred, discovered []string) []string {
 	seen := make(map[string]struct{}, len(preferred))
 	out := make([]string, 0, len(preferred)+len(discovered))
@@ -118,11 +97,6 @@ func mergeColumns(preferred, discovered []string) []string {
 	return out
 }
 
-// formatCell stringifies a SOQL cell value for export. nil → empty
-// string; everything else routes through fmt.Sprintf("%v"). Lists
-// emit "[a, b, c]" — better than "[]any{a b c}" — and other
-// composite types fall through to %v so the column doesn't crash on
-// unexpected shapes.
 func formatCell(v any) string {
 	if v == nil {
 		return ""

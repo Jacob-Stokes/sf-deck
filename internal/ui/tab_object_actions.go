@@ -1,13 +1,5 @@
 package ui
 
-// Object-level action menu — uses the generic Action[Ctx] core.
-//
-// Writes go through the Metadata API (DeployCustomObjectPatch),
-// not Tooling REST. See README_API_ROUTING.md for the split.
-// Every text edit ships with a Preview closure that fetches the
-// baseline and builds a diff before commit, so the user can see
-// what else rides in the CustomObject deploy envelope.
-
 import (
 	"context"
 	"fmt"
@@ -59,9 +51,6 @@ func buildObjectCtx(m Model) (objectCtx, bool, string) {
 	}, true, ""
 }
 
-// customObjectOnly blocks object-level actions on standard objects
-// (which don't have a CustomObject row, so the Metadata deploy would
-// fail). Reused on every action in this registry.
 func customObjectOnly() func(objectCtx) (bool, string) {
 	return func(c objectCtx) (bool, string) {
 		if !c.Describe.Custom {
@@ -117,10 +106,6 @@ func objectActionsFor(ctx objectCtx) []Action[objectCtx] {
 	}
 }
 
-// objectTextEdit builds a NewTextAction for a single string field on
-// CustomObject. When `initial` is nil the current value loads
-// asynchronously via Tooling. Every text edit wires the Preview
-// closure so the user sees the deploy diff before committing.
 func objectTextEdit(id, label, hint, metaKey string, multiline bool, initial func(objectCtx) string) Action[objectCtx] {
 	return NewTextAction(TextActionSpec[objectCtx]{
 		ID:        id,
@@ -180,11 +165,6 @@ func objectBoolToggle(
 	})
 }
 
-// readBaselineToggle pulls the cached CustomObjectBaseline for the
-// active sobject and runs the per-flag extractor. Returns nil when
-// the baseline hasn't loaded yet or when Salesforce didn't return a
-// value for this particular flag — caller treats nil as "default
-// to False / unknown."
 func readBaselineToggle(c objectCtx, extract func(*sf.CustomObjectBaseline) *bool) *bool {
 	if c.OrgData == nil || extract == nil {
 		return nil
@@ -200,11 +180,6 @@ func readBaselineToggle(c objectCtx, extract func(*sf.CustomObjectBaseline) *boo
 	return extract(base)
 }
 
-// currentStateSuffix appends "(currently: enabled)" / "(currently:
-// disabled)" / "(current state unknown)" to the modal title so the
-// user sees the actual state at a glance — not just the cursor
-// position. nil pointer = unknown (baseline not loaded or SF
-// didn't return a value for this flag).
 func currentStateSuffix(c objectCtx, extract func(*sf.CustomObjectBaseline) *bool) string {
 	b := readBaselineToggle(c, extract)
 	if b == nil {
@@ -242,9 +217,6 @@ func saveObjectMetaString(metaKey string) func(objectCtx, string, any) error {
 	}
 }
 
-// saveObjectMetaBool is the bool equivalent: one enable* flag
-// through a CustomObject deploy. No baseline round-trip — toggles
-// are rarely re-edited, and the deploy preserves un-set fields.
 func saveObjectMetaBool(metaKey string) func(objectCtx, any) error {
 	return func(c objectCtx, val any) error {
 		b, _ := val.(bool)
@@ -265,10 +237,6 @@ func saveObjectMetaBool(metaKey string) func(objectCtx, any) error {
 	}
 }
 
-// loadObjectMetaString is a LoadCurrent for the subset of CustomObject
-// metadata that *is* queryable via Tooling (only description today).
-// Label / pluralLabel use synchronous InitialBody from the describe
-// so they don't need to hit this path.
 func loadObjectMetaString(metaKey string) func(objectCtx) func() (string, error) {
 	return func(c objectCtx) func() (string, error) {
 		return func() (string, error) {
@@ -294,11 +262,6 @@ func loadObjectMetaString(metaKey string) func(objectCtx) func() (string, error)
 func previewObjectMetaString(metaKey string) func(objectCtx, string) (PreviewResult, error) {
 	return func(c objectCtx, val string) (PreviewResult, error) {
 		var base *sf.CustomObjectBaseline
-		// Cached path: ensure-and-read. If the Resource already has a
-		// fresh value, .Value() returns it without firing the Fetch
-		// closure. Stale values still get served here — the post-
-		// deploy Refresh in saveObjectMeta is what guarantees the
-		// baseline reflects the latest state after a write.
 		if c.OrgData != nil {
 			if r := c.OrgData.EnsureCustomObjectBaseline(c.Alias, c.Sobject); r != nil {
 				if v, ok := r.Get(); ok && v != nil {
@@ -307,8 +270,6 @@ func previewObjectMetaString(metaKey string) func(objectCtx, string) (PreviewRes
 			}
 		}
 		if base == nil {
-			// Cache miss — fall back to a direct fetch. Rare in
-			// practice (the baseline was loaded on drill-in).
 			b, err := sf.FetchCustomObjectBaseline(c.Alias, c.Sobject)
 			if err != nil {
 				return PreviewResult{}, err
@@ -319,8 +280,6 @@ func previewObjectMetaString(metaKey string) func(objectCtx, string) (PreviewRes
 			previewTextLine("label", base.Label, metaKey, val, "label"),
 			previewTextLine("pluralLabel", base.PluralLabel, metaKey, val, "pluralLabel"),
 			previewTextLine("description", base.Description, metaKey, val, "description"),
-			// sharingModel + nameField ship with the deploy too —
-			// show them as unchanged so the user knows.
 			{Field: "sharingModel", Before: base.SharingModel, After: base.SharingModel, Changed: false},
 			{Field: "nameField",
 				Before: base.NameFieldType + " / " + base.NameFieldLabel,
@@ -337,11 +296,6 @@ func refreshObjectDescribeFor(c objectCtx) tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	}
-	// Re-fetch the CustomObject baseline so the next time the user
-	// opens a toggle modal (or peeks at the Details panel) the
-	// "currently: enabled/disabled" suffix reflects the just-
-	// deployed state. Without this the cached baseline keeps the
-	// pre-deploy values forever.
 	if c.OrgData != nil {
 		if r := c.OrgData.EnsureCustomObjectBaseline(c.Alias, c.Sobject); r != nil {
 			if cmd := r.Refresh(c.Cache); cmd != nil {
@@ -358,10 +312,6 @@ func refreshObjectDescribeFor(c objectCtx) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// --- deploy-patch shape helpers ----------------------------------------
-
-// stringPatchFor builds a one-field CustomObjectPatch for a string-
-// valued metadata key.
 func stringPatchFor(metaKey, val string) (sf.CustomObjectPatch, error) {
 	patch := sf.CustomObjectPatch{}
 	switch metaKey {
@@ -377,8 +327,6 @@ func stringPatchFor(metaKey, val string) (sf.CustomObjectPatch, error) {
 	return patch, nil
 }
 
-// boolPatchFor builds a one-field CustomObjectPatch for a bool-valued
-// enable* flag.
 func boolPatchFor(metaKey string, val bool) (sf.CustomObjectPatch, error) {
 	patch := sf.CustomObjectPatch{}
 	b := sf.BoolPtr(val)
@@ -399,7 +347,6 @@ func boolPatchFor(metaKey string, val bool) (sf.CustomObjectPatch, error) {
 	return patch, nil
 }
 
-// previewTextLine builds one diff row for a string field.
 func previewTextLine(field, current, editingKey, newVal, myKey string) PreviewLine {
 	if field == editingKey {
 		return PreviewLine{Field: field, Before: current, After: newVal, Changed: current != newVal}
@@ -407,8 +354,6 @@ func previewTextLine(field, current, editingKey, newVal, myKey string) PreviewLi
 	return PreviewLine{Field: field, Before: current, After: current, Changed: false}
 }
 
-// deployResultErrorForUI turns a non-success DeployResult into an
-// error the UI can render.
 func deployResultErrorForUI(r *sf.DeployResult) error {
 	msg := r.FirstError
 	if msg == "" {
@@ -445,9 +390,6 @@ func customObjectIDCached(d *orgData, alias, sobject string) (string, error) {
 	return id, nil
 }
 
-// logDeploy writes a UI-side trace to ~/.sf-deck/deploy.log when
-// SFDECK_DEBUG_DEPLOY=1. Mirrors the sf-package dlogf so deploy-
-// hang reports can distinguish "UI fired save" from "HTTP went out".
 func logDeploy(format string, args ...any) {
 	if os.Getenv("SFDECK_DEBUG_DEPLOY") != "1" {
 		return

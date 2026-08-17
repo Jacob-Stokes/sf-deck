@@ -10,21 +10,17 @@ import "testing"
 func TestFlowVersionsDrillRefreshLatch(t *testing.T) {
 	d := &orgData{}
 
-	// Drill into flow A → refresh.
 	d.FlowCur = "A"
 	if !d.takeFlowVersionsDrillRefresh() {
 		t.Fatal("first drill into A should refresh")
 	}
-	// Return to A (same flow) → no re-fetch.
 	if d.takeFlowVersionsDrillRefresh() {
 		t.Error("returning to the same flow should not refresh")
 	}
-	// Drill into B → refresh.
 	d.FlowCur = "B"
 	if !d.takeFlowVersionsDrillRefresh() {
 		t.Error("drilling into a different flow should refresh")
 	}
-	// Back on the flows list clears the latch → re-drill A refreshes.
 	d.flowVersionsLoadedFor = "" // what ensureFlowsListData does
 	d.FlowCur = "A"
 	if !d.takeFlowVersionsDrillRefresh() {

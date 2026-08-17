@@ -16,8 +16,6 @@ func newHistoryStore(t *testing.T) *Store {
 	return s
 }
 
-// ----- LogApexHistory + ListApexHistory roundtrip ----------------
-
 func TestApexHistory_RoundtripFields(t *testing.T) {
 	s := newHistoryStore(t)
 	now := time.Unix(time.Now().Unix(), 0) // truncate to seconds; SQLite stores Unix epoch
@@ -101,7 +99,6 @@ func TestApexHistory_FilterByOrg(t *testing.T) {
 		}
 	}
 
-	// Empty orgUser returns everything.
 	all, _ := s.ListApexHistory("", 10)
 	if len(all) != 3 {
 		t.Errorf("all-org: len = %d, want 3", len(all))
@@ -117,14 +114,11 @@ func TestApexHistory_LimitRespected(t *testing.T) {
 	if len(rows) != 2 {
 		t.Errorf("limit ignored: len = %d, want 2", len(rows))
 	}
-	// limit=0 means no limit
 	rows, _ = s.ListApexHistory("u", 0)
 	if len(rows) != 5 {
 		t.Errorf("limit=0: len = %d, want 5", len(rows))
 	}
 }
-
-// ----- TrimApexHistory -----------------------------------------
 
 func TestTrimApexHistory_KeepsMostRecentPerOrg(t *testing.T) {
 	s := newHistoryStore(t)
@@ -143,7 +137,6 @@ func TestTrimApexHistory_KeepsMostRecentPerOrg(t *testing.T) {
 		t.Errorf("u@x.com: kept %d, want 3", len(left1))
 	}
 	if len(left2) != 3 {
-		// 4 rows total, keep=3 → 3 remaining
 		t.Errorf("u2@x.com: kept %d, want 3", len(left2))
 	}
 }
@@ -161,8 +154,6 @@ func TestTrimApexHistory_ZeroKeepIsNoop(t *testing.T) {
 		t.Errorf("rows = %d, want 5 (no-op trim)", len(rows))
 	}
 }
-
-// ----- ApexHistoryEntry.Field --------------------------------
 
 func TestApexHistoryEntry_FieldExtraction(t *testing.T) {
 	e := ApexHistoryEntry{

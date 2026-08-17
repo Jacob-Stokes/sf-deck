@@ -1,10 +1,5 @@
 package sf
 
-// Page layouts for one sObject — the object-drill Layouts subtab.
-// Tooling Layout filters by TableEnumOrId, which is the API name for
-// standard objects but the CustomObject's ID for custom ones (the
-// classic tooling-API gotcha; both shapes are supported.
-
 import (
 	"fmt"
 	"sort"
@@ -61,8 +56,6 @@ func ListObjectLayouts(target, sobject string) ([]PageLayoutRow, error) {
 	return out, nil
 }
 
-// customObjectID resolves a custom object's tooling CustomObject Id
-// from its API name. Handles both ns__Dev__c and Dev__c shapes.
 func customObjectID(target, sobject string) (string, error) {
 	base := strings.TrimSuffix(sobject, "__c")
 	ns := ""
@@ -129,7 +122,6 @@ func ListObjectFlows(target, sobject string) ([]ObjectFlowRow, error) {
 		if err != nil {
 			return nil, err
 		}
-		// FlowDefinitionView stores the 15-char id.
 		if len(id) == 18 {
 			id = id[:15]
 		}
@@ -171,11 +163,6 @@ func ListObjectFlows(target, sobject string) ([]ObjectFlowRow, error) {
 		}
 		out = append(out, row)
 	}
-	// Order by execution phase, then by TriggerOrder within the phase
-	// (the real run order — 10/20/50…), then by label as a tiebreak. The
-	// UI renders Salesforce's Flow Trigger Explorer grouping by walking
-	// the slice and inserting a header at each phase boundary. Stable to
-	// keep the SOQL's alphabetical order where TriggerOrder ties.
 	sort.SliceStable(out, func(i, j int) bool {
 		pi, pj := FlowPhaseRank(out[i]), FlowPhaseRank(out[j])
 		if pi != pj {

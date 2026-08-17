@@ -57,8 +57,6 @@ func TestResolveOrg(t *testing.T) {
 	})
 
 	t.Run("alias preferred over conflicting username", func(t *testing.T) {
-		// Build orgs where org A's alias equals org B's username — alias
-		// match should win.
 		conflict := sf.Org{Alias: "shared@x", Username: "alice@example.com"}
 		other := sf.Org{Username: "shared@x"}
 		conflictApp := newTestApp([]sf.Org{other, conflict}, nil)
@@ -96,10 +94,6 @@ func TestResolveOrg(t *testing.T) {
 	})
 
 	t.Run("pinned org missing from connected list falls back", func(t *testing.T) {
-		// Pin a username that isn't in the connected org list (e.g.
-		// user logged out via sf CLI while sf-deck wasn't running).
-		// Should silently fall back to the first connected org
-		// rather than erroring.
 		pinned := &settings.Settings{Orgs: map[string]settings.OrgConfig{
 			"ghost@example.com": {Default: true},
 		}}
@@ -138,7 +132,6 @@ func TestResolveOrg(t *testing.T) {
 }
 
 func TestSafetyFor_KindDefaults(t *testing.T) {
-	// Empty Settings → fall through to kind-based defaults.
 	a := newTestApp(nil, &settings.Settings{})
 
 	cases := []struct {
@@ -162,8 +155,6 @@ func TestSafetyFor_KindDefaults(t *testing.T) {
 }
 
 func TestSafetyFor_AliasOverride(t *testing.T) {
-	// Sandbox would default to "records" — but per-alias override sets
-	// it to "read_only".
 	st := &settings.Settings{
 		Orgs: map[string]settings.OrgConfig{
 			"sand": {Safety: "read_only"},
@@ -177,12 +168,10 @@ func TestSafetyFor_AliasOverride(t *testing.T) {
 }
 
 func TestSafetyFor_NilGuards(t *testing.T) {
-	// Nil app should default to read-only — most conservative.
 	var nilApp *App
 	if got := nilApp.SafetyFor(sf.Org{IsScratch: true}); got != settings.SafetyReadOnly {
 		t.Errorf("nil app SafetyFor = %s, want read_only", got)
 	}
-	// App with nil Settings same story.
 	a := &App{}
 	if got := a.SafetyFor(sf.Org{IsScratch: true}); got != settings.SafetyReadOnly {
 		t.Errorf("nil settings SafetyFor = %s, want read_only", got)
@@ -214,7 +203,6 @@ func TestCanWrite(t *testing.T) {
 		if be.Actual != settings.SafetyReadOnly {
 			t.Errorf("Actual = %v, want SafetyReadOnly", be.Actual)
 		}
-		// Message should mention the actual level + what was required.
 		msg := be.Error()
 		if !strings.Contains(msg, "read_only") || !strings.Contains(msg, "records") {
 			t.Errorf("Error() = %q, want substrings 'read_only' and 'records'", msg)

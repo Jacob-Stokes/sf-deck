@@ -1,14 +1,5 @@
 package ui
 
-// orgData per-ListView search-spec installation.
-//
-// Extracted from newOrgData in model.go — these are the 20+ MatchSpec
-// registrations that wire substring search + relevance scoring onto
-// each ListView wrapper. The patterns are mechanically similar (Any /
-// Field / Fields / Primary) and lifting them out keeps newOrgData
-// readable. See internal/ui/uilayout.MakeMatcher for the field-scoped
-// search syntax.
-
 import (
 	"strings"
 
@@ -16,17 +7,10 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// installOrgDataSearchSpecs wires substring + scoring on every
-// ListView held by orgData. Called once per org from newOrgData.
-// Per-chip ChipUsers lists are lazily created and share the
-// d.userMatch / d.userScore wrappers set up here.
 func installOrgDataSearchSpecs(d *orgData) {
 	installReportsAnalyticsSearchSpecs(d)
 	installMetaSearchSpecs(d)
 
-	// ListView predicates — substring match across the searchable
-	// fields, with `field:value` shorthand for column-scoped queries.
-	// See uilayout.MakeMatcher for the syntax.
 	installSearch(&d.SObjectList, uilayout.MatchSpec[sf.SObject]{
 		Any: func(s sf.SObject) string {
 			return strings.ToLower(s.Name + " " + s.Label)
@@ -356,9 +340,6 @@ func installOrgDataSearchSpecs(d *orgData) {
 		Primary: "Name",
 	}
 	installSearch(&d.RecentList, recentSpec)
-	// SF list shares the same matcher + scorer — same row shape,
-	// same search semantics — so toggling modes preserves typing-
-	// to-filter behaviour.
 	installSearch(&d.RecentSFList, recentSpec)
 	installSearch(&d.RecentlyViewedList, uilayout.MatchSpec[sf.RecentlyViewedRow]{
 		Any: func(r sf.RecentlyViewedRow) string {
@@ -447,9 +428,6 @@ func installOrgDataSearchSpecs(d *orgData) {
 	})
 }
 
-// --- /reports Dashboards + Report Types (added with the /meta build;
-// these two shipped 2026-06-11 without matchers, so / matched nothing) ---
-
 func installReportsAnalyticsSearchSpecs(d *orgData) {
 	installSearch(&d.DashboardList, uilayout.MatchSpec[sf.DashboardRow]{
 		Any: func(r sf.DashboardRow) string {
@@ -488,8 +466,6 @@ func installReportsAnalyticsSearchSpecs(d *orgData) {
 		Primary: "Label",
 	})
 }
-
-// --- /meta surfaces ------------------------------------------------------
 
 func installMetaSearchSpecs(d *orgData) {
 	installSearch(&d.MetaTypesList, uilayout.MatchSpec[sf.MetadataTypeInfo]{

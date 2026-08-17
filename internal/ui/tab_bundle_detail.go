@@ -2,27 +2,6 @@ package ui
 
 // /bundle (TabBundleDetail) — drill-in view for one sfdx-project
 // bundle linked to a DevProject.
-//
-// Shows the bundle's metadata (path, default org, last activity),
-// the manifest contents (fast — just reads package.xml from disk),
-// and — when the org supports it — the retrieve/deploy preview
-// tables produced by `sf project retrieve preview --json` and
-// `sf project deploy preview --json`. On non-tracked orgs (most
-// production / sandbox without source tracking) we fall back to
-// just the manifest listing with a note explaining why.
-//
-// Actions wire from this view's keys:
-//
-//   r           full retrieve (sf project retrieve start)
-//   D           full deploy (sf project deploy start)
-//   v           validate deploy (sf project deploy validate)
-//   o           reveal in Finder
-//   y           yank path
-//   esc         back to /bundles
-//
-// Per-row retrieve/deploy of individual items is deferred — most
-// users want all-or-nothing. Adding per-row later means adding a
-// cursor + per-row dispatch on the preview tables.
 
 import (
 	"strings"
@@ -60,7 +39,6 @@ func (m Model) renderProjectBundleDetail(w, innerH int) string {
 		return redLine("  bundle: " + err.Error())
 	}
 
-	// Sticky header.
 	var lines []string
 	lines = append(lines, sectionTitle("Bundle"))
 	lines = append(lines, dimLine("  "+b.Path, inner))
@@ -74,8 +52,6 @@ func (m Model) renderProjectBundleDetail(w, innerH int) string {
 		lines = append(lines, kvRow("  last deployed", b.LastDeployedAt.Format("2006-01-02 15:04"), inner))
 	}
 
-	// Stale-bundle branch: short-circuit before we try to render
-	// rows whose paths no longer exist.
 	if b.Stale() {
 		lines = append(lines, "")
 		lines = append(lines,
@@ -88,15 +64,9 @@ func (m Model) renderProjectBundleDetail(w, innerH int) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// View-mode switcher row — two pseudo-chips. `[` / `]`
-	// cycle between them, lifting the bundle-files reload as a
-	// side effect (see cycleBundleDetailView).
 	lines = append(lines, "")
 	lines = append(lines, renderBundleViewSwitcher(m, inner))
 
-	// Preview state (components view): not loaded yet / errored /
-	// fallback caption. Skipped for files mode — that view's
-	// data comes from the FS, not the preview goroutine.
 	preview, ok := m.bundlePreviews[b.ID]
 	if m.bundleDetailView == bundleViewComponents {
 		switch {
@@ -114,9 +84,6 @@ func (m Model) renderProjectBundleDetail(w, innerH int) string {
 				inner))
 		}
 	} else {
-		// Files mode: breadcrumb line so the user always knows
-		// where they are. Bundle root → "/" so it's a visible
-		// thing rather than an empty line.
 		crumb := "/"
 		if m.bundleFilesCwd != "" {
 			crumb = "/" + m.bundleFilesCwd
@@ -124,8 +91,6 @@ func (m Model) renderProjectBundleDetail(w, innerH int) string {
 		lines = append(lines, "", dimLine("  "+crumb, inner))
 	}
 
-	// Row body via the shared list-table renderer. Files mode
-	// always gets a body; components mode waits for the preview.
 	wantBody := m.bundleDetailView == bundleViewFiles || (ok && preview.Err == nil)
 	if wantBody {
 		lines = append(lines, "")
@@ -143,11 +108,6 @@ func (m Model) renderProjectBundleDetail(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// bundleDetailFooterHint returns the per-view hint line shown at
-// the bottom of TabBundleDetail. Files mode has no validate /
-// deploy / retrieve in the hint — those still WORK (the keys are
-// global to the tab), but the hint focuses on what's relevant in
-// the current view to keep it short.
 func bundleDetailFooterHint(view bundleDetailView) string {
 	viewKeys := firstPretty(Keys.PrevView) + " " + firstPretty(Keys.NextView)
 	switch view {
@@ -161,10 +121,6 @@ func bundleDetailFooterHint(view bundleDetailView) string {
 	}
 }
 
-// renderBundleViewSwitcher draws a tiny "tab strip" with the two
-// view modes. The active one is bracketed + bold; the other is
-// muted. Same general look as the existing chip strips so the
-// user recognises it as something they can cycle.
 func renderBundleViewSwitcher(m Model, inner int) string {
 	active := lipgloss.NewStyle().
 		Foreground(theme.Fg).
@@ -188,11 +144,6 @@ func renderBundleViewSwitcher(m Model, inner int) string {
 	return "  " + compsRendered + "  " + filesRendered
 }
 
-// renderBundleDetailBody renders the list-table block for the
-// active view. Components view → manifest preview rows; files
-// view → on-disk file rows. Empty bodies still emit the title
-// row so the user gets visible feedback that they switched
-// views even when the destination is empty.
 func (m Model) renderBundleDetailBody(inner, budget int) []string {
 	if m.bundleDetailView == bundleViewFiles {
 		return m.renderBundleFilesBody(inner, budget)
@@ -227,10 +178,6 @@ func (m Model) renderBundleDetailBody(inner, budget int) []string {
 	return renderListModel(m, model, m.focus, inner, budget)
 }
 
-// renderBundleFilesBody renders the FILES view's table — the
-// cd-style directory listing. Directories get a small `<dir>`
-// glyph in the Name column via the recolor pass so the eye
-// catches navigable rows at a glance.
 func (m Model) renderBundleFilesBody(inner, budget int) []string {
 	rows := m.bundleFilesList.Filtered()
 	cols := bundleFileListCols()
@@ -245,8 +192,6 @@ func (m Model) renderBundleFilesBody(inner, budget int) []string {
 			return base
 		}
 		r := rows[row]
-		// Highlight directories + the parent row so the
-		// navigable surface stands out from plain files.
 		if r.IsParent || r.IsDir {
 			if col == 0 {
 				return base.Foreground(theme.Blue).Bold(true)
@@ -270,12 +215,10 @@ func (m Model) renderBundleFilesBody(inner, budget int) []string {
 	return renderListModel(m, model, m.focus, inner, budget)
 }
 
-// bundleDetailTitle is the section title shown above the table.
 func bundleDetailTitle(n int) string {
 	return "COMPONENTS · " + intToStr(n)
 }
 
-// kvRow formats a label/value row for the metadata block.
 func kvRow(label, value string, inner int) string {
 	left := lipgloss.NewStyle().Foreground(theme.Muted).Render(label)
 	right := lipgloss.NewStyle().Foreground(theme.Fg).Render(value)

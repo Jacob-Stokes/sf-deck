@@ -1,14 +1,5 @@
 package sf
 
-// Validation rule helpers — Tooling-API read + update for
-// ValidationRule records scoped to an sObject.
-//
-// Tooling's ValidationRule is a per-record row with Id + a Metadata
-// blob holding the full definition (active, errorMessage,
-// errorDisplayField, errorConditionFormula, description). List
-// queries return the row metadata; drill into one to get the
-// formula body.
-
 import "fmt"
 
 // ValidationRuleRow is one row in the list of a sobject's validation
@@ -24,8 +15,6 @@ type ValidationRuleRow struct {
 // ListValidationRules returns every ValidationRule defined on the
 // given sobject. Queries Tooling; read-only.
 func ListValidationRules(target, sobject string) ([]ValidationRuleRow, error) {
-	// Tooling accepts EntityDefinition dotted-field — we don't need
-	// the EntityDefinition Id, just the qualified name.
 	return queryRows(target,
 		fmt.Sprintf(
 			"SELECT Id, ValidationName, Active, Description "+
@@ -75,8 +64,5 @@ func GetValidationRule(target, id string) (ValidationRuleDetail, error) {
 	det.ErrorMessage = asString(meta["errorMessage"])
 	det.ErrorDisplayField = asString(meta["errorDisplayField"])
 	det.ErrorConditionFormula = asString(meta["errorConditionFormula"])
-	// ValidationName comes back as fullName in the Tooling shape —
-	// but we fetched by Id so we may not have it. List queries carry
-	// it; callers that need both should consult the list row.
 	return det, nil
 }

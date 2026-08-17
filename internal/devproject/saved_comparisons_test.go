@@ -23,7 +23,6 @@ func TestSavedComparisonRoundTrip(t *testing.T) {
 		t.Fatalf("id/timestamp not stamped: %+v", saved)
 	}
 
-	// List omits the blob.
 	list, err := st.ListSavedComparisons()
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +34,6 @@ func TestSavedComparisonRoundTrip(t *testing.T) {
 		t.Error("ListSavedComparisons should not load the blob")
 	}
 
-	// Get includes the blob, byte-identical.
 	got, err := st.GetSavedComparison(saved.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +45,6 @@ func TestSavedComparisonRoundTrip(t *testing.T) {
 		t.Errorf("scalar fields wrong: %+v", got)
 	}
 
-	// Rename.
 	if err := st.RenameSavedComparison(saved.ID, "Renamed"); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +53,6 @@ func TestSavedComparisonRoundTrip(t *testing.T) {
 		t.Errorf("rename failed: %q", got2.Name)
 	}
 
-	// Delete.
 	if err := st.DeleteSavedComparison(saved.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +80,6 @@ func TestUpdateComparisonOverwrites(t *testing.T) {
 	if got.Name != "X" {
 		t.Errorf("name should be unchanged by UpdateComparison: %q", got.Name)
 	}
-	// Unknown id → not found.
 	if err := st.UpdateComparison("nope", "", "", "", "", nil); err != ErrSavedComparisonNotFound {
 		t.Errorf("expected NotFound, got %v", err)
 	}

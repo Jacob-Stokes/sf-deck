@@ -50,15 +50,12 @@ func TestResolveSafety(t *testing.T) {
 		},
 	}
 
-	// 1. Explicit per-username override wins over everything.
 	if got := s.Resolve("user@prod", KindProduction); got != SafetyFull {
 		t.Errorf("username override = %v, want full", got)
 	}
-	// 2. Alias override when username has no config.
 	if got := s.Resolve("no-cfg@x", KindProduction, "alias-sandbox"); got != SafetyRecords {
 		t.Errorf("alias override = %v, want records", got)
 	}
-	// 3. Per-kind default when neither username nor alias is configured.
 	if got := s.Resolve("someone@sbx", KindSandbox); got != SafetyRecords {
 		t.Errorf("sandbox default = %v, want records", got)
 	}
@@ -201,7 +198,6 @@ func TestRecentExcludedSFTypes(t *testing.T) {
 		t.Errorf("custom list not reflected: %v", got)
 	}
 
-	// Explicit empty → filter nothing (distinct from unset = defaults).
 	s.SetRecentExcludedSFTypes(nil)
 	if got := s.RecentExcludedSFTypes(); len(got) != 0 {
 		t.Errorf("explicit empty should filter nothing, got %v", got)

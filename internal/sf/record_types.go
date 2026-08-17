@@ -1,9 +1,5 @@
 package sf
 
-// Record Type Tooling-API helpers — list + read + update. Same shape
-// as validation_rules.go: a light list row + a deeper Metadata detail
-// + a named wrapper over UpdateToolingMetadata.
-
 import "fmt"
 
 // RecordTypeRow is one row in the record-type list. Lightweight for

@@ -13,7 +13,6 @@ func TestPinDefault_SetAndRead(t *testing.T) {
 }
 
 func TestPinDefault_IsExclusive(t *testing.T) {
-	// Set alice → bob. Only one default at a time.
 	s := &Settings{}
 	s.PinDefault("alice@x")
 	if !s.PinDefault("bob@x") {
@@ -28,7 +27,6 @@ func TestPinDefault_IsExclusive(t *testing.T) {
 	if _, ok := s.Orgs["alice@x"]; ok {
 		t.Errorf("alice's entry should be removed (no other config); got %+v", s.Orgs["alice@x"])
 	}
-	// Bob has Default=true.
 	if !s.Orgs["bob@x"].Default {
 		t.Errorf("bob.Default = false; want true")
 	}
@@ -55,7 +53,6 @@ func TestPinDefault_Clear(t *testing.T) {
 	if got := s.DefaultOrgUsername(); got != "" {
 		t.Errorf("after clear, default = %q, want empty", got)
 	}
-	// Repeat clear → no change.
 	if s.PinDefault("") {
 		t.Error("PinDefault(\"\") on already-clear state returned changed=true")
 	}
@@ -102,8 +99,6 @@ func TestSetOrg_ClearPreservesDefaultPin(t *testing.T) {
 }
 
 func TestSetOrg_ClearDropsEntryWithNoDefault(t *testing.T) {
-	// Same flow but without a pin: clear should remove the entry
-	// entirely so TOML stays tidy.
 	s := &Settings{}
 	s.SetOrg("alice@x", SafetyRecords, false)
 	s.SetOrg("alice@x", SafetyReadOnly, true)

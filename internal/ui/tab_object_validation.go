@@ -1,13 +1,5 @@
 package ui
 
-// Validation subtab of TabObjectDetail — the list of ValidationRule
-// records defined on the currently-drilled sObject.
-//
-// List rendering uses the same renderRows primitive as every other
-// list view. The right sidebar (sidebarValidationRule, future)
-// surfaces the selected rule's full Metadata (formula body, error
-// message, display field) + the action menu for edits.
-
 import (
 	"fmt"
 	"strings"
@@ -19,8 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderObjectValidation renders the Validation subtab's main pane.
-// Main pane is the list; per-row details live in the sidebar.
 func (m Model) renderObjectValidation(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -61,7 +51,6 @@ func (m Model) renderObjectValidation(w, innerH int) string {
 		sel = 0
 	}
 
-	// Columns: active marker · name · description preview.
 	nameW := inner / 3
 	if nameW < 20 {
 		nameW = 20
@@ -77,9 +66,6 @@ func (m Model) renderObjectValidation(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderValidationRow is one row of the validation list: active dot,
-// rule name, description. Kept small since the detail view lives in
-// the sidebar.
 func renderValidationRow(r sf.ValidationRuleRow, selected, mainFocused bool, nameW, descW, inner int) string {
 	dot := validationStatusDot(r.Active)
 	nameStyle := lipgloss.NewStyle().Foreground(theme.Fg).Width(nameW)
@@ -100,8 +86,6 @@ func renderValidationRow(r sf.ValidationRuleRow, selected, mainFocused bool, nam
 	return ansi.Truncate(prefix+dot+" "+name+"  "+desc, inner, "…")
 }
 
-// validationStatusDot is a colored dot reflecting Active: green for
-// active, muted for inactive. Same visual language as flow status.
 func validationStatusDot(active bool) string {
 	if active {
 		return lipgloss.NewStyle().Foreground(theme.Green).Render("●")

@@ -5,16 +5,6 @@ package ui
 // Pressing q again — or esc — cancels. While active, the status bar
 // shows a CHORD alert with the available next letters, so the whole
 // namespace is discoverable without a cheat sheet.
-//
-// Why a leader key: it buys 26+ combos without spending scarce single-
-// key bindings, and each chord can be surface-aware (only the chords
-// valid on the current view show their hint). New chord = one entry in
-// chordRegistry.
-//
-// The input guard is structural, not a special case: chord entry is
-// dispatched AFTER handleInputModeKey in handleKey, so a q typed into a
-// search box / editor / SOQL is consumed as a literal character and
-// never reaches the chord layer.
 
 import (
 	"fmt"
@@ -29,23 +19,13 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// chordSpec is one q-<letter> chord.
 type chordSpec struct {
-	Letter string // the second key, e.g. "s"
-	Label  string // short hint shown in the CHORD alert ("s sort by modified")
-	// Available reports whether the chord applies on the current surface.
-	// Only Available chords show their hint and can fire. nil = always.
+	Letter    string // the second key, e.g. "s"
+	Label     string // short hint shown in the CHORD alert ("s sort by modified")
 	Available func(m Model) bool
-	// Do performs the chord. Returns the updated model + cmd. It runs
-	// with chord mode already exited.
-	Do func(m Model) (Model, tea.Cmd)
+	Do        func(m Model) (Model, tea.Cmd)
 }
 
-// Candidate column names per semantic sort, in preference order. The
-// first that's present + sortable on the active list wins. Kept as
-// (label, raw-field) pairs so both the schema-driven surfaces (which
-// name columns "Modified", "Created", "Name") and the record/list-view
-// surfaces (raw "LastModifiedDate", "CreatedDate") match.
 var (
 	sortColsModified = []string{"Modified", "LastModifiedDate", "SystemModstamp"}
 	sortColsCreated  = []string{"Created", "CreatedDate"}
@@ -55,15 +35,8 @@ var (
 	sortColsSize     = []string{"Size", "LengthWithoutComments", "BodyLength"}
 )
 
-// chordRegistry is the full q-<letter> catalogue. Add a chord here.
-//
-// The semantic-sort family (q-s/c/n) shares one shape: "sort by the
-// obvious <X> column if this list has one." Sorting by modified/created
-// defaults newest-first (recency intent); name defaults ascending.
 func chordRegistry() []chordSpec {
 	modified := semanticSortChord("s", "Last Modified", sortColsModified, true)
-	// q-s's first-press direction is user-configurable ([ui.startup]
-	// chord_sort_modified_desc); the others keep their fixed default.
 	modified.Do = func(m Model) (Model, tea.Cmd) {
 		name := m.firstSortableColumn(sortColsModified)
 		if name == "" {
@@ -75,8 +48,6 @@ func chordRegistry() []chordSpec {
 	return []chordSpec{
 		modified,
 		semanticSortChord("c", "Created date", sortColsCreated, true),
-		// Name sort lives on l (Label) — n belongs to notes, which
-		// wins the mnemonic fight.
 		semanticSortChord("l", "Name", sortColsName, false),
 		semanticSortChord("b", "Modified by", sortColsModBy, false),
 		semanticSortChord("t", "Status", sortColsStatus, false),
@@ -87,9 +58,6 @@ func chordRegistry() []chordSpec {
 		clearRecentChord(),
 		yankListTableChord(),
 		yankIDListChord(),
-		// Number-row chords are view-INDEPENDENT navigation (letters are
-		// view-contingent). q-<n> jumps to the Nth /home subtab from
-		// anywhere — the numbers mirror the subtab strip order.
 		homeSubtabChord("1", "Landing", SubtabHomeLanding),
 		homeSubtabChord("2", "Recently Viewed", SubtabHomeRecent),
 		homeSubtabChord("3", "Notifications", SubtabHomeNotifications),
@@ -98,8 +66,6 @@ func chordRegistry() []chordSpec {
 	}
 }
 
-// homeSubtabChord builds a chord that jumps straight to a home subtab
-// from any surface — view-independent, so always Available.
 func homeSubtabChord(letter, label string, sub Subtab) chordSpec {
 	return chordSpec{
 		Letter: letter,
@@ -110,9 +76,6 @@ func homeSubtabChord(letter, label string, sub Subtab) chordSpec {
 	}
 }
 
-// allChipIndex returns the strip index of the built-in "All" view chip
-// on the active surface, or -1 when the surface has no chip strip or no
-// "All" chip. The "all" chip has a stable ID across surfaces.
 func (m Model) allChipIndex() (surf *chipSurface, idx int) {
 	s := m.resolveChipSurface()
 	if s == nil || len(m.orgs) == 0 {
@@ -131,9 +94,6 @@ func (m Model) allChipIndex() (surf *chipSurface, idx int) {
 	return nil, -1
 }
 
-// allViewChord jumps to the built-in "All" view (the unfiltered chip)
-// on the current surface — quick "show me everything" without cycling
-// there. Available only where an "All" chip exists.
 func allViewChord() chordSpec {
 	return chordSpec{
 		Letter:    "a",
@@ -154,8 +114,6 @@ func allViewChord() chordSpec {
 	}
 }
 
-// viewStateDirty reports whether the active list view has a sort OR an
-// applied search — i.e. whether "reset view" would do anything.
 func (m Model) viewStateDirty() bool {
 	if st := (&m).activeListTableState(); st != nil && st.SortColumn != "" {
 		return true
@@ -166,9 +124,6 @@ func (m Model) viewStateDirty() bool {
 	return false
 }
 
-// resetViewChord clears the active list's sort AND applied search in one
-// gesture — back to the view's natural order + unfiltered. Available
-// only when something is actually applied.
 func resetViewChord() chordSpec {
 	return chordSpec{
 		Letter:    "x",
@@ -194,9 +149,6 @@ func resetViewChord() chordSpec {
 	}
 }
 
-// currentSurfaceChipID resolves the active surface's chip domain and
-// returns its selected chip ID via activeChipID (which also handles the
-// records-on-detail per-sObject cursor). "" when no chip surface.
 func (m Model) currentSurfaceChipID() string {
 	s := m.resolveChipSurface()
 	if s == nil || len(m.orgs) == 0 {
@@ -205,11 +157,6 @@ func (m Model) currentSurfaceChipID() string {
 	return m.activeChipID(s.Domain, "*")
 }
 
-// activeViewShowsLocalRecent reports whether the active surface displays
-// sf-deck's LOCAL recently-viewed log: the /home Recently Viewed subtab
-// in local mode, or any chip surface whose ACTIVE chip is the synthetic
-// "Recently viewed" lens. Gates the q-r clear chord — clearing the log
-// from a view that doesn't show it would be invisible and confusing.
 func (m Model) activeViewShowsLocalRecent() bool {
 	if len(m.orgs) == 0 {
 		return false
@@ -246,13 +193,9 @@ func clearRecentChord() chordSpec {
 				return m, nil
 			}
 			d.Recent = nil
-			// recentGen invalidates every visited-order / lens memo that
-			// keys off the log (chip recency ordering, SF-merge cache).
 			d.recentGen++
 			d.RecentList.Set(nil)
 			persistRecent(&m, orgUser, nil)
-			// Re-filter the active chip surface so the lens empties out
-			// right away instead of on the next chip switch.
 			if s := m.resolveChipSurface(); s != nil {
 				if reset := s.ResetList; reset != nil {
 					reset(d)
@@ -265,9 +208,6 @@ func clearRecentChord() chordSpec {
 	}
 }
 
-// jumpToHomeSubtab switches to /home and selects the subtab with the
-// given ID (by index, robust to subtab reordering), then fires the
-// tab-changed lifecycle so the subtab's data loads.
 func (m *Model) jumpToHomeSubtab(id Subtab) tea.Cmd {
 	idx := 0
 	for i, s := range homeSubtabs() {
@@ -282,10 +222,6 @@ func (m *Model) jumpToHomeSubtab(id Subtab) tea.Cmd {
 	return m.onTabChanged()
 }
 
-// semanticSortChord builds a "sort by <label>" chord: available only when
-// the active list has one of cols, and firing cycle-sorts by it (first
-// press in the given default direction). descFirst=true starts
-// newest/highest-first — right for recency sorts.
 func semanticSortChord(letter, label string, cols []string, descFirst bool) chordSpec {
 	return chordSpec{
 		Letter:    letter,
@@ -302,24 +238,16 @@ func semanticSortChord(letter, label string, cols []string, descFirst bool) chor
 	}
 }
 
-// enterChordMode flips chord mode on. Called from handleKey when q is
-// pressed in normal-nav mode (after the input guard).
 func (m Model) enterChordMode() (Model, tea.Cmd) {
 	m.chordActive = true
 	return m, nil
 }
 
-// handleChordKey dispatches the second keystroke of a chord. Only called
-// while chordActive. q or esc cancels; a bound+available letter fires;
-// anything else exits with a "no chord" flash (predictable — no
-// fall-through into normal single-key handling).
 func (m Model) handleChordKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	m.chordActive = false // every path exits chord mode
 	key := msg.String()
 	switch key {
 	case "q":
-		// q-q opens the full chord cheat-sheet — discoverability for
-		// every q-<letter> chord, with an "available here" marker.
 		(&m).showInfoModal(m.chordListModal())
 		return m, nil
 	case "esc", "ctrl+c":
@@ -339,8 +267,6 @@ func (m Model) handleChordKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// availableChords returns the chords valid on the current surface, for
-// the CHORD alert hint. Order follows the registry.
 func (m Model) availableChords() []chordSpec {
 	var out []chordSpec
 	for _, c := range chordRegistry() {
@@ -380,9 +306,6 @@ func (m Model) chordListModal() infoModalState {
 	}
 }
 
-// renderChordBar draws the CHORD-mode status bar: a highlighted "CHORD"
-// badge, the available q-<letter> hints for the current surface, and the
-// cancel affordance. Replaces the normal shortcut bar while chordActive.
 func (m Model) renderChordBar() string {
 	badge := lipgloss.NewStyle().
 		Foreground(theme.Bg).Background(theme.Magenta).Bold(true).
@@ -413,12 +336,6 @@ func (m Model) renderChordBar() string {
 		Render(content)
 }
 
-// --- chord implementations ------------------------------------------
-
-// firstSortableColumn returns the Name of the first candidate column that
-// is present AND sortable on the active list, or "" when none match. The
-// semantic-sort chords use it to resolve "the Name column", "the Created
-// column", etc. across surfaces that name the same data differently.
 func (m Model) firstSortableColumn(candidates []string) string {
 	_, cols := (&m).activeListTable()
 	for _, want := range candidates {

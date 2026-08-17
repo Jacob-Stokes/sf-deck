@@ -6,13 +6,6 @@ import (
 )
 
 // user_sessions.go — the per-user session drill behind /users → Active.
-//
-// The top-level Active list groups sessions BY USER (one representative
-// row each). Drilling a user lands here: every one of THAT user's live
-// sessions, each with its full detail — location (city/country),
-// browser + platform, IP, MFA/security, type, TTL, timestamps. This is
-// where all the AuthSession + LoginGeo + LoginHistory fields live
-// without cluttering the summary.
 
 // SessionRow is one AuthSession with its geo + device joins resolved.
 type SessionRow struct {

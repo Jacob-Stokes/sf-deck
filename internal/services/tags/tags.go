@@ -1,23 +1,5 @@
 // Package tags is the service layer for the personal tag annotation
 // system stored in devprojects.db.
-//
-// Tags are user-scoped (one global namespace per machine) and binding
-// rows are per-(item, org). This package wraps devproject.Store with a
-// validated typed surface shared by the TUI's tag manager and the
-// headless `sf-deck tag ...` commands.
-//
-// What lives here:
-//
-//   - Public Tag / Binding views with json tags for stable wire shape.
-//   - Validated CRUD: List / Show / Create / Update / Delete.
-//   - Binding ops: Apply / Remove / Set / TagsFor / ItemsWithTag.
-//   - Typed ErrNotFound / ErrAlreadyExists / ErrInvalidKind.
-//
-// What does NOT live here:
-//
-//   - SQL or migrations (devproject owns those).
-//   - Cross-cutting concerns like org resolution (callers pre-resolve
-//     the orgUser string and pass it in).
 package tags
 
 import (
@@ -39,10 +21,7 @@ type Tag struct {
 	Color     string    `json:"color,omitempty"`
 	Icon      string    `json:"icon,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
-	// Count is the binding count, populated by List when requested.
-	// Omitted from Show / Create / Update responses (we don't fetch
-	// it on the single-tag path to save the join).
-	Count int `json:"count,omitempty"`
+	Count     int       `json:"count,omitempty"`
 }
 
 // Binding is the public view of one tag→item attachment.
@@ -128,9 +107,6 @@ func KnownKinds() []string {
 	return out
 }
 
-// parseKind resolves a string into the devproject typed kind.
-// Returns ErrInvalidKind if not recognised. Caller is responsible for
-// surfacing this as invalid_argument.
 func parseKind(s string) (devproject.ItemKind, error) {
 	k, ok := validKinds[s]
 	if !ok {
@@ -139,7 +115,6 @@ func parseKind(s string) (devproject.ItemKind, error) {
 	return k, nil
 }
 
-// fromDP converts a devproject.Tag to the public view.
 func fromDP(t devproject.Tag) Tag {
 	return Tag{
 		ID:        t.ID,
@@ -150,8 +125,6 @@ func fromDP(t devproject.Tag) Tag {
 	}
 }
 
-// validateName enforces the rules the TUI's tag manager applies. Used
-// by Create + Update so the error surfaces before we even hit SQL.
 func validateName(name string) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("name is required")
@@ -204,10 +177,6 @@ func Show(s *devproject.Store, id int64, name string) (Tag, error) {
 		}
 		return fromDP(t), nil
 	}
-	// Lookup by id. The store doesn't expose a single-row getter, so
-	// scan via ListTags which is already sorted + fully fetched. The
-	// alternative — adding a single-row method — would gain nothing
-	// for the small N expected here (<100 tags is realistic).
 	all, err := s.ListTags()
 	if err != nil {
 		return Tag{}, err
@@ -379,10 +348,6 @@ func Apply(s *devproject.Store, tagID int64, kind, ref, orgUser string) (Result,
 	if err != nil {
 		return Result{}, err
 	}
-	// Detect changed by checking presence BEFORE the apply. The
-	// devproject store has INSERT OR IGNORE so it doesn't report
-	// rows-affected reliably for diagnostic purposes — easier to
-	// pre-check via TagsFor.
 	existing, err := s.TagsFor(k, ref, orgUser)
 	if err != nil {
 		return Result{}, err

@@ -1,19 +1,6 @@
 package ui
 
 // Details subtab of TabObjectDetail.
-//
-// Shows the sObject's own metadata: labels, identity, describe
-// capability flags, a compact field-count summary. Editable rows
-// (label / plural label / description and the five FEATURES toggles)
-// are navigable directly in the MAIN pane: arrow keys walk every
-// content row, and Enter / ctrl+e on an actionable row fires the
-// edit or toggle modal in place. The right sidebar is now info-only
-// — it merely reflects which action the cursored row maps to — so
-// the user can safely hide it.
-//
-// objectDetailRows is the single source of truth: both this renderer
-// and the cursor/activate hooks (tab_object_hooks.go) consume it so
-// the visible row order and the navigable index can never drift.
 
 import (
 	"fmt"
@@ -27,13 +14,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// objectDetailRow is one rendered line in the Details main pane.
-// Section titles, blank spacers and dim footnotes are non-navigable
-// (Navigable=false) so the cursor skips them; key/value rows are
-// navigable. actionIdx >= 0 marks a row that maps to an entry in
-// objectRegistry.Actions — Enter / ctrl+e on it opens that modal.
-// actionIdx < 0 is a read-only row (cursor still rests there, but
-// Enter is a no-op).
 type objectDetailRow struct {
 	Text      string // pre-rendered base text (before cursor styling)
 	Navigable bool
@@ -63,8 +43,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 	dim := func(s string) {
 		rows = append(rows, objectDetailRow{Text: dimLine(s, inner), ActionIdx: noAction})
 	}
-	// kv adds a navigable key/value row. action >= 0 wires it to a
-	// modal; noAction leaves it read-only (still navigable).
 	kv := func(k, val string, action int) {
 		rows = append(rows, objectDetailRow{
 			Text:      kvLine(k, val, inner),
@@ -73,7 +51,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 		})
 	}
 
-	// Title line: API name + label pair.
 	titleLine := v.Name
 	if v.Label != "" && v.Label != v.Name {
 		titleLine += "  —  " + v.Label
@@ -86,7 +63,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 	})
 	blank()
 
-	// IDENTITY
 	title("IDENTITY")
 	kv("api name", v.Name, noAction)
 	if v.Label != "" {
@@ -103,9 +79,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 		kind = "custom"
 	}
 	kv("kind", kind, noAction)
-	// description lives in IDENTITY conceptually; the value isn't in
-	// the describe so show the baseline's value (or a hint) and wire
-	// the edit action regardless.
 	desc := ""
 	if base != nil {
 		desc = base.Description
@@ -113,7 +86,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 	kv("description", dashIfEmpty(desc), 2)
 	blank()
 
-	// CAPABILITIES (from describe — always available, no extra call).
 	title("CAPABILITIES")
 	kv("queryable", yesNo(v.Queryable), noAction)
 	kv("createable", yesNo(v.Creatable), noAction)
@@ -121,10 +93,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 	kv("deletable", yesNo(v.Deletable), noAction)
 	blank()
 
-	// FEATURES — metadata-level toggles from the CustomObjectBaseline.
-	// Single-word labels keep each row on one line in the narrowed
-	// pane (the old "history tracking" / "chatter feeds" / "global
-	// search" labels wrapped when the sidebar was open).
 	title("FEATURES")
 	if base != nil {
 		kv("reports", boolPtrLabel(base.EnableReports), 3)
@@ -137,7 +105,6 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 	}
 	blank()
 
-	// FIELDS summary
 	customCount := 0
 	for _, f := range v.Fields {
 		if f.Custom {
@@ -157,16 +124,12 @@ func objectDetailRows(v sf.SObjectDescribe, base *sf.CustomObjectBaseline, r obj
 	return rows
 }
 
-// objectDetailMeta carries the describe Resource's render-relevant
-// state without threading the full Resource through objectDetailRows.
 type objectDetailMeta struct {
 	FetchedAt time.Time
 	Busy      bool
 	Err       error
 }
 
-// renderObjectDetails is the main-pane renderer for the Details
-// subtab of TabObjectDetail.
 func (m Model) renderObjectDetails(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -193,10 +156,6 @@ func (m Model) renderObjectDetails(w, innerH int) string {
 
 	rows := objectDetailRows(v, base, meta, inner)
 
-	// The cursor lives on navigable rows; objectActionCur indexes into
-	// the navigable subset. Translate it to an absolute row index so we
-	// can highlight the right line. Active only when this pane has focus
-	// (the action menu in the sidebar is no longer interactive).
 	navAbs := objectDetailNavIndex(rows)
 	curNav := m.objectActionCur
 	if curNav < 0 {
@@ -218,14 +177,8 @@ func (m Model) renderObjectDetails(w, innerH int) string {
 	return scrollLinesToCursor(out, cursorRow, innerH)
 }
 
-// renderObjectDetailLine applies cursor styling to one row. The
-// cursored row gets a left bar (bright when focused) and, when it
-// maps to an action, a trailing edit/toggle affordance so the user
-// knows Enter does something here.
 func renderObjectDetailLine(row objectDetailRow, cursored, active bool, inner int) string {
 	if !cursored {
-		// Non-cursored rows render with a 2-space gutter to align with
-		// the cursor bar's "▌ " prefix.
 		return "  " + row.Text
 	}
 	barColor := theme.Muted
@@ -240,7 +193,6 @@ func renderObjectDetailLine(row objectDetailRow, cursored, active bool, inner in
 			hintTxt = "  ↵ toggle"
 		}
 		hint := lipgloss.NewStyle().Foreground(theme.FgDim).Render(hintTxt)
-		// Only append the hint if there's room — keep within inner.
 		if ansi.StringWidth(line)+ansi.StringWidth(hintTxt) <= inner {
 			line += hint
 		}
@@ -248,10 +200,6 @@ func renderObjectDetailLine(row objectDetailRow, cursored, active bool, inner in
 	return line
 }
 
-// objectDetailNavIndex returns the absolute row indices of every
-// navigable row, in order. The Nth entry is the absolute row index of
-// the Nth navigable row — lets the cursor (which counts navigable
-// rows) map back to a render position.
 func objectDetailNavIndex(rows []objectDetailRow) []int {
 	var idx []int
 	for i, row := range rows {
@@ -273,9 +221,6 @@ func (m Model) objectDetailNavCount() int {
 	return len(objectDetailNavIndex(rows))
 }
 
-// objectDetailActionForCursor returns the action index the cursored
-// row maps to, or (noAction, false) when the cursor is on a read-only
-// row or the describe isn't loaded.
 func (m Model) objectDetailActionForCursor() (int, bool) {
 	rows, ok := m.objectDetailRowModel()
 	if !ok {
@@ -293,10 +238,6 @@ func (m Model) objectDetailActionForCursor() (int, bool) {
 	return row.ActionIdx, true
 }
 
-// objectDetailRowModel rebuilds the row model for the current Model
-// state. Returns (nil, false) when there's no org / describe yet.
-// Width is approximate (cursor logic doesn't depend on exact wrap);
-// uses the live pane width when available.
 func (m Model) objectDetailRowModel() ([]objectDetailRow, bool) {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -312,16 +253,9 @@ func (m Model) objectDetailRowModel() ([]objectDetailRow, bool) {
 	}
 	base, _ := readObjectBaselineForDetails(d, d.DescribeCur)
 	meta := objectDetailMeta{FetchedAt: r.FetchedAt(), Busy: r.Busy(), Err: r.Err()}
-	// Width only affects truncation, not which rows are navigable or
-	// which action they map to — the only things the cursor logic
-	// reads. A nominal width keeps the row set identical to the live
-	// render.
 	return objectDetailRows(r.Value(), base, meta, 60), true
 }
 
-// readObjectBaselineForDetails returns the cached baseline for
-// sobject if the resource has fetched. Returns (nil, false) when
-// not yet loaded — caller shows a "loading…" line while we wait.
 func readObjectBaselineForDetails(d *orgData, sobject string) (*sf.CustomObjectBaseline, bool) {
 	if d == nil {
 		return nil, false
@@ -344,8 +278,6 @@ func boolPtrLabel(b *bool) string {
 	return yesNo(*b)
 }
 
-// summaryObjectKind condenses custom/standard + keyPrefix into a
-// short one-line badge under the title.
 func summaryObjectKind(v sf.SObjectDescribe) string {
 	var parts []string
 	if v.Custom {

@@ -2,8 +2,6 @@ package settings
 
 import "time"
 
-// Cache-TTL and mouse-wheel tuning accessors. Split out of settings.go.
-
 // CacheTTL resolves the effective TTL for a resource key. Per-resource
 // override beats default_ttl; default_ttl beats the hardcoded fallback
 // which the caller passes as fallback. Hardcoded fallbacks stay at the

@@ -1,26 +1,13 @@
 package ui
 
 // Modal-flow message dispatch.
-//
-// Pairs with update_export_dispatch.go — extracted from update.go to
-// keep the main switch focused on cross-cutting messages. Handles
-// editModal / choiceModal / chipWizard / chipImport / chipOverflow /
-// criterion+value pickers / deep-collect / tab+subtab overflow
-// pickers / chip-manager invocation.
-//
-// Returns handled=true when matched so Update can short-circuit. The
-// return is (tea.Model, tea.Cmd, bool) — broader than the export
-// dispatcher because some apply* methods return tea.Model (interface
-// type) rather than concrete Model.
 
 import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// dispatchModalMsg routes modal/overlay-related messages.
 func (m Model) dispatchModalMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
-	// --- Global search records-mode SOSL result -------------------------
 	case recordsSearchResultMsg:
 		mm := m
 		(&mm).applyRecordsSearchResult(msg)
@@ -30,7 +17,6 @@ func (m Model) dispatchModalMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		cmd := (&mm).applyRecordsDebounceTick(msg)
 		return mm, cmd, true
 
-	// --- Edit modal ------------------------------------------------------
 	case editModalResultMsg:
 		mm, cmd := m.applyEditModalResult(msg)
 		return mm, cmd, true
@@ -41,7 +27,6 @@ func (m Model) dispatchModalMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mm, cmd := m.applyEditModalPreview(msg)
 		return mm, cmd, true
 
-	// --- Choice modal ----------------------------------------------------
 	case choiceModalResultMsg:
 		mm, cmd := m.applyChoiceModalResult(msg)
 		return mm, cmd, true
@@ -75,7 +60,6 @@ func (m Model) dispatchModalMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		return mm, cmd, true
 
-	// --- Chip wizard + chip-management overlays --------------------------
 	case chipWizardResultMsg:
 		mm, cmd := m.applyChipWizardResult(msg)
 		return mm, cmd, true
@@ -105,7 +89,6 @@ func (m Model) dispatchModalMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mm := m
 		return mm, (&mm).applyChipScopeChosen(msg), true
 
-	// --- Collect modal pipeline -----------------------------------------
 	case collectItemPickedMsg:
 		return m, m.applyCollectItemPicked(msg), true
 	case collectItemRemovedMsg:

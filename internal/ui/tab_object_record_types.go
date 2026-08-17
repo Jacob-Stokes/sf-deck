@@ -1,12 +1,5 @@
 package ui
 
-// Record Types subtab of TabObjectDetail — the list of RecordType
-// records defined on the currently-drilled sObject.
-//
-// Structurally identical to the Validation subtab: list in the main
-// pane, compact summary of the selected row in the sidebar. Drill
-// via Enter for full Metadata + action menu (TabRecordTypeDetail).
-
 import (
 	"fmt"
 	"strings"
@@ -18,8 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderObjectRecordTypes is the main-pane renderer for the Record
-// Types subtab.
 func (m Model) renderObjectRecordTypes(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -60,7 +51,6 @@ func (m Model) renderObjectRecordTypes(w, innerH int) string {
 		sel = 0
 	}
 
-	// Columns: active dot · developer name · label · description preview.
 	devW := inner / 4
 	if devW < 18 {
 		devW = 18
@@ -80,7 +70,6 @@ func (m Model) renderObjectRecordTypes(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderRecordTypeRow is one row of the record-type list.
 func renderRecordTypeRow(rt sf.RecordTypeRow, selected, mainFocused bool, devW, labelW, descW, inner int) string {
 	dot := validationStatusDot(rt.Active) // green-active / muted-inactive; same visual as validation
 	devStyle := lipgloss.NewStyle().Foreground(theme.Fg).Width(devW)

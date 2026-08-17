@@ -15,8 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// jsonUnmarshal aliases encoding/json.Unmarshal so the file-local
-// parse helpers don't pull the package name into every line.
 var jsonUnmarshal = json.Unmarshal
 
 func dispatchBundle(a *app.App, args Args, stdout io.Writer, mode headless.WriteMode) int {
@@ -160,9 +158,6 @@ func bundleCreate(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 	changed := true
 	if res.RetrieveErr != nil {
 		data["retrieve_error"] = res.RetrieveErr.Error()
-		// Partial success: the bundle row + manifest are written, but
-		// the retrieve failed. Map to ExitPartial so scripts can
-		// branch cleanly.
 		exitCode = headless.ExitPartialSuccess
 	}
 	r := headless.Success("bundle.create", orgUser, in.OrgAlias, changed, data)
@@ -371,10 +366,6 @@ func bundleReport(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 		"deploy_id": *jobID,
 		"sf_output": string(result.Output),
 	}
-	// Surface the terminal status fields so consumers don't have to
-	// parse sf_output. Status is the lifecycle field;
-	// numberComponentErrors / numberTestErrors are the "did it fail"
-	// signals validate cares about.
 	if status, ok := parseDeployStatus(result.Output); ok {
 		data["status"] = status
 	}
@@ -437,11 +428,6 @@ func buildDeployOpts(testsFlag, testClasses string) (sf.DeployOpts, error) {
 	return opts, nil
 }
 
-// parseDeployJobID extracts the DeployRequest.Id (0Af...) from the sf
-// project deploy --json output. Both sync and async modes include
-// "id" in the result block; we surface it so a synchronous deploy
-// that times out client-side still tells the agent which job to
-// poll.
 func parseDeployJobID(out []byte) string {
 	var env struct {
 		Result struct {
@@ -454,10 +440,6 @@ func parseDeployJobID(out []byte) string {
 	return env.Result.ID
 }
 
-// parseDeployStatus extracts the lifecycle Status (Pending /
-// InProgress / Succeeded / Failed / Canceled) plus the test/component
-// error counts. Returns ok=false when the JSON didn't parse —
-// caller fills in nothing rather than rendering misleading zeros.
 func parseDeployStatus(out []byte) (map[string]any, bool) {
 	var env struct {
 		Result struct {
@@ -484,9 +466,6 @@ func parseDeployStatus(out []byte) (map[string]any, bool) {
 	}, true
 }
 
-// jsonUnmarshalLenient is encoding/json.Unmarshal with the empty-
-// input nil-check — sf can emit stderr-only on failure, in which
-// case stdout is empty.
 func jsonUnmarshalLenient(out []byte, v any) error {
 	if len(out) == 0 {
 		return errors.New("empty output")
@@ -494,9 +473,6 @@ func jsonUnmarshalLenient(out []byte, v any) error {
 	return jsonUnmarshal(out, v)
 }
 
-// writeBundleErr translates bundle service errors → typed headless
-// envelope codes. Bundle-specific (not_found / stale) get their own
-// codes; everything else falls through to the generic argerr path.
 func writeBundleErr(command, orgUser string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	var notFound bundles.ErrNotFound
 	if errors.As(err, &notFound) {

@@ -9,10 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// permParentFetchedAt is TabPermParentDetail's header-freshness hook.
-// The drill-in shows a different resource per subtab, so the age
-// follows the active one; Overview (and PSG Components) rides the
-// parent list the row came from.
 func permParentFetchedAt(m Model, d *orgData) time.Time {
 	switch m.currentSubtab() {
 	case SubtabParentObjects:
@@ -185,10 +181,6 @@ func (m *Model) ensurePermParentData(d *orgData, o sf.Org) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// refreshPermParentData is the r-key refresh for TabPermParentDetail:
-// force-refresh the resource behind the ACTIVE subtab (object perms /
-// system perms / assigned users) plus the parent lists. Without this r
-// was a no-op on a permset/PSG/profile drill — only ctrl+r reached it.
 func (m Model) refreshPermParentData(d *orgData) tea.Cmd {
 	if d == nil || len(m.orgs) == 0 {
 		return nil

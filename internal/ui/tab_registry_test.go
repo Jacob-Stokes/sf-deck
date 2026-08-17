@@ -5,23 +5,6 @@ package ui
 // — the kind of "did I forget to set Field X on the new entry I just
 // added" mistakes that would otherwise show up as a runtime nil-deref
 // or as silent "this gesture does nothing on this tab."
-//
-// What's enforced here:
-//
-//   1. Every registered Tab has a Renderer (or its Subtabs all do).
-//   2. Every Subtabs entry has a non-empty Label (used in the tab
-//      strip; empty Label = invisible subtab).
-//   3. Every tab declaring Subtabs also declares GetSubtabIdx +
-//      SetSubtabIdx (the subtab cursor accessors).
-//   4. Every listSurface that sets BuildRenderModel returns a model
-//      with non-nil State + Search + Cols + Cell when called against
-//      an empty orgData. This catches regressions where a new
-//      surface forgets one of those — the shared renderer would
-//      crash at first frame.
-//
-// These tests don't replace the smoke tests (which exercise actual
-// rendering); they're cheaper structural checks that fail loudly at
-// "go test" time when the registry shape drifts.
 
 import (
 	"testing"
@@ -35,7 +18,6 @@ func TestTabRegistryCompleteness(t *testing.T) {
 		tab := tab
 		spec := spec
 		t.Run(tab.String(), func(t *testing.T) {
-			// (1) Renderer required at the tab level OR on every subtab.
 			if spec.Renderer == nil {
 				if len(spec.Subtabs) == 0 {
 					t.Errorf("tab %v has no Renderer and no Subtabs — render dispatch will crash", tab)
@@ -49,7 +31,6 @@ func TestTabRegistryCompleteness(t *testing.T) {
 				}
 			}
 
-			// (2) Every Subtabs entry needs a non-empty Label.
 			for i, sub := range spec.Subtabs {
 				if sub.Label == "" {
 					t.Errorf("tab %v subtab %d (%s) has empty Label — would be invisible in tab strip",
@@ -57,7 +38,6 @@ func TestTabRegistryCompleteness(t *testing.T) {
 				}
 			}
 
-			// (3) Subtab cursor accessors required when Subtabs non-empty.
 			if len(spec.Subtabs) > 0 {
 				if spec.GetSubtabIdx == nil {
 					t.Errorf("tab %v has Subtabs but no GetSubtabIdx — subtab nav broken", tab)
@@ -97,9 +77,6 @@ func TestListSurfaceBuildRenderModelShape(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				model, ok := surf.BuildRenderModel(m, d)
 				if !ok {
-					// Surface declined to produce a model for empty
-					// data. That's allowed — but if it returned ok=true,
-					// the rest of the asserts apply.
 					return
 				}
 				if model.State == nil {
@@ -148,9 +125,6 @@ func TestListOpenSurfacesHaveIdentity(t *testing.T) {
 	specs := tabSpecs()
 	checked := 0
 	for tab, spec := range specs {
-		// Tab-level List+Open surface (tabs without subtabs, e.g.
-		// /flows, /packages). A parent Identity or NoCollectReason
-		// satisfies it.
 		if spec.List != nil && spec.Open != nil && len(spec.Subtabs) == 0 {
 			checked++
 			if spec.Identity == nil && spec.NoCollectReason == "" {
@@ -161,8 +135,6 @@ func TestListOpenSurfacesHaveIdentity(t *testing.T) {
 			}
 		}
 
-		// Subtab-level List+Open surfaces. Identity may live on the
-		// subtab OR be inherited from the parent tab; either counts.
 		for _, sub := range spec.Subtabs {
 			if sub.List == nil || sub.Open == nil {
 				continue

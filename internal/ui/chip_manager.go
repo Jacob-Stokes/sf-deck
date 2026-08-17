@@ -1,14 +1,5 @@
 package ui
 
-// Unified chip manager. One opener + one dispatcher serve every
-// surface (records / objects / flows). The shared modal_chip_manager.go
-// owns the menu shape; this file owns the per-surface specifics:
-// which registry to read, which scope, which import flow, and how to
-// describe the chip in the menu hint.
-//
-// Replaces modal_lens_manager.go + modal_filter_manager.go (both
-// removed in the unified-query-ast cutover).
-
 import (
 	"fmt"
 	"github.com/charmbracelet/x/ansi"
@@ -24,8 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/qchip"
 )
 
-// chipDomain identifies which surface a manager invocation targets.
-// Drives registry lookup + import flow + scope.
 type chipDomain string
 
 const (
@@ -51,9 +40,6 @@ const (
 	domainActiveUsers chipDomain = "active-users"
 )
 
-// registryFor returns the live registry pointer for a domain.
-// Straight map lookup since every domain (Records included) lives in
-// chipRegistries.
 func (m *Model) registryFor(d chipDomain) *qchip.Registry {
 	return m.chipRegistry(d)
 }
@@ -90,12 +76,6 @@ func (m *Model) setActiveOrgOnChipRegistries(orgUser string) {
 	}
 }
 
-// chipGroupMembersResolver builds the closure registries use to answer
-// "is this username a member of this OrgGroup?" for ChipShareGroup
-// resolution. Reads settings live so a renamed/edited group is honoured
-// immediately. Returns nil when there's no settings store (group-shared
-// chips then fail closed, which matches the registry's documented
-// "nil = fail closed" contract).
 func (m Model) chipGroupMembersResolver() func(groupID, username string) bool {
 	if m.settings == nil {
 		return nil
@@ -116,10 +96,6 @@ func (m Model) activeOrgUserForChips() string {
 	return m.orgs[m.selected].Username
 }
 
-// openChipManagerFor opens the manager modal for the given domain.
-// `scope` is the chip's applicability — for records-shaped surfaces
-// it's the active sObject API name; for the universal surfaces
-// (/objects, /flows) it's "*".
 func (m *Model) openChipManagerFor(d chipDomain, scope, title string, withImport bool) tea.Cmd {
 	reg := m.registryFor(d)
 	if reg == nil {
@@ -154,11 +130,6 @@ func (m *Model) openChipManagerFor(d chipDomain, scope, title string, withImport
 	})
 }
 
-// ephemeralChipsFor returns the IPC-spawned session-only chips
-// registered at (domain, scope), shaped as chipMenuRows for the
-// manager modal. Cross-org "Preview here" entries (which share the
-// chipPreviews storage) are filtered out — they get their own
-// "other orgs" section.
 func (m Model) ephemeralChipsFor(d chipDomain, scope string) []chipMenuRow {
 	previews := m.chipPreviewsFor(d, scope)
 	if len(previews) == 0 {
@@ -202,7 +173,6 @@ func (m Model) chipsFromOtherOrgs(d chipDomain, scope string) []otherOrgChipRow 
 		if share.Allows(active, groupMembers) {
 			continue // already visible for this org — handled by the main list
 		}
-		// Identify the origin org so the preview tag / sub-modal can show it.
 		origin := chipOriginOrgFromShare(share)
 		out = append(out, otherOrgChipRow{
 			ID:            c.ID,
@@ -224,11 +194,6 @@ func chipScopeApplies(chipScope, querScope string) bool {
 	return chipScope == querScope
 }
 
-// chipOriginOrgFromShare picks a representative origin org for display.
-// For ChipShareOrg/Orgs it's the first listed username; for Group it's
-// the group id (the friendly-name resolver will translate); for global
-// it's "" (the section won't list these — they're always allowed —
-// but the helper is defensive).
 func chipOriginOrgFromShare(s settings.ChipShare) string {
 	switch s.Kind {
 	case settings.ChipShareOrg, settings.ChipShareOrgs:
@@ -241,7 +206,6 @@ func chipOriginOrgFromShare(s settings.ChipShare) string {
 	return ""
 }
 
-// otherOrgChipRow is one entry in the manager modal's cross-org section.
 type otherOrgChipRow struct {
 	ID            string
 	Label         string
@@ -250,13 +214,6 @@ type otherOrgChipRow struct {
 	Chip          qchip.Chip
 }
 
-// chipHint summarises a chip for the right-hand column of the menu.
-// Imported chips show their posterity link; user chips show a SOQL
-// snippet of the predicate; built-ins fall through to "built-in".
-// chipManagerHint composes the manager-row hint: the predicate / source
-// summary (chipHint) plus a "· <who>" share summary when the chip is
-// shared with other orgs. Single-org chips get just the predicate hint
-// (the row carries no ⇄ marker, so no need to mention scope).
 func chipManagerHint(m Model, c qchip.Chip) string {
 	base := chipHint(c)
 	if !c.Share.IsShared() {
@@ -295,9 +252,6 @@ func chipHint(c qchip.Chip) string {
 	return "(no filter)"
 }
 
-// dispatchChipManagerAction routes a manager-menu pick. Replaces the
-// per-surface dispatchLensManagerAction / dispatchObjectsFilterAction
-// / dispatchFlowsFilterAction that the old code had.
 func (m *Model) dispatchChipManagerAction(d chipDomain, scope, pick string) tea.Cmd {
 	switch {
 	case pick == "new":
@@ -313,10 +267,6 @@ func (m *Model) dispatchChipManagerAction(d chipDomain, scope, pick string) tea.
 		}
 		return m.applyChipSelection(d, scope, id)
 	case strings.HasPrefix(pick, "actions:"):
-		// Enter on a chip row opens the per-chip action picker
-		// (Pin/Unpin · Edit · Delete · Cancel) instead of
-		// committing immediately. Keeps the manager list one-row-
-		// per-chip while preserving every action.
 		id := strings.TrimPrefix(pick, "actions:")
 		return m.openChipActionsModal(d, id)
 	case strings.HasPrefix(pick, "otherorg:"):
@@ -325,18 +275,12 @@ func (m *Model) dispatchChipManagerAction(d chipDomain, scope, pick string) tea.
 		id := strings.TrimPrefix(pick, "otherorg:")
 		return m.openOtherOrgChipActions(d, id)
 	case strings.HasPrefix(pick, "eph:"):
-		// Enter on a session-only chip row: apply it (same as Enter
-		// on any other chip — the strip already shows it, we just
-		// move the cursor onto it).
 		id := strings.TrimPrefix(pick, "eph:")
 		if scope == "" {
 			scope = chipScopeFor(m, d)
 		}
 		return m.applyChipSelection(d, scope, id)
 	case strings.HasPrefix(pick, "ephactions:"):
-		// e on an ephemeral row opens the Save/Dismiss sub-modal
-		// instead of the usual rename/delete/scope set — those don't
-		// apply to a session-only chip.
 		id := strings.TrimPrefix(pick, "ephactions:")
 		return m.openEphemeralChipActions(d, id)
 	case strings.HasPrefix(pick, "ephsave:"):
@@ -366,9 +310,6 @@ func (m *Model) dispatchChipManagerAction(d chipDomain, scope, pick string) tea.
 		}
 		m.addChipPreview(d, scope, c, originOrg)
 		m.flash("previewing " + c.Label + " (session only)")
-		// Make the preview the ACTIVE view immediately — the preview
-		// row is already on the strip, so this just moves the cursor
-		// onto it (same path as Enter-to-apply on a local chip).
 		return m.applyChipSelection(d, scope, id)
 	case strings.HasPrefix(pick, "otherscope:"):
 		id := strings.TrimPrefix(pick, "otherscope:")
@@ -429,9 +370,6 @@ func (m *Model) dispatchChipManagerAction(d chipDomain, scope, pick string) tea.
 	return nil
 }
 
-// chipScopeFor returns the right scope value for a new chip on the
-// given domain. Records uses the active sObject; the universal
-// surfaces use "*".
 func chipScopeFor(m *Model, d chipDomain) string {
 	if d != domainRecords {
 		return "*"
@@ -443,8 +381,6 @@ func chipScopeFor(m *Model, d chipDomain) string {
 	return sobj
 }
 
-// openChipDeleteConfirm pops a yes/no confirm. Same UX as before; one
-// implementation now serves all three domains.
 func (m *Model) openChipDeleteConfirm(d chipDomain, id string) tea.Cmd {
 	reg := m.registryFor(d)
 	if reg == nil {
@@ -469,9 +405,6 @@ func (m *Model) openChipDeleteConfirm(d chipDomain, id string) tea.Cmd {
 			if m.settings != nil {
 				m.settings.DeleteChip(string(d), id)
 			}
-			// Drop from runtime registry too — UpsertChip's settings call
-			// rebuilt by LoadFromSettings would also work, but reloading
-			// is heavier than a direct mutation here.
 			user := reg.User()
 			out := user[:0]
 			for _, x := range user {
@@ -491,11 +424,6 @@ func (m *Model) openChipDeleteConfirm(d chipDomain, id string) tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// importSalesforceListView fetches a SF list view's SOQL via
-// /listviews/<id>/describe, parses it through query.Parse, and saves
-// the result as a chip with origin=imported. Works for any sObject-
-// backed surface — records pulls Account list views; flows pulls
-// FlowDefinition list views. The parser does the heavy lifting.
 func (m *Model) importSalesforceListView(d chipDomain, listViewID string) tea.Cmd {
 	d2, sobj := primaryImportTarget(m, d)
 	if sobj == "" {
@@ -536,12 +464,6 @@ func (m *Model) importSalesforceListView(d chipDomain, listViewID string) tea.Cm
 		scope = "*"
 	}
 
-	// Build the describe fallback chain. The list view's SobjectType
-	// is the natural first try, but Salesforce sometimes returns
-	// INVALID_TYPE for it (e.g. FlowDefinitionView is queryable as
-	// a SobjectType column on ListView but the describe endpoint
-	// only accepts FlowDefinition). When that happens, fall through
-	// to the domain's other targets.
 	_, allTargets := importTargets(m, d)
 	describeChain := []string{listViewSObject}
 	for _, t := range allTargets {
@@ -571,9 +493,6 @@ func (m *Model) importSalesforceListView(d chipDomain, listViewID string) tea.Cm
 			return chipImportDoneMsg{err: lastErr}
 		}
 		q, _, perr := query.Parse(desc.Query)
-		// perr is non-fatal — Parse returns a best-effort Query even
-		// when it rejects an unsupported clause. The user gets a flash
-		// alongside the success message.
 		newChip := qchip.Chip{
 			ID:         importChipID(sobj, sourceName),
 			Label:      sourceName,
@@ -625,9 +544,6 @@ func importTargets(m *Model, d chipDomain) (*orgData, []string) {
 	return nil, nil
 }
 
-// primaryImportTarget returns the canonical sObject we cache list-view
-// metadata under. For multi-target domains (flows) we use the first
-// entry as the cache key; the merged results live there.
 func primaryImportTarget(m *Model, d chipDomain) (*orgData, string) {
 	dd, targets := importTargets(m, d)
 	if len(targets) == 0 {
@@ -636,16 +552,12 @@ func primaryImportTarget(m *Model, d chipDomain) (*orgData, string) {
 	return dd, targets[0]
 }
 
-// chipImportDoneMsg lands on the main loop after the import finishes.
 type chipImportDoneMsg struct {
 	label    string
 	err      error
 	parseErr error
 }
 
-// chipImportListViewsReadyMsg fires when an auto-load of the list-view
-// catalog (kicked off by openChipImportPicker) finishes. Update reopens
-// the picker so the user sees the results without any extra keystrokes.
 type chipImportListViewsReadyMsg struct {
 	Domain chipDomain
 }
@@ -662,10 +574,6 @@ type chipImportListViewsFetchedMsg struct {
 	Views   []sf.ListView
 }
 
-// applyChipImportListViews is the Update-side handler for
-// chipImportListViewsFetchedMsg. Resolves the live Resource on the
-// active org and writes the payload — see "async discipline" in
-// docs/development/architecture.md for the rule this enforces.
 func (m Model) applyChipImportListViews(msg chipImportListViewsFetchedMsg) (Model, tea.Cmd) {
 	if len(m.orgs) == 0 {
 		return m, nil
@@ -679,7 +587,6 @@ func (m Model) applyChipImportListViews(msg chipImportListViewsFetchedMsg) (Mode
 	}
 }
 
-// applyChipImportDone is the Update-side handler.
 func (m Model) applyChipImportDone(msg chipImportDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		m.flash("import failed: " + msg.err.Error())
@@ -694,8 +601,6 @@ func (m Model) applyChipImportDone(msg chipImportDoneMsg) (Model, tea.Cmd) {
 	return m, m.onTabChanged()
 }
 
-// importChipID builds a stable id for an imported chip from the
-// scope + source name. Re-importing the same view overwrites cleanly.
 func importChipID(scope, name string) string {
 	id := strings.ToLower(scope) + "-" + slugify(name)
 	if id == "-" || id == "" {
@@ -704,11 +609,6 @@ func importChipID(scope, name string) string {
 	return id
 }
 
-// openChipImportPicker opens the list-view picker. When the catalog
-// hasn't loaded yet — common on /flows since the user hasn't visited
-// /records · Salesforce mode — we fire the fetch transparently and
-// re-open the picker once the data lands. Some domains (flows) span
-// multiple sObjects, so we query each candidate and merge results.
 func (m *Model) openChipImportPicker(d chipDomain) tea.Cmd {
 	dd, targets := importTargets(m, d)
 	if dd == nil || len(targets) == 0 {
@@ -722,17 +622,9 @@ func (m *Model) openChipImportPicker(d chipDomain) tea.Cmd {
 	primary := targets[0]
 	r, ok := dd.ListViewsPerSObject[primary]
 	if !ok || r.FetchedAt().IsZero() {
-		// Auto-fetch and re-open. Query every candidate sObject and
-		// merge so the user sees their list views regardless of
-		// which underlying object Salesforce parked them on.
 		m.flash("loading Salesforce list views…")
 		alias := targetArg(o)
 		domain := d
-		// Touch (lazy-allocate) the Resource on the main goroutine so
-		// the apply path in Update can find it. The Fetch closure
-		// itself isn't used here — the cache miss path lands via the
-		// chipImportListViewsFetchedMsg we emit below, applied via
-		// applyChipImportListViews on the Update goroutine.
 		_ = dd.EnsureListViews(alias, primary)
 		queries := append([]string(nil), targets...)
 		return func() tea.Msg {
@@ -813,8 +705,6 @@ func (m *Model) openChipImportPicker(d chipDomain) tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// slugify is the same kebab-cased id helper the old lens import used.
-// Centralised here so chip ids look the same across surfaces.
 func slugify(s string) string {
 	var b strings.Builder
 	prevDash := false
@@ -832,17 +722,6 @@ func slugify(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// openOtherOrgChipActions is the sub-modal for a row in the manager's
-// "chips from your other orgs" section. Three actions, no defaults that
-// silently modify the chip:
-//
-//   - Preview here (session)  → drop an ephemeral preview onto the strip
-//     that vanishes on relaunch.
-//   - Add to scope…           → run the scope chooser; on commit, the
-//     chip is rewritten with the new Share
-//     and now permanently visible per its
-//     widened scope.
-//   - Cancel                  → close, no state change.
 func (m *Model) openOtherOrgChipActions(d chipDomain, chipID string) tea.Cmd {
 	cfg, ok := m.findChipConfigByID(d, chipID)
 	if !ok {
@@ -880,10 +759,6 @@ func (m *Model) openOtherOrgChipActions(d chipDomain, chipID string) tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// openEphemeralChipActions opens the Save / Dismiss sub-modal for
-// an IPC-spawned session-only chip. Save promotes the chip to a
-// persisted entry via the same chips.Create service the CLI uses;
-// Dismiss drops the entry from m.chipPreviews.
 func (m *Model) openEphemeralChipActions(d chipDomain, chipID string) tea.Cmd {
 	p, ok := m.findChipPreview(chipID)
 	if !ok || p.OriginOrgUser != chipPreviewOriginIPC {
@@ -918,10 +793,6 @@ func (m *Model) openEphemeralChipActions(d chipDomain, chipID string) tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// openEphemeralSavePrompt asks the user for a stable id to promote
-// the ephemeral chip under. Routes through chips.Create so every
-// validation (id shape, collision, column shape) runs through the
-// same code path the CLI uses.
 func (m *Model) openEphemeralSavePrompt(d chipDomain, chipID string) tea.Cmd {
 	p, ok := m.findChipPreview(chipID)
 	if !ok || p.OriginOrgUser != chipPreviewOriginIPC {
@@ -970,9 +841,6 @@ func (m *Model) openEphemeralSavePrompt(d chipDomain, chipID string) tea.Cmd {
 	})
 }
 
-// findChipConfigByID locates a chip in settings by (domain, id). Used
-// for the cross-org preview/widen flows where the chip is NOT in the
-// active registry (it belongs to another org's scope).
 func (m Model) findChipConfigByID(d chipDomain, id string) (settings.ChipConfig, bool) {
 	if m.settings == nil {
 		return settings.ChipConfig{}, false

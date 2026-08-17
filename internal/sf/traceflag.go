@@ -1,25 +1,6 @@
 package sf
 
 // TraceFlag management for anonymous-Apex log capture.
-//
-// Anonymous Apex executions only land in ApexLog when the running
-// user has an *active* TraceFlag pointing at a DebugLevel during
-// the call. Without one, executeAnonymous succeeds but no log row
-// is ever created — exactly the "nothing comes up in log" case.
-//
-// Workbench / Apex Replay / VS Code's Salesforce Extensions all
-// auto-set one when running anonymous Apex. We do the same:
-//
-//	1. EnsureTraceFlagForUser(userID) — find or create a DebugLevel
-//	   with a sensible default + a TraceFlag covering userID for
-//	   the next ~30 minutes. Idempotent: re-uses an existing
-//	   active TraceFlag when one is already in effect.
-//	2. The caller fires executeAnonymous.
-//	3. FetchLatestApexLog reads the resulting row.
-//
-// We don't clean the TraceFlag up after the run — leaving it
-// active for 30 minutes lets the user run a series of snippets
-// without re-priming every time. The flag expires on its own.
 
 import (
 	"encoding/json"
@@ -55,7 +36,6 @@ func EnsureTraceFlagForUser(alias, userID string) (TraceFlagResult, error) {
 	}
 	now := time.Now().UTC()
 
-	// Step 1: check for an existing active TraceFlag on this user.
 	soql := fmt.Sprintf(
 		"SELECT Id, DebugLevelId, ExpirationDate FROM TraceFlag "+
 			"WHERE TracedEntityId = '%s' AND LogType = 'USER_DEBUG' "+
@@ -76,13 +56,11 @@ func EnsureTraceFlagForUser(alias, userID string) (TraceFlagResult, error) {
 		}, nil
 	}
 
-	// Step 2: find or create the DebugLevel.
 	dlID, err := findOrCreateDebugLevel(c)
 	if err != nil {
 		return TraceFlagResult{}, err
 	}
 
-	// Step 3: create a TraceFlag valid for 30 minutes.
 	expires := now.Add(30 * time.Minute)
 	body, _ := json.Marshal(map[string]any{
 		"TracedEntityId": userID,
@@ -112,10 +90,6 @@ func EnsureTraceFlagForUser(alias, userID string) (TraceFlagResult, error) {
 	}, nil
 }
 
-// findOrCreateDebugLevel returns the Id of our canonical DebugLevel,
-// creating it on first use. We pick a stable DeveloperName ("sfdeck")
-// so subsequent invocations re-use the row instead of polluting the
-// org with one DebugLevel per session.
 func findOrCreateDebugLevel(c *Client) (string, error) {
 	const developerName = "sfdeck"
 	soql := fmt.Sprintf(

@@ -4,12 +4,6 @@ package sf
 // from Users() in orgstats.go which is the home-tab recent-logins
 // summary (capped at ~10). This pulls a broader slice with a higher
 // cap so chip predicates have material to filter against.
-//
-// Cap is intentional: large orgs can have tens of thousands of User
-// records (community licences, retired accounts). 2000 is the sweet
-// spot for chip-driven UX without dragging the network round-trip.
-// Surfaces wanting genuinely-all-users go through SF list views via
-// the records-mode chip toggle.
 
 import (
 	"encoding/json"
@@ -288,14 +282,10 @@ func FetchUserAccess(target, userID string) (UserAccess, error) {
 			continue
 		}
 		if owned, ok := ps["IsOwnedByProfile"].(bool); ok && owned {
-			// The profile's shadow permset — the card already shows
-			// the profile by name; repeating it here is noise.
 			continue
 		}
 		viaGroup := ""
 		if psg, ok := r["PermissionSetGroup"].(map[string]any); ok {
-			// PSG's display field is MasterLabel, not Name — the
-			// generic relationName helper would come back empty.
 			viaGroup = asString(psg["MasterLabel"])
 		}
 		out.PermSets = append(out.PermSets, UserPermSetRow{

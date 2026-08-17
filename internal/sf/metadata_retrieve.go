@@ -3,20 +3,6 @@ package sf
 // Metadata API retrieve — the project-free path used by the /compare
 // "Metadata API" route (and the Auto-route fallback for types Tooling
 // can't serve).
-//
-// The Metadata API proper is SOAP-only; Salesforce exposes no REST
-// listMetadata / retrieveRequest. Rather than implement a SOAP client,
-// we shell out to `sf`, which already speaks it:
-//
-//   - MetadataListByType  → `sf org list metadata --metadata-type T`
-//   - RetrieveMetadataXML → `sf project retrieve start --metadata T:N…`
-//     into a throwaway temp project, then read the resulting source
-//     files back as XML strings.
-//
-// This is deliberately the *slow* route (process spawn + temp dir +
-// async retrieve). It's gated behind the user's explicit "Metadata API"
-// method choice (or Auto-fallback), where the tradeoff — fewest API
-// calls, all types, higher latency — is the whole point.
 
 import (
 	"encoding/json"
@@ -53,8 +39,6 @@ func MetadataListByType(alias, metadataType string) ([]MetadataItem, error) {
 	}
 	var parsed listMetadataWrapper
 	if err := json.Unmarshal(out, &parsed); err != nil {
-		// `sf` returns {result: []} for empty types but sometimes a bare
-		// array; tolerate both.
 		var bare []MetadataItem
 		if err2 := json.Unmarshal(out, &bare); err2 == nil {
 			return bare, nil
@@ -80,9 +64,6 @@ func RetrieveMetadataXML(alias, metadataType string, members []string) (map[stri
 	}
 	defer os.RemoveAll(dir)
 
-	// Minimal sfdx project so `sf project retrieve` is happy outside a
-	// real project. sourceApiVersion is required; the default package
-	// dir "force-app" is where retrieved source lands.
 	if err := writeMinimalSFDXProject(dir, alias); err != nil {
 		return nil, err
 	}
@@ -99,9 +80,6 @@ func RetrieveMetadataXML(alias, metadataType string, members []string) (map[stri
 		return nil, fmt.Errorf("retrieve %s: %w", metadataType, err)
 	}
 
-	// Walk the retrieved source tree and map fullName → contents. We key
-	// on the file's base name minus the metadata suffix so it lines up
-	// with the inventory's component keys.
 	root := filepath.Join(dir, "force-app")
 	out := map[string]string{}
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
@@ -121,21 +99,7 @@ func RetrieveMetadataXML(alias, metadataType string, members []string) (map[stri
 	return out, nil
 }
 
-// metadataComponentKey strips known metadata file suffixes to recover
-// the component's developer name. e.g.
-//
-//	MyClass.cls-meta.xml      → "" (skip the meta sidecar)
-//	MyClass.cls               → "MyClass"
-//	My_Rule.validationRule-meta.xml → "My_Rule"
-//	Account.object-meta.xml   → "Account"
-//
-// Returns "" for files we don't want to key on (meta sidecars whose
-// primary file we already captured, or unrecognised files).
 func metadataComponentKey(filename string) string {
-	// Source-format suffixes we care about. For source files with a
-	// separate -meta.xml sidecar (e.g. .cls + .cls-meta.xml) we key on
-	// the primary file and skip the sidecar. For XML-only types the
-	// -meta.xml IS the content, so we key on it.
 	switch {
 	case strings.HasSuffix(filename, ".cls-meta.xml"),
 		strings.HasSuffix(filename, ".trigger-meta.xml"),
@@ -151,9 +115,6 @@ func metadataComponentKey(filename string) string {
 	case strings.HasSuffix(filename, ".component"):
 		return strings.TrimSuffix(filename, ".component")
 	}
-	// XML-only types: strip the .<suffix>-meta.xml or .<suffix> tail and
-	// return the base name. Covers .field-meta.xml, .validationRule-meta.xml,
-	// .recordType-meta.xml, .flow-meta.xml, .object-meta.xml, etc.
 	base := filename
 	if i := strings.Index(base, "-meta.xml"); i >= 0 {
 		base = base[:i]

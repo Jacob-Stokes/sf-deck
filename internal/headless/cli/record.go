@@ -15,9 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// dispatchRecord routes `sf-deck record <verb>`. Read-only — `get`
-// returns one record, `recent` returns the N most recently modified.
-// SOQL-driven custom listings go through `sf-deck soql run`.
 func dispatchRecord(a *app.App, args Args, stdout io.Writer, mode headless.WriteMode) int {
 	verb := args.Verb
 	if verb == "" {
@@ -41,9 +38,6 @@ func dispatchRecord(a *app.App, args Args, stdout io.Writer, mode headless.Write
 	return headless.ExitCodeFor(r)
 }
 
-// recordGet fetches one record by ID. Either --object is passed
-// explicitly, or we infer it from the 3-char key prefix on the
-// record id when --object is empty (matches the TUI's behaviour).
 func recordGet(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	fs := newFlagSet("record get")
 	target := fs.String("org", "", "Alias or username (empty = default)")
@@ -69,8 +63,6 @@ func recordGet(a *app.App, rest []string, stdout io.Writer, mode headless.WriteM
 
 	sobjectName := *object
 	if sobjectName == "" {
-		// Resolve via key prefix. sf.ListSObjects returns SObjects
-		// with KeyPrefix populated; scan for a match.
 		resolved, rerr := resolveSObjectByPrefix(app.TargetArg(o), *id)
 		if rerr != nil {
 			return writeDescribeErr("record.get", o.Username, *id, rerr, stdout, mode)
@@ -131,15 +123,6 @@ func recordRecent(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 	return headless.ExitCodeFor(r)
 }
 
-// resolveSObjectByPrefix scans the org's sObject list for an entry
-// whose KeyPrefix matches the first 3 chars of recordID. Returns the
-// API name. Used by `record get` when --object is omitted — saves the
-// caller from having to know which 3-letter prefix maps to Account vs.
-// Contact etc.
-//
-// Falls back to a clear "unable to resolve" error rather than guessing
-// when no prefix match exists (e.g. recordID belongs to a managed
-// package object not yet enabled in this org).
 func resolveSObjectByPrefix(target, recordID string) (string, error) {
 	if len(recordID) < 3 {
 		return "", fmt.Errorf("record id too short to resolve sObject")
@@ -167,8 +150,6 @@ func recordUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 	object := fs.String("object", "",
 		"sObject API name (inferred from --id key prefix if omitted)")
 	id := fs.String("id", "", "Record id (required)")
-	// Repeated --field K=V. flag.Var with a custom type captures all
-	// occurrences; flag.String only keeps the last.
 	fields := &kvFlag{}
 	fs.Var(fields, "field",
 		"Field assignment in K=V form. Repeat for multiple fields. "+
@@ -190,7 +171,6 @@ func recordUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 			errors.New("at least one --field K=V is required"), stdout, mode)
 	}
 
-	// Materialise the field map. "null" → JSON null (clear).
 	payload := make(map[string]any, len(fields.values))
 	for k, v := range fields.values {
 		if v == "null" {
@@ -208,9 +188,6 @@ func recordUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 			result.SObject, *id, err, stdout, mode)
 	}
 	if len(result.FieldErrors) > 0 {
-		// Salesforce validation rejection — invalid_argument is the
-		// right shape since the caller passed bad data. Include the
-		// per-field errors verbatim so agents can correct + retry.
 		errs := make([]map[string]any, 0, len(result.FieldErrors))
 		for _, fe := range result.FieldErrors {
 			errs = append(errs, map[string]any{
@@ -231,9 +208,6 @@ func recordUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 		return headless.ExitCodeFor(r)
 	}
 
-	// Success — return the submitted field set so agents can confirm
-	// what was actually sent (helpful when an automation chain logs
-	// each step).
 	r := headless.Success("record.update", result.Target.Username, result.Target.CLIArg, true,
 		map[string]any{
 			"object": result.SObject,
@@ -244,9 +218,6 @@ func recordUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 	return headless.ExitCodeFor(r)
 }
 
-// kvFlag is a flag.Value that collects repeated K=V pairs into a map.
-// Used by --field on record update + by future verbs that take
-// arbitrary key/value sets (e.g. record create in Phase 4).
 type kvFlag struct {
 	values map[string]string
 }
@@ -279,8 +250,6 @@ func (k *kvFlag) Set(s string) error {
 	return nil
 }
 
-// kvFlagKeys returns the keys of a parsed kvFlag's value map in a
-// flag.Visit-stable order. Used for diagnostic output.
 func kvFlagKeys(k *kvFlag) []string {
 	out := make([]string, 0, len(k.values))
 	for kk := range k.values {
@@ -289,7 +258,6 @@ func kvFlagKeys(k *kvFlag) []string {
 	return out
 }
 
-// Compile-time check: kvFlag satisfies flag.Value.
 var _ flag.Value = (*kvFlag)(nil)
 
 func writeRecordErr(command, orgUser, objectName, recordID string, err error, stdout io.Writer, mode headless.WriteMode) int {

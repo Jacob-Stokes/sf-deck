@@ -1,12 +1,5 @@
 package ui
 
-// /compare — Screen 4: the per-component body diff drill-in.
-//
-// Default view is side-by-side A│B (source left, target right) with
-// red deletions / green additions; `u` toggles a single-column unified
-// diff for terminals too narrow to split long lines. Bodies are fetched
-// lazily on open (via the provider) and diffed with internal/diff.
-
 import (
 	"fmt"
 	"strings"
@@ -22,8 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/highlight"
 )
 
-// openCompareDiff fetches both bodies for the selected inventory row and
-// opens the side-by-side diff view.
 func (m *Model) openCompareDiff(d *orgData) tea.Cmd {
 	if d.Run == nil {
 		return nil
@@ -32,16 +23,9 @@ func (m *Model) openCompareDiff(d *orgData) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	// Snapshot path (Auto / Metadata API). Retained bodies diff with ZERO
-	// further API calls. But a body may have been DROPPED at retrieve time
-	// (over the memory budget — typically Profiles/StaticResources); the
-	// inventory still knows its status (from the hash), so re-fetch the
-	// missing side(s) live, then diff.
 	if d.Run.hashA != nil || d.Run.hashB != nil || d.Run.snapA != nil || d.Run.snapB != nil {
 		aHave := snapHasBody(d.Run.snapA, row.Type, row.Key)
 		bHave := snapHasBody(d.Run.snapB, row.Type, row.Key)
-		// A-only / B-only rows legitimately have no counterpart — those
-		// "absent" sides are not a dropped body, so don't re-fetch them.
 		aMissing := !aHave && row.AID != ""
 		bMissing := !bHave && row.BID != ""
 		if !aMissing && !bMissing {
@@ -49,15 +33,9 @@ func (m *Model) openCompareDiff(d *orgData) tea.Cmd {
 			d.Diff = &compareDiffView{Row: row, Result: res, Lang: compareLangFor(row.Type)}
 			return nil
 		}
-		// Re-fetch the dropped side(s) live, off the UI loop.
 		d.Diff = &compareDiffView{Row: row, Lang: compareLangFor(row.Type), Loading: true}
 		return m.refetchCompareBodies(d, row, aMissing, bMissing)
 	}
-	// Tooling path: lazily fetch the two bodies via the provider. Only
-	// reachable for the Tooling method (no snapshot). Object-rooted
-	// CHILD rows (keyed "Object.Child") have no per-component provider
-	// fetch — they only exist inside the snapshot path — so guard against
-	// the broken RetrieveMetadataXML fallback mishandling them.
 	if strings.Contains(row.Key, ".") {
 		m.flash("open this comparison with the Auto/Metadata API method to diff " + row.Type)
 		return nil
@@ -78,12 +56,10 @@ func (m *Model) openCompareDiff(d *orgData) tea.Cmd {
 	return nil
 }
 
-// closeCompareDiff returns from the body diff to the inventory list.
 func (m *Model) closeCompareDiff(d *orgData) {
 	d.Diff = nil
 }
 
-// snapHasBody reports whether a retained body exists for a row.
 func snapHasBody(snap diff.Snapshot, typeLabel, key string) bool {
 	if snap == nil {
 		return false
@@ -96,7 +72,6 @@ func snapHasBody(snap diff.Snapshot, typeLabel, key string) bool {
 	return ok
 }
 
-// compareBodyFetchedMsg delivers re-fetched dropped bodies for a drill-in.
 type compareBodyFetchedMsg struct {
 	OrgKey string
 	Row    diff.Row
@@ -107,12 +82,8 @@ type compareBodyFetchedMsg struct {
 	Err    error
 }
 
-// refetchCompareBodies re-fetches the dropped side(s) of one component
-// off the UI loop and emits compareBodyFetchedMsg. Only the missing
-// side(s) are fetched; the retained side (if any) rides through.
 func (m *Model) refetchCompareBodies(d *orgData, row diff.Row, aMissing, bMissing bool) tea.Cmd {
 	source, target := d.Run.Source.OrgRef(), d.Run.Target.OrgRef()
-	// Capture the retained bodies for the non-missing side.
 	var aHave, bHave string
 	if !aMissing {
 		aHave = snapBody(d.Run.snapA, row.Type, row.Key)
@@ -144,7 +115,6 @@ func (m *Model) refetchCompareBodies(d *orgData, row diff.Row, aMissing, bMissin
 	}
 }
 
-// applyCompareBodyFetched fills the drill-in diff once the re-fetch lands.
 func (m *Model) applyCompareBodyFetched(msg compareBodyFetchedMsg) {
 	d, ok := m.data[msg.OrgKey]
 	if !ok || d.Diff == nil || d.Diff.Row.Key != msg.Row.Key || d.Diff.Row.Type != msg.Row.Type {
@@ -159,10 +129,6 @@ func (m *Model) applyCompareBodyFetched(msg compareBodyFetchedMsg) {
 	d.Diff.Loading = false
 }
 
-// comparePreviewFetchedMsg delivers a re-fetched body for the side-panel
-// preview. Unlike compareBodyFetchedMsg (drill-in), it stores the body
-// back into the snapshot so the preview (and a later drill-in) rebuild
-// from it.
 type comparePreviewFetchedMsg struct {
 	OrgKey string
 	Row    diff.Row
@@ -173,8 +139,6 @@ type comparePreviewFetchedMsg struct {
 	Err    error
 }
 
-// refetchComparePreview fetches the dropped side(s) for the preview, off
-// the UI loop, emitting comparePreviewFetchedMsg.
 func (m *Model) refetchComparePreview(d *orgData, row diff.Row, aMissing, bMissing bool) tea.Cmd {
 	source, target := d.Run.Source.OrgRef(), d.Run.Target.OrgRef()
 	orgKey := ""
@@ -201,8 +165,6 @@ func (m *Model) refetchComparePreview(d *orgData, row diff.Row, aMissing, bMissi
 	}
 }
 
-// applyComparePreviewFetched stores the fetched body into the snapshot and
-// clears the loading flag so the preview rebuilds on next render.
 func (m *Model) applyComparePreviewFetched(msg comparePreviewFetchedMsg) {
 	d, ok := m.data[msg.OrgKey]
 	if !ok || d.Run == nil {
@@ -224,11 +186,9 @@ func (m *Model) applyComparePreviewFetched(msg comparePreviewFetchedMsg) {
 		}
 		d.Run.snapB[msg.Row.Type][msg.Row.Key] = msg.BBody
 	}
-	// Force a rebuild on next render (the body is now present).
 	d.previewKey = ""
 }
 
-// snapBody returns a retained body or "".
 func snapBody(snap diff.Snapshot, typeLabel, key string) string {
 	if snap == nil {
 		return ""
@@ -239,14 +199,9 @@ func snapBody(snap diff.Snapshot, typeLabel, key string) string {
 	return ""
 }
 
-// fetchOneComponentBody re-fetches a single component's body live. Handles
-// the object-child case (key "Object.Child" → retrieve the parent object
-// and extract), CustomObject itself, Apex (bulk column), and plain
-// top-level types (single-name SOAP readMetadata).
 func fetchOneComponentBody(alias, typeLabel, key string) (string, error) {
 	switch {
 	case compareObjectChildTypes[typeLabel]:
-		// Re-fetch the parent object with child extraction; pick our key out.
 		objectName := key
 		if dot := strings.IndexByte(key, '.'); dot >= 0 {
 			objectName = key[:dot]
@@ -287,7 +242,6 @@ func compareLangFor(typeLabel string) string {
 	}
 }
 
-// renderCompareDiff draws the body diff (side-by-side or unified).
 func (m Model) renderCompareDiff(w, innerH int, d *orgData) string {
 	dv := d.Diff
 	inner := w - 4
@@ -340,10 +294,6 @@ func toggleWord(unified bool) string {
 	return "unified"
 }
 
-// renderSideBySideDiff lays out two columns: A (source) left, B (target)
-// right, separated by a vertical bar. Deletions tint A red, insertions
-// tint B green, equal lines are plain on both. A blank "(absent)" gap
-// fills the side that has no counterpart on that row.
 func renderSideBySideDiff(dv *compareDiffView, inner, budget int) []string {
 	colW := (inner - 3) / 2 // 3 = " │ " separator
 	if colW < 8 {
@@ -378,8 +328,6 @@ func renderSideBySideDiff(dv *compareDiffView, inner, budget int) []string {
 	return out
 }
 
-// renderUnifiedDiff is the narrow-terminal fallback: a single git-style
-// column with +/- prefixes.
 func renderUnifiedDiff(dv *compareDiffView, inner, budget int) []string {
 	red := lipgloss.NewStyle().Foreground(theme.Red)
 	green := lipgloss.NewStyle().Foreground(theme.Green)
@@ -402,8 +350,6 @@ func renderUnifiedDiff(dv *compareDiffView, inner, budget int) []string {
 	return out
 }
 
-// padCellTo right-pads an (already truncated, possibly styled) cell to
-// width using the visible width so the separator bar stays aligned.
 func padCellTo(s string, w int) string {
 	gap := w - ansi.StringWidth(s)
 	if gap <= 0 {
@@ -412,8 +358,6 @@ func padCellTo(s string, w int) string {
 	return s + strings.Repeat(" ", gap)
 }
 
-// stepCompareComponent moves the inventory cursor by delta and reopens
-// the diff for the new row — the [ / ] prev/next-component nav.
 func (m *Model) stepCompareComponent(d *orgData, delta int) tea.Cmd {
 	if d.Diff == nil {
 		return nil

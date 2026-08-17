@@ -1,10 +1,5 @@
 package ui
 
-// format.go — thin wrappers forwarding to uilayout.
-// All formatting logic now lives in internal/ui/uilayout/format.go.
-// These package-level aliases allow existing callers in internal/ui/
-// to keep using unqualified names without any changes.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
@@ -23,7 +18,6 @@ func dashIfEmpty(s string) string           { return uilayout.DashIfEmpty(s) }
 func capsFlags(d sf.SObjectDescribe) string { return uilayout.CapsFlags(d) }
 func prettyDate(iso string) string          { return uilayout.PrettyDate(iso) }
 
-// Table primitives — see uilayout/table.go.
 type tableColumn = uilayout.Column
 
 func renderTableHeader(cols []tableColumn, inner int) string {

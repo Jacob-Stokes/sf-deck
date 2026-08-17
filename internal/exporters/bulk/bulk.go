@@ -3,18 +3,6 @@
 // the channel-based progress event stream, the per-stage flash
 // messages, and the tea.Msg types used to thread events back through
 // the Bubble Tea Update loop.
-//
-// Lives under internal/exporters/ alongside soql/ and devproject/ —
-// one subpackage per export source. Format converters (csv/json/xlsx)
-// live in the parent exporters/ package.
-//
-// Architecture: the package depends on a small Host interface that
-// the UI shell implements. That keeps bulk free of any ui-package
-// coupling — it only sees flash banners, modal openings, and an
-// in-flight handle slot.
-//
-// Submitted Bulk API jobs are routed through sf.BulkQuery (defined in
-// internal/sf), which owns the REST plumbing + polling cadence.
 package bulk
 
 import (
@@ -32,8 +20,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/securefile"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
-
-// --- Public types ---------------------------------------------------------
 
 // OpenPathMsg lands after the records-export scope picker selects
 // Full. Carries the unbounded SOQL and a label for the filename.
@@ -96,46 +82,26 @@ func (f *Flight) Cancel() { f.cancel() }
 // (typically the chip name). Used by host flash messages.
 func (f *Flight) Label() string { return f.label }
 
-// event is the internal channel payload. Unifies progress + done so
-// the host's read-cmd has one source to select from.
 type event struct {
 	progress *ProgressMsg
 	done     *DoneMsg
 }
 
-// --- Host interface -------------------------------------------------------
-
 // Host is the surface this package requires from its UI shell. Keep
 // it narrow — every method here is one the export flow actually calls.
 type Host interface {
-	// Flash + FlashFor surface user-visible status messages on the
-	// banner zone. FlashFor lets long-running stages override the
-	// default fade timing so progress doesn't disappear mid-job.
 	Flash(msg string)
 	FlashFor(msg string, d time.Duration)
 
-	// OpenPathPicker opens the path-edit modal pre-populated with
-	// defaultPath. onConfirm is invoked with the user-entered path
-	// when they accept; the returned tea.Msg should typically be a
-	// StartMsg.
 	OpenPathPicker(title, hint, defaultPath string, onConfirm func(path string) tea.Msg) tea.Cmd
 
-	// DefaultPath builds the default save path for a CSV export
-	// labelled `label` — honours the user's export-dir setting.
 	DefaultPath(label string) string
 
-	// ActiveUsername returns the currently-selected org's username,
-	// or "" when no org is selected.
 	ActiveUsername() string
 
-	// Flight + SetFlight expose the in-flight Flight slot so the
-	// host can route ctrl+c to the right cancel func and the
-	// dispatcher can re-arm channel reads.
 	Flight() *Flight
 	SetFlight(f *Flight)
 }
-
-// --- Flow functions -------------------------------------------------------
 
 // OpenPathPicker prompts the host's path-edit modal pre-populated
 // with the default CSV path.
@@ -188,16 +154,8 @@ func Start(host Host, msg StartMsg) tea.Cmd {
 	host.SetFlight(&Flight{events: events, cancel: cancel, label: label})
 	host.Flash("submitting bulk job…  (ctrl+c to cancel)")
 
-	// forwarderDone is closed by the forwarder when its drain loop
-	// exits. The main bulk goroutine waits on this before closing
-	// events — without it, the main goroutine could close(events)
-	// while the forwarder still holds a buffered progress value
-	// mid-send, panicking with "send on closed channel".
 	forwarderDone := make(chan struct{})
 
-	// Forwarder: copies sf.BulkQueryProgress → event until the
-	// progress channel closes. Owns no other channels; only writes
-	// to events.
 	go func() {
 		defer close(forwarderDone)
 		for p := range progress {
@@ -239,8 +197,6 @@ func Start(host Host, msg StartMsg) tea.Cmd {
 		if err != nil {
 			done.Err = err
 			if errors.Is(err, context.Canceled) {
-				// Preserve the prior UX: a cancelled export publishes the
-				// captured rows, but only after the writer has closed cleanly.
 				if commitErr := f.Commit(); commitErr != nil {
 					done.Err = fmt.Errorf("publish partial export: %w", commitErr)
 				}
@@ -275,8 +231,6 @@ func ReadCmd(events <-chan event) tea.Cmd {
 		return nil
 	}
 }
-
-// --- Apply* handlers ------------------------------------------------------
 
 // ApplyProgress updates the flash banner with the current stage.
 func ApplyProgress(host Host, msg ProgressMsg) {
@@ -339,8 +293,6 @@ func ApplyDone(host Host, msg DoneMsg) {
 		"chunks": msg.Chunks,
 	})
 }
-
-// --- helpers -------------------------------------------------------------
 
 // expandTilde resolves a leading ~ in a path against $HOME. Hand-rolled
 // to avoid importing the (much larger) os/user package just for this.

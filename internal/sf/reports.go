@@ -1,18 +1,5 @@
 package sf
 
-// Saved Reports — read-only browse + preview via the Analytics REST API.
-//
-// Phase 1 of the reports feature: list saved reports, fetch their cached
-// run for inline preview. Export + force-rerun + headless live in later
-// phases (see vault: salesforce-deck/research/reports-feature-research).
-//
-// Endpoints used:
-//   GET /services/data/vXX/analytics/reports          — list saved reports
-//   GET /services/data/vXX/analytics/reports/<id>     — run, returns cached
-//
-// Both honour Run Reports + the report's own folder/object permissions
-// for the running user.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -28,13 +15,10 @@ import (
 // definition. Folder + describe info comes free with the list endpoint
 // so we don't need a second round-trip per row to populate the grid.
 type ReportSummary struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	FolderID   string `json:"folderId,omitempty"`
-	FolderName string `json:"folderName,omitempty"`
-	// Format is one of "Tabular" / "Summary" / "Matrix" / "MultiBlock"
-	// (the SF spelling for joined). Phase 1 previews only the first
-	// three cleanly; MultiBlock surfaces as "open in SF" only.
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	FolderID    string `json:"folderId,omitempty"`
+	FolderName  string `json:"folderName,omitempty"`
 	Format      string `json:"format,omitempty"`
 	Owner       string `json:"owner,omitempty"`
 	Description string `json:"desc,omitempty"`
@@ -150,11 +134,7 @@ func ListReportFolders(orgAlias string) ([]ReportFolder, error) {
 // report run into. Mirrors the four-option matrix the Lightning
 // export modal exposes: {Formatted, Details Only} × {xlsx, csv}.
 type ReportExportFormat struct {
-	// View "formatted" includes report header, groupings, and filter
-	// settings; "details" emits detail rows only. Maps to the SF UI's
-	// "Formatted Report" vs "Details Only" radio.
 	View string // "formatted" | "details"
-	// File "xlsx" or "csv".
 	File string // "xlsx" | "csv"
 }
 
@@ -182,7 +162,6 @@ func (f ReportExportFormat) IsValid(body []byte) bool {
 	if f.File == "xlsx" {
 		return len(body) >= 2 && body[0] == 'P' && body[1] == 'K'
 	}
-	// csv: anything that isn't an HTML page or a JSON error envelope.
 	if len(body) == 0 {
 		return false
 	}
@@ -190,13 +169,6 @@ func (f ReportExportFormat) IsValid(body []byte) bool {
 		return false
 	}
 	if body[0] == '{' || body[0] == '[' {
-		// Could be a SF error JSON — but a single-cell csv could
-		// also start with [. Tighten: real Analytics JSON errors
-		// come back with Content-Type application/json, which the
-		// caller already used to pick this code path. So: if the
-		// caller asked for csv and got JSON, the caller already
-		// handled it via the Content-Type detector below. Treat
-		// non-HTML as csv-shaped.
 	}
 	return true
 }
@@ -223,11 +195,6 @@ func ExportReport(orgAlias, reportID string, fmt_ ReportExportFormat) ([]byte, e
 	path := c.APIPath("analytics/reports/" + reportID)
 	q := url.Values{}
 	q.Set("includeDetails", "true")
-	// Bigger reports take 60-120s server-side to serialize; the default
-	// 30s client timeout is the #1 reason this path falls through to
-	// the (verification-prone) frontdoor cookie-session route. Give
-	// the analytics endpoint headroom — if SF really hangs longer than
-	// 3min the report wasn't going to complete usefully anyway.
 	body, err := c.getWithAcceptTimeout(path, q,
 		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 		3*time.Minute)
@@ -269,9 +236,6 @@ func RunReport(orgAlias, reportID string, forceRerun bool) (ReportRun, error) {
 	q := url.Values{}
 	q.Set("includeDetails", "true")
 	if forceRerun {
-		// SF treats this exactly like the UI's Refresh button —
-		// re-runs and persists, so the next caller sees the fresh
-		// result whether they asked for it or not.
 		q.Set("cache", "false")
 	}
 	body, err := c.get(path, q)
@@ -281,10 +245,6 @@ func RunReport(orgAlias, reportID string, forceRerun bool) (ReportRun, error) {
 	return parseReportRun(reportID, body)
 }
 
-// parseReportRun extracts the bits of the analytics-results payload
-// we render in the preview. The payload is large + structured by
-// report format; we pull what's universally useful and ignore the rest
-// (groupings, filter info, original definition) until later phases.
 func parseReportRun(reportID string, body []byte) (ReportRun, error) {
 	var raw struct {
 		Attributes struct {
@@ -334,17 +294,6 @@ func parseReportRun(reportID string, body []byte) (ReportRun, error) {
 			Type:    info.DataType,
 		})
 	}
-	// factMap layout differs by format:
-	//   Tabular: every detail row lives under "T!T".
-	//   Summary: "T!T" holds the grand-total aggregates only; detail
-	//            rows are under per-group keys ("0!T", "1!T", "0_0!T",
-	//            etc. — the suffix "!T" marks a leaf row bucket).
-	//   Matrix:  rows live under "<rowGroup>!<colGroup>" leaf cells;
-	//            same "!T" detail-leaf convention applies for the
-	//            row-axis grand totals when includeDetails=true.
-	// Walk every leaf bucket and accumulate rows in the order SF
-	// returned them. Aggregates (grand total) come from "T!T" if
-	// present.
 	keys := make([]string, 0, len(raw.FactMap))
 	for k := range raw.FactMap {
 		keys = append(keys, k)
@@ -352,8 +301,6 @@ func parseReportRun(reportID string, body []byte) (ReportRun, error) {
 	sort.Strings(keys)
 	for _, k := range keys {
 		bucket := raw.FactMap[k]
-		// Skip pure-aggregate buckets (no rows). For summary reports the
-		// "T!T" bucket has no rows but does have the grand totals.
 		if k == "T!T" && len(bucket.Aggregates) > 0 {
 			out.Aggregates = map[string]any{}
 			for _, a := range bucket.Aggregates {
@@ -367,8 +314,6 @@ func parseReportRun(reportID string, body []byte) (ReportRun, error) {
 					break
 				}
 				key := out.Columns[i].APIName
-				// Prefer label when present (picklist values, lookup
-				// names) — that's what SF would render in the UI.
 				if c.Label != "" {
 					row[key] = c.Label
 				} else {

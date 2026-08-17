@@ -72,12 +72,10 @@ func TestMultipicklist_ToggleSelections(t *testing.T) {
 	if len(state.Selected) != 2 || state.Selected[0] != "Red" || state.Selected[1] != "Blue" {
 		t.Errorf("init split wrong: %v", state.Selected)
 	}
-	// cursor=0 (Red), toggle removes it.
 	e.HandleKey(&state, fakeKey("space"))
 	if len(state.Selected) != 1 || state.Selected[0] != "Blue" {
 		t.Errorf("after toggle off: %v", state.Selected)
 	}
-	// move to Green, toggle on.
 	e.HandleKey(&state, fakeKey("down"))
 	e.HandleKey(&state, fakeKey("space"))
 	if !containsString(state.Selected, "Green") {
@@ -87,8 +85,6 @@ func TestMultipicklist_ToggleSelections(t *testing.T) {
 	if mode != CommitValue {
 		t.Fatalf("commit mode=%v", mode)
 	}
-	// Order depends on toggle order; just check both expected
-	// values are present.
 	s := val.(string)
 	if !contains(s, "Blue") || !contains(s, "Green") {
 		t.Errorf("commit value missing entries: %q", s)

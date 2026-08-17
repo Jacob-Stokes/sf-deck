@@ -26,8 +26,6 @@ import (
 // becoming unreachable. Rail-open is covered too: the rail eats
 // 24-34 columns of the bar, the largest source of drift.
 func TestVisiblePinnedTabsMatchesRenderer(t *testing.T) {
-	// Widths from "everything fits" down to "almost nothing fits";
-	// step 1 so fit-boundary widths (the bug's habitat) are all hit.
 	for _, leftOpen := range []bool{false, true} {
 		for width := 40; width <= 220; width++ {
 			m := Model{}

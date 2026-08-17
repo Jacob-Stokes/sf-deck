@@ -26,7 +26,6 @@ func TestShape_DiscoversExtraColumns(t *testing.T) {
 		{"Id": "001", "Name": "Acme", "Phone": "555"},
 	}
 	headers, _ := Shape(records, []string{"Id"})
-	// Id first (preferred), then discovered columns alphabetically.
 	if len(headers) != 3 || headers[0] != "Id" {
 		t.Errorf("headers = %v", headers)
 	}

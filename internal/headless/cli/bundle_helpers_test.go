@@ -7,13 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// Pure-function helpers in bundle.go are easy to test without an
-// org. These cover the parser/validator surface so future edits
-// don't silently break the agent contract (the IDs/statuses they
-// extract are what scripts poll on).
-
-// ----- buildDeployOpts ---------------------------------------------
-
 func TestBuildDeployOpts_EmptyTestsLevel(t *testing.T) {
 	got, err := buildDeployOpts("", "")
 	if err != nil {
@@ -105,8 +98,6 @@ func TestBuildDeployOpts_ClassesOnNonSpecified(t *testing.T) {
 	}
 }
 
-// ----- parseDeployJobID -------------------------------------------
-
 func TestParseDeployJobID_ExtractsID(t *testing.T) {
 	out := []byte(`{"result":{"id":"0Af0X00000Wxyz","status":"InProgress"}}`)
 	if id := parseDeployJobID(out); id != "0Af0X00000Wxyz" {
@@ -126,8 +117,6 @@ func TestParseDeployJobID_MissingIDReturnsEmpty(t *testing.T) {
 		t.Errorf("expected empty id when missing; got %q", id)
 	}
 }
-
-// ----- parseDeployStatus ------------------------------------------
 
 func TestParseDeployStatus_ExtractsAllFields(t *testing.T) {
 	out := []byte(`{"result":{
@@ -163,8 +152,6 @@ func TestParseDeployStatus_MalformedReturnsNotOk(t *testing.T) {
 	}
 }
 
-// ----- jsonUnmarshalLenient ---------------------------------------
-
 func TestJSONUnmarshalLenient_EmptyErrors(t *testing.T) {
 	var v map[string]any
 	if err := jsonUnmarshalLenient(nil, &v); err == nil {
@@ -192,8 +179,6 @@ func TestJSONUnmarshalLenient_HappyPath(t *testing.T) {
 	}
 }
 
-// ----- parseBool ---------------------------------------------------
-
 func TestParseBool_AcceptsCommonForms(t *testing.T) {
 	trues := []string{"true", "True", "TRUE", "t", "T", "1", "yes", "Y", "y"}
 	for _, s := range trues {
@@ -209,7 +194,6 @@ func TestParseBool_AcceptsCommonForms(t *testing.T) {
 			t.Errorf("parseBool(%q) = (%v, %v); want (false, nil)", s, got, err)
 		}
 	}
-	// Whitespace tolerated
 	got, err := parseBool(" true ")
 	if err != nil || !got {
 		t.Errorf("parseBool(\" true \") = (%v, %v); want (true, nil)", got, err)

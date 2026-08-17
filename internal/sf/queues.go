@@ -1,10 +1,5 @@
 package sf
 
-// Queue + QueueSObject helpers — Salesforce stores queues as
-// `Group` records with Type='Queue', plus `QueueSObject` rows
-// associating each queue with the sObject types it can hold (Cases,
-// Leads, custom routables).
-
 import (
 	"fmt"
 	"strings"
@@ -102,13 +97,9 @@ func ListQueues(target string) ([]QueueRow, error) {
 		return out, nil
 	}
 
-	// QueueSObject for the sObject-handled list. One row per
-	// (queue, sobject) pair — group up.
 	qs, err := c.QueryREST(
 		"SELECT QueueId, SobjectType FROM QueueSObject ORDER BY QueueId", false)
 	if err != nil {
-		// Soft-fail: the list is still useful without the sobject
-		// breakdown. Caller doesn't see this error.
 		return out, nil
 	}
 	for _, r := range qs.Records {
@@ -159,10 +150,6 @@ func (g GroupMemberRow) Targets() []OpenTarget {
 				Path: "/lightning/r/User/" + g.ID + "/view"},
 		}
 	case "Group":
-		// Group records don't have a Lightning record-detail page
-		// (they're a metadata sObject); fall back to the classic
-		// redirect which Salesforce routes to the Setup queue /
-		// public-group editor.
 		return []OpenTarget{
 			{ID: "view", Label: "Group (classic redirect)",
 				Path: "/" + g.ID},
@@ -198,7 +185,6 @@ func ListGroupMembersDetailed(target, groupID string) ([]GroupMemberRow, error) 
 	if len(memberQ.Records) == 0 {
 		return nil, nil
 	}
-	// Bucket member ids by sObject prefix: 005 = User, 00G = Group.
 	var userIDs, groupIDs []string
 	for _, r := range memberQ.Records {
 		id := asString(r["UserOrGroupId"])

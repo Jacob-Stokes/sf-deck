@@ -1,28 +1,5 @@
 package sf
 
-// Bulk API 2.0 query client. Used by the records "full export" flow
-// (ctrl+x in /records when the chip is showing a preview) to pull the
-// entire matching dataset to disk without going through the synchronous
-// /query + cursor-follow path.
-//
-// Lifecycle:
-//   1. POST /services/data/vXX.0/jobs/query
-//      Body: {"operation":"query","query":"SELECT ..."}
-//      → 200 with {"id": "<jobId>", ...}
-//   2. GET /services/data/vXX.0/jobs/query/<jobId>  (poll)
-//      → {"state":"UploadComplete" | "InProgress" | "JobComplete" | "Failed" | "Aborted"}
-//      Poll every ~2-5s until JobComplete (or terminal failure).
-//   3. GET /services/data/vXX.0/jobs/query/<jobId>/results
-//      → text/csv body. Optional response header "Sforce-Locator" gives
-//      the cursor for the next chunk (call again with ?locator=<value>).
-//      "Sforce-NumberOfRecords" header reports rows in this chunk.
-//
-// Each network call ticks the usage tracker via fireOnCall, same as
-// REST. Polling is NOT free against the daily API limit — every poll
-// counts as a call. The caller is responsible for setting a sensible
-// poll cadence (we default to 2s, ramping to 10s after the first
-// minute) so a 30-second job uses ~10 polls instead of 30.
-
 import (
 	"bufio"
 	"bytes"
@@ -86,7 +63,6 @@ func (c *Client) BulkQuery(ctx context.Context, soql string, out io.Writer, prog
 		}
 	}
 
-	// Step 1: submit the job.
 	sendProgress(BulkQueryProgress{Stage: "submit"})
 	jobID, err := c.bulkSubmit(soql)
 	if err != nil {
@@ -94,13 +70,8 @@ func (c *Client) BulkQuery(ctx context.Context, soql string, out io.Writer, prog
 	}
 	res.JobID = jobID
 
-	// Step 2: poll. Cadence ramps from 2s → 10s so short jobs respond
-	// quickly without hammering the API limit on long ones.
 	for {
 		if err := ctx.Err(); err != nil {
-			// Best-effort cancel: tell SF to abort the job so its
-			// row-scan stops eating capacity. Ignore the ack error
-			// (the user already wants out).
 			_ = c.bulkAbort(jobID)
 			return res, ctx.Err()
 		}
@@ -126,7 +97,6 @@ func (c *Client) BulkQuery(ctx context.Context, soql string, out io.Writer, prog
 	}
 
 downloadLoop:
-	// Step 3: stream results. Honour Sforce-Locator until empty.
 	locator := ""
 	for {
 		if err := ctx.Err(); err != nil {
@@ -155,12 +125,6 @@ downloadLoop:
 	return res, nil
 }
 
-// pollInterval returns the wait between status polls. Ramps from a
-// fast initial cadence up to a slow steady one so a multi-minute job
-// uses far fewer polls than a fixed interval would. The middle/steady
-// value is the configurable BulkPoll (default 5s); the fast and slow
-// ends are derived as half and double, so tuning one knob scales the
-// whole ramp.
 func pollInterval(pollCount int) time.Duration {
 	steady := cfgBulkPoll()
 	fast := steady / 2
@@ -178,7 +142,6 @@ func pollInterval(pollCount int) time.Duration {
 	}
 }
 
-// bulkSubmit POSTs the job-create request and returns the new job ID.
 func (c *Client) bulkSubmit(soql string) (string, error) {
 	path := c.APIPath("jobs/query")
 	body, err := json.Marshal(map[string]any{
@@ -205,7 +168,6 @@ func (c *Client) bulkSubmit(soql string) (string, error) {
 	return parsed.ID, nil
 }
 
-// bulkStatus polls one status update.
 func (c *Client) bulkStatus(jobID string) (string, error) {
 	path := c.APIPath("jobs/query/" + jobID)
 	resp, err := c.get(path, nil)
@@ -221,7 +183,6 @@ func (c *Client) bulkStatus(jobID string) (string, error) {
 	return parsed.State, nil
 }
 
-// bulkAbort tells SF to stop processing the job. Best-effort.
 func (c *Client) bulkAbort(jobID string) error {
 	path := c.APIPath("jobs/query/" + jobID)
 	body, _ := json.Marshal(map[string]any{"state": "Aborted"})
@@ -229,13 +190,6 @@ func (c *Client) bulkAbort(jobID string) error {
 	return err
 }
 
-// bulkDownloadChunk streams one /results page into out. Returns the
-// row count for this chunk and the Sforce-Locator header for the next
-// page (or "" if this was the last chunk).
-//
-// When includeHeader is true, the CSV header row is written; on
-// subsequent chunks it's stripped so the output file has one header
-// row total.
 func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, includeHeader bool) (int, string, error) {
 	c.mu.Lock()
 	token := c.accessToken
@@ -288,10 +242,6 @@ func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, include
 		}
 	}
 
-	// Stream the body line-by-line so we can:
-	//   (a) skip the CSV header row on chunks after the first, and
-	//   (b) emit progress as we go without buffering everything in
-	//       memory.
 	br := bufio.NewReaderSize(resp.Body, 32*1024)
 	rows := 0
 	lineNum := 0
@@ -304,8 +254,6 @@ func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, include
 			err = rerr
 			return rows, "", rerr
 		}
-		// ReadLine truncates at the newline; rejoin if isPrefix
-		// indicates the line was longer than the buffer.
 		full := append([]byte(nil), line...)
 		for isPrefix {
 			var more []byte
@@ -317,8 +265,6 @@ func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, include
 			full = append(full, more...)
 		}
 		lineNum++
-		// Skip header on non-first chunks. The very first chunk
-		// keeps its header so the output file is valid CSV.
 		if lineNum == 1 && !includeHeader {
 			continue
 		}
@@ -337,9 +283,6 @@ func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, include
 			break
 		}
 	}
-	// Prefer the SF-reported header count when it disagrees with our
-	// line count (rare: CSV embedded newlines inside quoted strings
-	// would let our naive line-count diverge from SF's record count).
 	if rowsFromHeader > 0 {
 		rows = rowsFromHeader
 	}
@@ -386,8 +329,6 @@ func BulkQueryRecords(ctx context.Context, orgAlias, soql string, progress chan<
 	return parseBulkCSV(buf.Bytes())
 }
 
-// parseBulkCSV converts a Bulk API 2.0 CSV body into QueryResult
-// shape. Empty bodies (zero matches) return an empty result.
 func parseBulkCSV(body []byte) (QueryResult, error) {
 	r := csv.NewReader(bytes.NewReader(body))
 	r.ReuseRecord = false

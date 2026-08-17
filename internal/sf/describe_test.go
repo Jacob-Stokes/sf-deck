@@ -18,17 +18,12 @@ func TestDescribe_Singleflight(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
-		// Simulate ~50ms describe latency so the two goroutines
-		// actually overlap.
 		time.Sleep(50 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"name":"Account","label":"Account","fields":[]}`))
 	}))
 	defer srv.Close()
 
-	// Pre-populate a Client so Describe's REST-path branch fires
-	// directly without going through RESTClient bootstrap. Need to
-	// reach the singleflight inside Describe, not test RESTClient.
 	clientsMu.Lock()
 	clients["test-alias"] = &clientEntry{
 		client: &Client{
@@ -39,7 +34,6 @@ func TestDescribe_Singleflight(t *testing.T) {
 			http:        srv.Client(),
 		},
 	}
-	// Mark the once as done so RESTClient returns immediately.
 	clients["test-alias"].once.Do(func() {})
 	clientsMu.Unlock()
 	defer func() {
@@ -76,7 +70,6 @@ func TestDescribe_Singleflight(t *testing.T) {
 // concurrent calls return the same *Client pointer, with only one
 // entry in the registry.
 func TestRESTClient_SingleEntryPerAlias(t *testing.T) {
-	// Reset registry so this test is isolated.
 	InvalidateRESTClients()
 
 	// Pre-seed an entry whose once has already fired with a valid

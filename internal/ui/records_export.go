@@ -1,20 +1,6 @@
 package ui
 
 // Records-list export.
-//
-// Pressing x on a records-shaped surface (TabRecords, /objects ·
-// records subtab, /users · All users) opens the same two-step
-// flow as SOQL export: format picker (xlsx / csv / json) → path
-// picker (pre-populated with <export-dir>/<context>-<timestamp>.<ext>).
-//
-// Records-list data is already in memory — we don't re-run the
-// SOQL. Same exporters package reused so a CSV from /records and a
-// CSV from /soql share their row shape + header style.
-//
-// Why a separate module: the source data shape differs slightly.
-// SOQL results are []map[string]any with arbitrary columns; records
-// lists carry a typed RecordsList that already projects the chip's
-// SELECT columns in order.
 
 import (
 	"errors"
@@ -35,11 +21,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// recordsExportSurfaceActive reports whether the user is on a
-// surface that the export gesture should apply to. Lets the
-// global key dispatcher pre-filter so a stray x on /home or /apex
-// doesn't accidentally fire — and so other tabs are free to bind
-// x to their own actions.
 func (m Model) recordsExportSurfaceActive() bool {
 	switch m.tab() {
 	case TabRecords:
@@ -100,9 +81,6 @@ func (m Model) triggerRecordsExport() (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// hasLimitClause reports whether soql contains a trailing LIMIT clause.
-// Matches the same shape stripTrailingLimit removes — case-insensitive,
-// integer after " LIMIT " up to end-of-string.
 func hasLimitClause(soql string) bool {
 	trimmed := strings.TrimRight(soql, " \t\r\n")
 	low := strings.ToLower(trimmed)
@@ -154,14 +132,6 @@ func (m *Model) openRecordsExportFormatPicker(label string, rowCount int) tea.Cm
 	return m.openChoiceModal(state)
 }
 
-// openRecordsExportScopePicker is the first stage shown when the
-// chip's SOQL carries a LIMIT clause — the in-view result is a slice
-// by construction. Choosing Full routes into the Bulk path; choosing
-// Visible routes into the existing format picker.
-//
-// Pointer receiver — same reason as openRecordsExportFormatPicker:
-// openChoiceModal mutates the model to display the modal, and a
-// value receiver would discard that mutation.
 func (m *Model) openRecordsExportScopePicker(label string, list *sf.RecordsList, visible int) tea.Cmd {
 	opts := []choiceOption{
 		{
@@ -204,11 +174,6 @@ func (m *Model) openRecordsExportScopePicker(label string, list *sf.RecordsList,
 	return m.openChoiceModal(state)
 }
 
-// openRecordsExportFormatMsg is the post-scope-picker message that
-// re-enters the format picker once the user has confirmed Visible.
-// Lets the scope picker stay a single-purpose modal instead of
-// re-opening a choice modal from inside another choice modal's
-// success callback.
 type openRecordsExportFormatMsg struct {
 	Label    string
 	RowCount int
@@ -238,10 +203,6 @@ func stripTrailingLimit(soql string) string {
 	return strings.TrimRight(trimmed[:i], " \t\r\n")
 }
 
-// activeRecordsListForExport returns a pointer to the in-memory
-// RecordsList for the active /records-style surface, or nil for
-// non-records surfaces (e.g. /users). The pointer is read-only; we
-// only need Done / TotalSize / Query off it.
 func (m Model) activeRecordsListForExport() *sf.RecordsList {
 	d, sobj := m.activeRecordsSObject()
 	if sobj == "" || d == nil {
@@ -255,15 +216,11 @@ func (m Model) activeRecordsListForExport() *sf.RecordsList {
 	return &v
 }
 
-// openRecordsExportPathMsg arrives after the user picks a format.
 type openRecordsExportPathMsg struct {
 	Format exporters.Format
 	Label  string // used as the filename prefix
 }
 
-// openRecordsExportPathPicker opens the path-edit modal, mirrors
-// SOQL export's shape — same edit modal, same expand-tilde,
-// same export directory setting from settings.toml.
 func (m *Model) openRecordsExportPathPicker(msg openRecordsExportPathMsg) tea.Cmd {
 	defaultPath := m.defaultRecordsExportPath(msg.Label, msg.Format)
 	format := msg.Format
@@ -298,16 +255,12 @@ func (m *Model) openRecordsExportPathPicker(msg openRecordsExportPathMsg) tea.Cm
 	return m.openEditModal(state)
 }
 
-// startRecordsExportMsg lands once both format + path are confirmed.
 type startRecordsExportMsg struct {
 	Format exporters.Format
 	Path   string
 	Label  string
 }
 
-// startRecordsExport resolves the source rows + columns and writes
-// the file. Synchronous-feeling but goroutine-backed via tea.Cmd —
-// the data is already in memory so writes are typically fast.
 func (m *Model) startRecordsExport(msg startRecordsExportMsg) tea.Cmd {
 	rows, _, ok := m.recordsExportSource()
 	if !ok || len(rows) == 0 {
@@ -325,12 +278,6 @@ func (m *Model) startRecordsExport(msg startRecordsExportMsg) tea.Cmd {
 
 	return func() tea.Msg {
 		headers, dataRows := exsoql.Shape(rows, cols)
-		// Generic sheet name — Excel caps sheet names at 31 chars
-		// and forbids /\?*[]:; passing a record-shaped label
-		// here either gets silently truncated or rejected. The
-		// filename already encodes the context (object + chip +
-		// timestamp), so a flat "Export" inside the workbook is
-		// the right level of detail.
 		_ = label
 		if err := securefile.Write(savePath, false, func(w io.Writer) error {
 			return exporters.Write(w, format, headers, dataRows, "Export")
@@ -341,13 +288,11 @@ func (m *Model) startRecordsExport(msg startRecordsExportMsg) tea.Cmd {
 	}
 }
 
-// recordsExportDoneMsg lands after the export attempt.
 type recordsExportDoneMsg struct {
 	Path string
 	Err  error
 }
 
-// applyRecordsExportDone folds the result into a flash banner.
 func (m *Model) applyRecordsExportDone(msg recordsExportDoneMsg) {
 	if msg.Err != nil {
 		m.flashFor("export failed: "+msg.Err.Error(), 8*time.Second)
@@ -358,15 +303,6 @@ func (m *Model) applyRecordsExportDone(msg recordsExportDoneMsg) {
 	applog.Info("records.export.saved", map[string]any{"path": msg.Path})
 }
 
-// recordsExportSource resolves (rows, label, ok) for the current
-// surface. label feeds the filename / modal title. Returns ok=false
-// when no records-shaped surface is active.
-//
-//   - /records · object-detail-records-subtab → ChipRecords for
-//     the active sObject + chip
-//   - /users · All users → ChipUsers for the active chip,
-//     converted from typed UserRow back to map[string]any so the
-//     exporters get a uniform shape
 func (m Model) recordsExportSource() ([]map[string]any, string, bool) {
 	if d, sobj := m.activeRecordsSObject(); sobj != "" {
 		if r := currentRecordsResource(d, sobj); r != nil && !r.FetchedAt().IsZero() {
@@ -400,10 +336,6 @@ func (m Model) recordsExportSource() ([]map[string]any, string, bool) {
 	return nil, "", false
 }
 
-// recordsExportColumns picks the column order for the active
-// surface. Records lists already carry list.Columns in SELECT
-// order; users surface uses a fixed projection so the file matches
-// what's on screen.
 func (m Model) recordsExportColumns() []string {
 	if d, sobj := m.activeRecordsSObject(); sobj != "" {
 		if r := currentRecordsResource(d, sobj); r != nil && !r.FetchedAt().IsZero() {
@@ -419,10 +351,6 @@ func (m Model) recordsExportColumns() []string {
 	return nil
 }
 
-// userRowAsMap flattens a typed UserRow into the map[string]any
-// shape the exporters consume. Mirrors the Profile.Name /
-// UserRole.Name keys SF returns natively so the JSON export looks
-// like a real Salesforce row.
 func userRowAsMap(u sf.UserRow) map[string]any {
 	row := map[string]any{
 		"Id":            u.ID,
@@ -436,8 +364,6 @@ func userRowAsMap(u sf.UserRow) map[string]any {
 	return row
 }
 
-// defaultRecordsExportPath reuses the same export-dir setting as
-// reports + SOQL so users only configure it once.
 func (m Model) defaultRecordsExportPath(label string, format exporters.Format) string {
 	dir := expandTilde(m.settings.ReportExportDir())
 	ts := time.Now().Format("20060102-150405")

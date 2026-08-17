@@ -1,11 +1,6 @@
 // Package sources holds concrete TreeSource implementations for each
 // tree-shaped Salesforce surface. Each source is a small adapter
 // from sf package types to treechip.TreeNode.
-//
-// Sources live here (not in internal/sf) because they're treechip-
-// specific shape adapters; the underlying sf functions return raw
-// types. Keeping the adapters in this subpackage avoids leaking
-// treechip types into the SF data layer.
 package sources
 
 import (

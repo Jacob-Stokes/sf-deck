@@ -1,21 +1,5 @@
 package ui
 
-// /compare — org-to-org metadata compare UI.
-//
-// Structure mirrors /soql and /exec: a top-level tab with New / Saved /
-// History subtabs (see the TabCompare registry entry in tab_registry.go).
-//
-//   - New      : setup form (source/target/scope) → on Compare, retrieves
-//                both orgs and shows the inventory list. Inventory reuses
-//                the shared list engine (cursor/sort/search/chips/columns).
-//   - Saved    : reusable comparison definitions (persisted in settings).
-//   - History  : past runs this session.
-//
-// The metadata-agnostic compare/diff logic lives in internal/diff; the
-// sf bridge lives in compare_providers.go. This file is the UI wiring +
-// the bespoke setup form and inventory column schema. The side-by-side
-// body diff (drill-in) lives in tab_compare_diff.go.
-
 import (
 	"errors"
 	"fmt"
@@ -34,8 +18,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// --- top-level render dispatch --------------------------------------------
-
 func (m Model) renderCompare(w, innerH int) string {
 	return m.dispatchSubtab(w, innerH, m.tabSubtabs(), m.compareSubtabIdx,
 		map[Subtab]subtabBranch{
@@ -47,8 +29,6 @@ func (m Model) renderCompare(w, innerH int) string {
 	)
 }
 
-// renderCompareNew renders the New subtab: the setup form ONLY. Results
-// (retrieving / inventory / diff) live on the Result subtab.
 func (m Model) renderCompareNew(w, innerH int) string {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -57,9 +37,6 @@ func (m Model) renderCompareNew(w, innerH int) string {
 	return m.renderCompareSetup(w, innerH, d)
 }
 
-// renderCompareResult renders the Result subtab: the active/opened
-// comparison's retrieving screen, inventory list, or drill-in diff,
-// depending on phase. Placeholder when there's no run yet.
 func (m Model) renderCompareResult(w, innerH int) string {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -68,7 +45,6 @@ func (m Model) renderCompareResult(w, innerH int) string {
 	run := d.Run
 	switch {
 	case run == nil || run.Phase == comparePhaseSetup:
-		// No active result — point the user at New.
 		var lines []string
 		lines = append(lines, sectionTitle("COMPARE · RESULT"))
 		lines = append(lines, "")
@@ -78,7 +54,6 @@ func (m Model) renderCompareResult(w, innerH int) string {
 	case run.Phase == comparePhaseRetrieving:
 		return m.renderCompareRetrieving(w, innerH, run)
 	default:
-		// Drill-in body diff takes over the pane when open.
 		if d.Diff != nil {
 			return m.renderCompareDiff(w, innerH, d)
 		}
@@ -86,11 +61,6 @@ func (m Model) renderCompareResult(w, innerH int) string {
 	}
 }
 
-// --- setup form (Screen 1) ------------------------------------------------
-
-// compareSetupRow identifies one navigable row of the setup form. The
-// Editing row is present only when the run is linked to a saved
-// comparison; the rest are always present. Order = render/cursor order.
 type compareSetupRow int
 
 const (
@@ -101,11 +71,6 @@ const (
 	setupRowCompare
 )
 
-// compareSetupRowsFor returns the ordered navigable rows for the New
-// setup form. The form is always the plain fresh-compose form: editing
-// a SAVED comparison (with its overwrite/clone toggle) happens in the
-// dedicated compareEditModal, not here — so no per-run "Editing" row
-// can leak onto the subtab.
 func compareSetupRowsFor(d *orgData) []compareSetupRow {
 	return []compareSetupRow{setupRowSource, setupRowTarget, setupRowScope, setupRowMethod, setupRowCompare}
 }
@@ -142,12 +107,9 @@ func (m Model) renderCompareSetup(w, innerH int, d *orgData) string {
 	}
 	lines = append(lines, "")
 
-	// Cost line: estimated API calls per the chosen method + the org's
-	// remaining daily API budget, so the route choice is informed.
 	lines = append(lines, "")
 	lines = append(lines, dimLine("  "+m.compareCostLine(d), inner))
 
-	// The Compare action row (always the last row).
 	onCompare := cur == len(rows)-1
 	actLabel := theme.Subtle.Render("  Compare")
 	if onCompare {
@@ -163,8 +125,6 @@ func (m Model) renderCompareSetup(w, innerH int, d *orgData) string {
 	return strings.Join(lines, "\n")
 }
 
-// compareSetupValues returns the display strings for each setup row,
-// defaulting source to the active org.
 func (m Model) compareSetupValues(d *orgData) (source, target, scope, method string) {
 	var src, tgt endpoint
 	mth := compareMethodAuto
@@ -221,8 +181,6 @@ func estimateCompareCalls(method compareMethod, scope []string) int {
 	return buildComparePlan(scope, method).EstimatedCalls
 }
 
-// dailyAPIBudget returns (remaining, max, ok) for DailyApiRequests on
-// the active org, from the already-fetched Home limits.
 func (m Model) dailyAPIBudget() (int, int, bool) {
 	if len(m.orgs) == 0 {
 		return 0, 0, false
@@ -239,7 +197,6 @@ func (m Model) dailyAPIBudget() (int, int, bool) {
 	return 0, 0, false
 }
 
-// methodHint is the one-line tradeoff reminder shown next to the method.
 func methodHint(cm compareMethod) string {
 	switch cm {
 	case compareMethodTooling:
@@ -251,7 +208,6 @@ func methodHint(cm compareMethod) string {
 	}
 }
 
-// defaultCompareScope is the v1 default: all available provider types.
 func defaultCompareScope() []string {
 	var out []string
 	for _, p := range compareProviders() {
@@ -267,9 +223,6 @@ func scopeLabel(scope []string) string {
 	return strings.Join(scope, ", ")
 }
 
-// endpointDisplay renders a comparison endpoint for the setup form.
-// Org endpoints show alias + username; project endpoints (future) show
-// a project tag. Empty → "(none)".
 func endpointDisplay(m Model, e endpoint) string {
 	if e.IsZero() {
 		return theme.Subtle.Render("(none)")
@@ -289,8 +242,6 @@ func endpointDisplay(m Model, e endpoint) string {
 	return username
 }
 
-// endpointLabel is the plain (unstyled) short label for an endpoint —
-// used in titles and history rows.
 func endpointLabel(m Model, e endpoint) string {
 	if e.IsZero() {
 		return "(none)"
@@ -306,14 +257,11 @@ func endpointLabel(m Model, e endpoint) string {
 	return e.Ref
 }
 
-// --- retrieving (Screen 2) ------------------------------------------------
-
 func (m Model) renderCompareRetrieving(w, innerH int, run *compareRun) string {
 	inner := w - 4
 	var lines []string
 	lines = append(lines, sectionTitle("COMPARE   "+m.compareTitleArrow(run)))
 
-	// Count completion across all (side,type) units.
 	done, failed, total := 0, 0, run.expected
 	for _, p := range run.Progress {
 		switch p.State {
@@ -369,7 +317,6 @@ func (m Model) renderCompareRetrieving(w, innerH int, run *compareRun) string {
 	}
 	lines = append(lines, "")
 
-	// Two columns: source statuses | target statuses, one row per type.
 	colW := (inner - 3) / 2
 	if colW < 16 {
 		colW = 16
@@ -414,9 +361,6 @@ func (m Model) renderCompareRetrieving(w, innerH int, run *compareRun) string {
 	return strings.Join(lines, "\n")
 }
 
-// compareRetrieveScrollActive reports whether the /compare retrieving
-// screen is showing — the condition under which nav keys scroll the
-// per-type progress list instead of moving a list cursor.
 func (m Model) compareRetrieveScrollActive() bool {
 	if m.tab() != TabCompare || m.currentSubtab() != SubtabCompareResult {
 		return false
@@ -438,7 +382,6 @@ func clampRetrieveScroll(off, total, window int) int {
 	return off
 }
 
-// compareProgressCell renders one type's status for one side.
 func compareProgressCell(typeLabel string, p retrieveProgress, frame int) string {
 	var icon string
 	switch p.State {
@@ -447,9 +390,6 @@ func compareProgressCell(typeLabel string, p retrieveProgress, frame int) string
 	case retrieveFailed:
 		icon = lipgloss.NewStyle().Foreground(theme.Red).Render("✗")
 	default:
-		// Pending rows are either in flight or imminently will be (the
-		// whole comparison is actively retrieving) — show the spinner
-		// so none of them read as frozen.
 		icon = lipgloss.NewStyle().Foreground(theme.Yellow).Render(compareSpinner(frame))
 	}
 	suffix := ""
@@ -469,15 +409,11 @@ func compareProgressCell(typeLabel string, p retrieveProgress, frame int) string
 	return icon + " " + typeLabel + suffix
 }
 
-// shortErr distils a retrieve error into a compact reason for the progress
-// cell: keeps the salient tail (e.g. "INVALID_TYPE: ... not supported")
-// and trims the noisy "readMetadata <Type>: " prefix our SOAP layer adds.
 func shortErr(err error) string {
 	if err == nil {
 		return "failed"
 	}
 	s := err.Error()
-	// Drop our own "readMetadata X: " / "listMetadata: " wrapper prefix.
 	if i := strings.Index(s, ": "); i >= 0 && i < 40 {
 		rest := s[i+2:]
 		if rest != "" {
@@ -492,7 +428,6 @@ func shortErr(err error) string {
 	return s
 }
 
-// compareSpinnerFrames is a braille spinner — smooth and compact.
 var compareSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 func compareSpinner(frame int) string {
@@ -502,16 +437,10 @@ func compareSpinner(frame int) string {
 	return compareSpinnerFrames[frame%len(compareSpinnerFrames)]
 }
 
-// compareDots cycles "" / "." / ".." / "..." so the label visibly
-// breathes even between unit completions.
 func compareDots(frame int) string {
 	return strings.Repeat(".", frame%4)
 }
 
-// compareAnimatedBar draws the progress bar with a moving shimmer cell
-// travelling through the UNFILLED portion — so the bar reads as "alive"
-// even when `done` is static (a long object retrieve in flight). The
-// filled portion still reflects real progress.
 func compareAnimatedBar(done, total, width, frame int) string {
 	if total <= 0 || width <= 0 {
 		return ""
@@ -536,8 +465,6 @@ func compareAnimatedBar(done, total, width, frame int) string {
 	return b.String()
 }
 
-// humanizeCompareAge renders a coarse "how long ago" for the staleness
-// banner (minutes / hours / days).
 func humanizeCompareAge(d time.Duration) string {
 	switch {
 	case d < time.Minute:
@@ -558,8 +485,6 @@ func maxInt(a, b int) int {
 	return b
 }
 
-// --- inventory (Screen 3) -------------------------------------------------
-
 func (m Model) renderCompareInventory(w, innerH int, d *orgData) string {
 	inner := w - 4
 	run := d.Run
@@ -568,9 +493,6 @@ func (m Model) renderCompareInventory(w, innerH int, d *orgData) string {
 	head = append(head, sectionTitle("COMPARE   "+m.compareTitleArrow(run)))
 	head = append(head, dimLine(fmt.Sprintf("  %d components · %d differ · %d source-only · %d target-only · %d same",
 		len(run.Inv.Rows), different, aOnly, bOnly, same), inner))
-	// Staleness banner for an OPENED saved comparison: it's a point-in-time
-	// photo; components may have changed since. (Live runs have a zero
-	// OpenedSavedAt and show nothing.)
 	if !run.OpenedSavedAt.IsZero() {
 		age := humanizeCompareAge(time.Since(run.OpenedSavedAt))
 		head = append(head, lipgloss.NewStyle().Foreground(theme.Yellow).Render(
@@ -595,8 +517,6 @@ func (m Model) renderCompareInventory(w, innerH int, d *orgData) string {
 	body := renderListModel(m, model, m.focus, inner, budget)
 	return strings.Join(append(head, body...), "\n")
 }
-
-// --- inventory list surface -----------------------------------------------
 
 func compareInventoryColumnSchema() tablemodel.Schema[diff.Row] {
 	return tablemodel.Schema[diff.Row]{
@@ -630,7 +550,6 @@ var compareInventoryListSurface = listSurface{
 		}
 		resolved := mustResolveColumns(compareInventoryColumnSchema())
 		cols := resolved.ListColumns()
-		// Install sort BEFORE Filtered() (see cookbook gotcha #1).
 		installListViewOrderRows(&d.InventoryList, &d.InventoryTable, cols,
 			func(items []diff.Row, row, col int) string {
 				if row < 0 || row >= len(items) || col < 0 || col >= len(cols) {
@@ -692,11 +611,6 @@ func (d *orgData) syncInventoryList() {
 	d.InventoryList.Set(d.Run.Inv.Rows)
 }
 
-// --- key / nav hooks (tab-level) ------------------------------------------
-
-// moveCompareCursor routes cursor movement: the New subtab drives the
-// setup form; the Result subtab drives the drill-in scroll or the
-// inventory list. (Saved/History route through their listSurface.)
 func (m *Model) moveCompareCursor(delta int) {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -741,8 +655,6 @@ func (m Model) compareSearchPtr() *searchState {
 	return nil
 }
 
-// compareListTable exposes the inventory table to the column-nav / sort
-// machinery when the inventory is showing.
 func compareListTable(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn) {
 	d, ok := m.activeOrgState()
 	if !ok || d.Run == nil || d.Run.Phase != comparePhaseInventory || d.Diff != nil {
@@ -754,8 +666,6 @@ func compareListTable(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn
 	return &d.InventoryTable, schemaListColumns(compareInventoryColumnSchema())
 }
 
-// compareDiffOpen reports whether the body-diff drill-in is currently
-// showing (gates the diff-specific keys: u, [ / ], scroll).
 func (m Model) compareDiffOpen() bool {
 	d, ok := m.activeOrgState()
 	return ok && d.Diff != nil
@@ -774,11 +684,6 @@ func clampScroll(v, n int) int {
 	return v
 }
 
-// --- run command ----------------------------------------------------------
-
-// compareInventoryMsg carries a finished comparison back to Update.
-// For the snapshot path SnapA/SnapB are populated so drill-in re-diffs
-// bodies with no further API calls.
 type compareInventoryMsg struct {
 	OrgKey       string
 	Inv          diff.Inventory
@@ -786,13 +691,6 @@ type compareInventoryMsg struct {
 	Err          error
 }
 
-// startCompare kicks off retrieval+diff for the active run in a
-// goroutine, returning a tea.Cmd that produces a compareInventoryMsg.
-//
-// Route branch:
-//   - Tooling: per-provider path (fast Tooling list, lazy bodies).
-//   - Auto / Metadata API: SOAP snapshot retrieval by planned type lanes,
-//     followed by an exact body-level diff over hashes.
 func (m *Model) startCompare(d *orgData) tea.Cmd {
 	if d.Run == nil {
 		return nil
@@ -806,8 +704,6 @@ func (m *Model) startCompare(d *orgData) tea.Cmd {
 	}
 	run.Phase = comparePhaseRetrieving
 	run.Err = nil
-	// Results live on the Result subtab — jump there so the user sees the
-	// retrieving screen and inventory, instead of them squatting in New.
 	m.compareSubtabIdx = compareSubtabResultIdx
 	orgKey := ""
 	if len(m.orgs) > 0 {
@@ -848,9 +744,6 @@ func (m *Model) startCompare(d *orgData) tea.Cmd {
 	// can't skew accounting). See compareRun.recordComponents / retainBody.
 	run.bodyCap = m.settings.CompareBodyCapBytes()
 	run.retainCeiling = m.settings.CompareRetainCeilingBytes()
-	// Bound the retrieve fan-out around actual API calls. Type commands
-	// can all launch, but listMetadata/readMetadata/bulk Apex calls share
-	// this semaphore so CompareConcurrency() is the real request cap.
 	run.sem = make(chan struct{}, m.settings.CompareConcurrency())
 
 	pend := func(side, t string) {
@@ -869,9 +762,6 @@ func (m *Model) startCompare(d *orgData) tea.Cmd {
 		expected += 2
 	}
 	if len(plan.ObjectTypes) > 0 {
-		// One object retrieve per side fills all in-scope object-child
-		// types. Each in-scope child type gets a progress row; the
-		// retrieve emits a compareObjectsDoneMsg carrying every bucket.
 		for _, t := range plan.ObjectTypes {
 			pend("source", t)
 			pend("target", t)
@@ -887,13 +777,10 @@ func (m *Model) startCompare(d *orgData) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// compareTickMsg advances the retrieving-screen animation frame.
 type compareTickMsg struct{}
 
 const compareTickInterval = 200 * time.Millisecond
 
-// compareTickCmd returns a one-shot tick; Update re-arms it while a
-// retrieve is in flight (single-flight via compareTickRunning).
 func (m *Model) compareTickCmd() tea.Cmd {
 	if m.compareTickRunning {
 		return nil
@@ -902,8 +789,6 @@ func (m *Model) compareTickCmd() tea.Cmd {
 	return tea.Tick(compareTickInterval, func(time.Time) tea.Msg { return compareTickMsg{} })
 }
 
-// compareRetrieveInFlight reports whether any org currently has a run in
-// the retrieving phase — the condition for keeping the spinner ticking.
 func (m Model) compareRetrieveInFlight() bool {
 	for _, d := range m.data {
 		if d != nil && d.Run != nil && d.Run.Phase == comparePhaseRetrieving {
@@ -913,8 +798,6 @@ func (m Model) compareRetrieveInFlight() bool {
 	return false
 }
 
-// splitObjectChildScope partitions scope into the object-child types
-// (served by the single object-rooted retrieve) and everything else.
 func splitObjectChildScope(scope []string) (objChildren, perType []string) {
 	includeAllObjectBuckets := hasType(scope, "CustomObject")
 	addedObject := map[string]bool{}
@@ -941,7 +824,6 @@ func splitObjectChildScope(scope []string) (objChildren, perType []string) {
 	return
 }
 
-// compareTypeDoneMsg reports one (side, type) retrieve finishing.
 type compareTypeDoneMsg struct {
 	OrgKey     string
 	Side       string // "source" / "target"
@@ -951,13 +833,8 @@ type compareTypeDoneMsg struct {
 	Err        error
 }
 
-// apexCompareTypes use the fast bulk-Tooling-body lane (readMetadata
-// rejects Apex; one `SELECT Name, Body` query gets them all in seconds).
 var apexCompareTypes = map[string]bool{"ApexClass": true, "ApexTrigger": true}
 
-// retrieveTypeCmd retrieves ONE non-object type for one side via the
-// fastest lane: Apex → bulk Tooling body query; everything else → list
-// names + parallel batched SOAP readMetadata. Returns compareTypeDoneMsg.
 func retrieveTypeCmd(run *compareRun, orgKey, side, alias, metadataType string) tea.Cmd {
 	return func() tea.Msg {
 		var comps map[string]string
@@ -984,9 +861,6 @@ func retrieveTypeCmd(run *compareRun, orgKey, side, alias, metadataType string) 
 	}
 }
 
-// compareObjectsDoneMsg reports the object-rooted retrieve finishing for
-// one side. It carries every CustomObject-rooted bucket, but only the
-// planned in-scope buckets are recorded.
 type compareObjectsDoneMsg struct {
 	OrgKey  string
 	Side    string
@@ -995,9 +869,6 @@ type compareObjectsDoneMsg struct {
 	Err     error
 }
 
-// retrieveObjectsCmd runs ONE object-rooted SOAP retrieve for a side
-// (list objects → parallel batched readMetadata, children parsed inline)
-// and returns a compareObjectsDoneMsg.
 func retrieveObjectsCmd(run *compareRun, orgKey, side, alias string, inScope []string) tea.Cmd {
 	return func() tea.Msg {
 		run.acquire()
@@ -1016,11 +887,6 @@ func retrieveObjectsCmd(run *compareRun, orgKey, side, alias string, inScope []s
 	}
 }
 
-// listMembers enumerates a type's unmanaged component names via SOAP
-// listMetadata (HTTP, no `sf` CLI subprocess) — the fast twin of `sf org
-// list metadata`. Verified to return identical fullNames to the CLI (see
-// the listbench measurement) while being multiples faster and free of
-// the subprocess storm that froze large (~600-type) compares.
 func listMembers(alias, metadataType string) ([]string, error) {
 	c, err := sf.RESTClient(alias)
 	if err != nil {
@@ -1040,15 +906,11 @@ func listMembers(alias, metadataType string) ([]string, error) {
 	return out, nil
 }
 
-// applyCompareTypeDone folds one (side,type) retrieve result into the
-// active run, updates the progress map, and — once every expected unit
-// has landed — assembles the snapshots, diffs, and flips to inventory.
 func (m *Model) applyCompareTypeDone(d *orgData, msg compareTypeDoneMsg) tea.Cmd {
 	run := d.Run
 	if run == nil || run.Phase != comparePhaseRetrieving {
 		return nil // stale (user navigated away / re-ran)
 	}
-	// Record progress.
 	st := retrieveDone
 	note := ""
 	if msg.Err != nil {
@@ -1061,15 +923,12 @@ func (m *Model) applyCompareTypeDone(d *orgData, msg compareTypeDoneMsg) tea.Cmd
 		Side: msg.Side, Type: msg.Type, State: st,
 		Count: len(msg.Components), Note: note,
 	}
-	// Record hashes (all) + bodies (within the memory budget).
 	if msg.Err == nil && len(msg.Components) > 0 {
 		run.recordComponents(msg.Side, msg.Type, msg.Components)
 	}
 	return m.maybeFinishCompare(d)
 }
 
-// applyCompareObjectsDone folds the single object-rooted retrieve into
-// the in-scope object-child type buckets + progress, for one side.
 func (m *Model) applyCompareObjectsDone(d *orgData, msg compareObjectsDoneMsg) tea.Cmd {
 	run := d.Run
 	if run == nil || run.Phase != comparePhaseRetrieving {
@@ -1085,8 +944,6 @@ func (m *Model) applyCompareObjectsDone(d *orgData, msg compareObjectsDoneMsg) t
 		} else {
 			comps := msg.Buckets[t]
 			count = len(comps)
-			// Record hashes (all) + bodies (within budget); empty bucket
-			// (0 of that child type) still records the empty type map.
 			run.recordComponents(msg.Side, t, comps)
 		}
 		run.Progress[progressKey(msg.Side, t)] = retrieveProgress{
@@ -1096,7 +953,6 @@ func (m *Model) applyCompareObjectsDone(d *orgData, msg compareObjectsDoneMsg) t
 	return m.maybeFinishCompare(d)
 }
 
-// snapshotFor returns the source or target snapshot map for a side.
 func (run *compareRun) snapshotFor(side string) diff.Snapshot {
 	if side == "target" {
 		return run.snapB
@@ -1104,13 +960,6 @@ func (run *compareRun) snapshotFor(side string) diff.Snapshot {
 	return run.snapA
 }
 
-// maybeFinishCompare checks whether every expected (side,type) unit has
-// a terminal state and, if so, returns a tea.Cmd that diffs the two
-// snapshots OFF the UI goroutine. The diff over ~80k components is heavy
-// (string work + allocation); running it inline in Update froze the
-// event loop at "99%" and spiked memory. The cmd emits compareInventoryMsg,
-// whose handler flips to the inventory. Returns nil if not yet complete
-// or already finishing (guarded by run.diffing) so we don't launch twice.
 func (m *Model) maybeFinishCompare(d *orgData) tea.Cmd {
 	run := d.Run
 	done := 0
@@ -1132,9 +981,6 @@ func (m *Model) maybeFinishCompare(d *orgData) tea.Cmd {
 	// SnapA/SnapB for drill-in. The cmd must not touch Model/run state.
 	ha, hb := run.hashA, run.hashB
 	ba, bb := run.snapA, run.snapB
-	// Collect types that failed to retrieve on either side so the inventory
-	// surfaces them as errors instead of as phantom one-sided drift (the
-	// snapshot path has no error channel of its own — unlike the list path).
 	var typeErrs []diff.TypeError
 	for _, p := range run.Progress {
 		if p.State == retrieveFailed {
@@ -1153,15 +999,10 @@ func (m *Model) maybeFinishCompare(d *orgData) tea.Cmd {
 	}
 }
 
-// compareTitleArrow renders "source → target" using endpoint labels.
 func (m Model) compareTitleArrow(run *compareRun) string {
 	return endpointLabel(m, run.Source) + " → " + endpointLabel(m, run.Target)
 }
 
-// providersForScopeMethod filters providers to the scope's types and
-// selects each type's fetch route per the chosen method. (Route
-// selection within a provider is wired in compare_providers.go; this
-// just narrows the set + picks the right provider variant per method.)
 func providersForScopeMethod(scope []string, method compareMethod) []diff.Provider {
 	all := providersForMethod(method)
 	if len(scope) == 0 {

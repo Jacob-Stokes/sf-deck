@@ -96,7 +96,6 @@ func TestSortCursorCachesPermutation(t *testing.T) {
 		return values[row]
 	}
 
-	// First call populates the cache.
 	_ = identityRowSpace(state, cols, len(values), cell, "rows:v1").VisibleToDisplay(2)
 	first := cellCalls
 
@@ -111,7 +110,6 @@ func TestSortCursorCachesPermutation(t *testing.T) {
 			cellCalls-first)
 	}
 
-	// Third call (e.g. drill reads the cursor row): still cached.
 	_ = identityRowSpace(state, cols, len(values), cell, "rows:v1").VisibleToDisplay(0)
 	if cellCalls != first {
 		t.Errorf("third call re-invoked cell %d times; want cache hit",

@@ -3,14 +3,6 @@ package ui
 // orggroups.go — left-rail grouping computation. Pure data shapes
 // here; rendering lives in leftrail.go and the keyboard handlers in
 // update_keys.go.
-//
-// The grouping is purely client-side decoration on top of the list
-// of orgs that `sf` already knows about. Each authed org belongs to
-// at most one user-defined group; orgs not explicitly assigned land
-// under a synthetic "Ungrouped" section at the bottom of the rail.
-//
-// renderOrgsWidget walks orgRailRow values produced by buildRailRows,
-// and the cursor (m.orgRailCursor) addresses the same flat list.
 
 import (
 	"strings"
@@ -19,7 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// orgRailRowKind identifies what a single rail row represents.
 type orgRailRowKind int
 
 const (
@@ -27,9 +18,6 @@ const (
 	railRowOrg                               // a single org under a group (or under "Ungrouped")
 )
 
-// orgRailRow is one renderable line in the left-rail org panel. The
-// rail's cursor (m.orgRailCursor) addresses this list directly so a
-// single nav key handler can treat headers + orgs uniformly.
 type orgRailRow struct {
 	Kind    orgRailRowKind
 	GroupID string // header: own id; org: containing group id (or "" for ungrouped)
@@ -59,8 +47,6 @@ func buildRailRows(orgs []sf.Org, groups []settings.OrgGroupConfig) []orgRailRow
 		byUser[o.Username] = i
 	}
 
-	// Track which orgs got pulled into a group so we know what's left
-	// for the Ungrouped section.
 	taken := make(map[string]bool, len(orgs))
 	var rows []orgRailRow
 
@@ -71,8 +57,6 @@ func buildRailRows(orgs []sf.Org, groups []settings.OrgGroupConfig) []orgRailRow
 			OrgIdx:  -1,
 		})
 		if g.Collapsed {
-			// Still mark members as taken so they don't fall through
-			// to Ungrouped.
 			for _, m := range g.Members {
 				if _, ok := byUser[m]; ok {
 					taken[m] = true
@@ -95,9 +79,6 @@ func buildRailRows(orgs []sf.Org, groups []settings.OrgGroupConfig) []orgRailRow
 		}
 	}
 
-	// Ungrouped section — only render the header when there are
-	// any unassigned orgs (or when there are no user groups at all,
-	// so the user sees their orgs even with zero config).
 	hasUngrouped := false
 	for _, o := range orgs {
 		if !taken[o.Username] {
@@ -111,10 +92,6 @@ func buildRailRows(orgs []sf.Org, groups []settings.OrgGroupConfig) []orgRailRow
 			GroupID: ungroupedID,
 			OrgIdx:  -1,
 		})
-		// When there are zero user groups we don't need a header at
-		// all — the rail looks the same as it always did. Drop the
-		// header in that case so the existing UX is preserved for
-		// users who haven't opted in to groups.
 		if len(groups) == 0 {
 			rows = rows[:len(rows)-1]
 		}
@@ -134,9 +111,6 @@ func buildRailRows(orgs []sf.Org, groups []settings.OrgGroupConfig) []orgRailRow
 	return rows
 }
 
-// findGroupByID returns a copy of the named group from the slice,
-// plus its index. Returns (-1) when not found. Linear scan; the
-// group list is short.
 func findGroupByID(groups []settings.OrgGroupConfig, id string) (int, settings.OrgGroupConfig) {
 	for i, g := range groups {
 		if g.ID == id {
@@ -146,8 +120,6 @@ func findGroupByID(groups []settings.OrgGroupConfig, id string) (int, settings.O
 	return -1, settings.OrgGroupConfig{}
 }
 
-// groupHeaderLabel returns the human label for a group id. Handles
-// the synthetic Ungrouped id.
 func groupHeaderLabel(groups []settings.OrgGroupConfig, id string) string {
 	if id == ungroupedID {
 		return "Ungrouped"
@@ -170,8 +142,6 @@ func groupHeaderCollapsed(groups []settings.OrgGroupConfig, id string) bool {
 	return false
 }
 
-// groupMemberCount counts how many orgs from `orgs` fall under the
-// group id, honouring the synthetic Ungrouped bucket.
 func groupMemberCount(orgs []sf.Org, groups []settings.OrgGroupConfig, id string) int {
 	if id == ungroupedID {
 		taken := map[string]bool{}
@@ -205,10 +175,6 @@ func groupMemberCount(orgs []sf.Org, groups []settings.OrgGroupConfig, id string
 	return n
 }
 
-// slugifyGroupName produces a stable id from a user-supplied group
-// name. Lowercase, alphanumerics + hyphens; collapses runs and trims
-// leading/trailing hyphens. Falls back to "group" when the input is
-// purely punctuation.
 func slugifyGroupName(name string) string {
 	var b strings.Builder
 	prevHyphen := false

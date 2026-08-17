@@ -2,25 +2,6 @@ package ui
 
 // Tag picker modal — multi-select list of all tags, used by the `t`
 // keybind to apply / remove tags on the cursored item.
-//
-// Shape:
-//
-//   ╭─ Tags · Account.Phone ────────────────╮
-//   │ + new tag…                            │
-//   │ ☑ cleanup-q2                          │
-//   │ ☐ tech-debt                           │
-//   │ ☑ fragile                             │
-//   │                                       │
-//   │ space toggle · ↵ save · esc cancel    │
-//   ╰───────────────────────────────────────╯
-//
-// Differs from choiceModal by being multi-select with a commit-on-
-// enter (rather than commit-on-selection) flow. Reuses the modal
-// box primitive + renderModalRows pattern so it visually matches.
-//
-// On save: computes the diff between the original tag set and the
-// checked set, then calls store.SetTagsFor with the new full set.
-// Atomic in the store layer (single transaction).
 
 import (
 	"errors"
@@ -34,48 +15,24 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// tagPickerState is the live state of the tag-picker modal.
 type tagPickerState struct {
-	// Target — the item the modal is editing tags for.
 	Kind    devproject.ItemKind
 	Ref     string
 	OrgUser string
 	Title   string // shown in the modal header
 
-	// Tags is every defined tag (one row per tag). Order is by name.
-	Tags []devproject.Tag
-	// Selected mirrors the checkbox state — Selected[i] == true iff
-	// Tags[i] is currently checked. Initialised from the store on
-	// open and toggled by space.
+	Tags     []devproject.Tag
 	Selected []bool
-	// Cursor is the highlighted row. Position 0 is the special
-	// "+ new tag…" row; positions 1..len(Tags) map to Tags[i-1].
-	Cursor int
+	Cursor   int
 
-	// NewTagInput holds the in-progress new-tag name when the user
-	// is on the "+ new tag" row and has started typing. Empty string
-	// = not in new-tag-input mode.
 	NewTagInput string
 
-	// Err carries any commit error so the user can retry without
-	// losing their selection.
 	Err error
 
-	// BulkRefs, when non-empty, switches the picker into bulk mode:
-	// the checkbox edits apply to EVERY ref (all of Kind, same org).
-	// Checked-at-open = tags every item already shares (the
-	// intersection); checking adds to all, unchecking a shared tag
-	// removes from all, and partially-applied tags (unchecked at
-	// open) are left alone unless explicitly checked.
-	BulkRefs []string
-	// bulkBaseline records which tag ids were checked at open so the
-	// commit can diff added vs removed.
+	BulkRefs     []string
 	bulkBaseline map[int64]bool
 }
 
-// openTagPicker is the canonical opener. Loads the full tag list
-// from the store + the item's current bindings, pre-checks the
-// applied tags, and pops the modal.
 func (m *Model) openTagPicker(kind devproject.ItemKind, ref, orgUser, title string) tea.Cmd {
 	if m.devProjects == nil {
 		m.flash("tags unavailable: devproject store not loaded")
@@ -115,9 +72,6 @@ func (m *Model) openTagPicker(kind devproject.ItemKind, ref, orgUser, title stri
 	return nil
 }
 
-// openBulkTagPicker opens the picker over EVERY visible row of a
-// surface — the "tag everything I'm looking at" path (T). Pre-checks
-// the intersection of the rows' current tags.
 func (m *Model) openBulkTagPicker(kind devproject.ItemKind, refs []string, orgUser, title string) tea.Cmd {
 	if m.devProjects == nil {
 		m.flash("tags unavailable: devproject store not loaded")
@@ -141,7 +95,6 @@ func (m *Model) openBulkTagPicker(kind devproject.ItemKind, refs []string, orgUs
 		m.flash("load tags: " + err.Error())
 		return nil
 	}
-	// Intersection: a tag is pre-checked only when EVERY ref has it.
 	counts := map[int64]int{}
 	for _, r := range refs {
 		for _, t := range byItem[string(kind)+":"+r] {
@@ -169,8 +122,6 @@ func (m *Model) openBulkTagPicker(kind devproject.ItemKind, refs []string, orgUs
 	return nil
 }
 
-// renderTagPicker draws the modal overlay. Returns "" when the
-// modal isn't open. Layered into the overlay chain in render.go.
 func (m Model) renderTagPicker() string {
 	tp := m.tagPicker
 	if tp == nil {
@@ -181,12 +132,8 @@ func (m Model) renderTagPicker() string {
 	var rows []string
 	rows = append(rows, header, "")
 
-	// Row 0: "+ new tag" — switches to inline-input when user
-	// presses enter on it. The visible label flips to a text-entry
-	// hint while NewTagInput is active.
 	newRowLabel := "+ new tag…"
 	if tp.NewTagInput != "" || tp.Cursor == 0 && tp.NewTagInput == "" {
-		// Highlight when cursor is here OR active typing.
 	}
 	if tp.NewTagInput != "" {
 		newRowLabel = "+ " + tp.NewTagInput + "▏"
@@ -198,8 +145,6 @@ func (m Model) renderTagPicker() string {
 		if t.Icon != "" {
 			label = t.Icon + " " + label
 		}
-		// Use the tag's color for the label so the user sees pill-
-		// preview color even before saving.
 		colored := lipgloss.NewStyle().Foreground(tagColorFor(t.Color)).Render(label)
 		rows = append(rows, tagPickerRow(colored, tp.Selected[i], tp.Cursor == i+1, true))
 	}
@@ -221,8 +166,6 @@ func (m Model) renderTagPicker() string {
 	return modalBox(strings.Join(rows, "\n"), width)
 }
 
-// tagPickerRow formats one row with checkbox + label, applying a
-// highlight when selected (cursor on this row).
 func tagPickerRow(label string, checked, highlighted, hasCheckbox bool) string {
 	box := "  "
 	if hasCheckbox {
@@ -241,10 +184,6 @@ func tagPickerRow(label string, checked, highlighted, hasCheckbox bool) string {
 	return prefix + style.Render(box+label)
 }
 
-// updateTagPicker handles key presses while the modal is open. Esc
-// closes; space toggles; enter commits or creates-new; arrows move
-// the cursor; printable chars feed the new-tag input when the user
-// is on row 0 with inline-input active.
 func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 	tp := m.tagPicker
 	if tp == nil {
@@ -252,7 +191,6 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 	key := msg.String()
 
-	// New-tag inline input mode: most keys feed the buffer.
 	if tp.NewTagInput != "" || (tp.Cursor == 0 && key == "enter") {
 		switch key {
 		case "esc":
@@ -264,7 +202,6 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			if tp.NewTagInput == "" {
-				// First Enter on the "+ new tag" row: enter input mode.
 				tp.NewTagInput = ""
 				// We use an empty buffer + a marker (cursor==0 + Enter
 				// pressed) — bump to a single space stand-in that we'll
@@ -276,7 +213,6 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 				tp.NewTagInput = " " // sentinel; backspaced before commit
 				return m, nil
 			}
-			// Commit the new tag.
 			name := strings.TrimSpace(tp.NewTagInput)
 			if name == "" {
 				tp.NewTagInput = ""
@@ -286,24 +222,16 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 				tp.Err = errors.New("store unavailable")
 				return m, nil
 			}
-			// Rotate the default color through the palette so tags
-			// created inline aren't all blue. Keyed off the existing tag
-			// count → each new tag gets the next palette colour; recolour
-			// later in /tags (tab to the colour field, ←/→).
 			created, err := m.devProjects.CreateTag(name, nextRotatingTagColor(len(tp.Tags)), "")
 			if err != nil {
 				tp.Err = err
 				return m, nil
 			}
-			// Insert the new tag into the modal's Tags slice in sorted
-			// order, mark it selected, and exit input mode.
 			tp.Tags = append(tp.Tags, created)
 			tp.Selected = append(tp.Selected, true)
 			sortTagsByName(tp.Tags, tp.Selected)
 			tp.NewTagInput = ""
 			tp.Err = nil
-			// Find the new tag's index post-sort and move the cursor
-			// onto it so the user can see it landed.
 			for i, t := range tp.Tags {
 				if t.ID == created.ID {
 					tp.Cursor = i + 1
@@ -313,10 +241,6 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		case "backspace":
 			if len(tp.NewTagInput) > 0 {
-				// Trim trailing rune. Simple ASCII slice — names are
-				// typically short and ASCII; an emoji prefix in a
-				// name is unlikely (and our valid-name regex would
-				// reject it later anyway).
 				tp.NewTagInput = tp.NewTagInput[:len(tp.NewTagInput)-1]
 				if tp.NewTagInput == "" {
 					tp.NewTagInput = " " // keep sentinel until esc
@@ -351,14 +275,11 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case " ", "space":
-		// Toggle the checkbox on the cursored row. Row 0 has no
-		// checkbox so space is a no-op there.
 		if tp.Cursor >= 1 && tp.Cursor-1 < len(tp.Selected) {
 			tp.Selected[tp.Cursor-1] = !tp.Selected[tp.Cursor-1]
 		}
 		return m, nil
 	case "enter":
-		// Commit the diff.
 		if m.devProjects == nil {
 			tp.Err = errors.New("store unavailable")
 			return m, nil
@@ -370,10 +291,6 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 		}
 		if len(tp.BulkRefs) > 0 {
-			// Bulk: diff against the open-time intersection. Checked
-			// and not in baseline -> add everywhere; in baseline and
-			// now unchecked -> remove everywhere. Everything else is
-			// untouched (partially-tagged rows keep their own tags).
 			var add, remove []int64
 			checked := map[int64]bool{}
 			for i, t := range tp.Tags {
@@ -414,10 +331,7 @@ func (m Model) updateTagPicker(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// sortTagsByName sorts the (Tags, Selected) slice pair in tandem so
-// the row order stays alphabetical after a new tag is created.
 func sortTagsByName(tags []devproject.Tag, sel []bool) {
-	// Insertion sort — n is small (typically <50 tags).
 	for i := 1; i < len(tags); i++ {
 		for j := i; j > 0 && strings.ToLower(tags[j-1].Name) > strings.ToLower(tags[j].Name); j-- {
 			tags[j-1], tags[j] = tags[j], tags[j-1]

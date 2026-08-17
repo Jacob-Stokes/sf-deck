@@ -1,10 +1,5 @@
 package ui
 
-// /apex Classes + Triggers list surfaces. Both follow the static-
-// list-with-schema shape — declared via ListViewTableSpec[T] so
-// the per-surface code is just the schema, list/state accessors,
-// title, marks, gutters, and the Valid-red recolor rule.
-
 import (
 	"charm.land/lipgloss/v2"
 
@@ -45,8 +40,6 @@ var apexClassesTableSpec = ListViewTableSpec[sf.ApexClassRow]{
 		)
 	},
 	Recolor: func(items []sf.ApexClassRow, row, col int, colName string, base lipgloss.Style) lipgloss.Style {
-		// Tint Valid red when the class is invalid — same visual
-		// cue the bespoke renderer used.
 		if colName == "Valid" && !items[row].IsValid {
 			return base.Foreground(theme.Red)
 		}

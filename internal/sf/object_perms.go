@@ -1,12 +1,5 @@
 package sf
 
-// ObjectPermissions helpers — list and upsert/delete ObjectPermissions
-// records via the regular REST API.
-//
-// ObjectPermissions are sparse like FieldPermissions: a row only exists
-// when at least one of the six booleans has been explicitly set. When no
-// row exists, all six flags are effectively false.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -108,7 +101,6 @@ func UpsertObjectPermission(target, id, parentID, sobject string, r, c2, e, d, v
 		}
 		return resp.ID, nil
 	}
-	// PATCH — SobjectType and ParentId are immutable after creation.
 	patchBody, err := json.Marshal(map[string]any{
 		"PermissionsRead":             r,
 		"PermissionsCreate":           c2,

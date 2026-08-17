@@ -178,17 +178,6 @@ func (m Model) refreshReportDetailData(d *orgData) tea.Cmd {
 	return nil
 }
 
-// activateReportDetail handles Enter on a report-run row. When the
-// row carries a Salesforce Id we can resolve to an sObject (via
-// the cached SObjects keyPrefix table), drill into it through the
-// canonical record-detail surface so the user gets all the same
-// chrome (KV grid, sidebar actions, recent-tracking) they get from
-// /records or /recent. Returns to TabReportDetail on Esc.
-//
-// No-op (with a flash) when the row has no Id column, when the
-// prefix doesn't resolve to a known sObject, or when SObjects
-// haven't loaded yet — drilling without a target sObject would be
-// a worse UX than not drilling at all.
 func (m *Model) activateReportDetail() tea.Cmd {
 	if len(m.orgs) == 0 {
 		return nil
@@ -227,16 +216,10 @@ func (m *Model) activateReportDetail() tea.Cmd {
 	return m.triggerRecordDrill(sobject, id, name, TabReportDetail)
 }
 
-// reportRowID extracts the Salesforce 15/18-char record ID from a
-// report-run row, if present. Reports include the Id column when
-// configured to (most tabular reports do); summary / aggregate
-// reports usually don't. Returns "" when no usable Id is found.
 func reportRowID(row map[string]any) string {
 	if row == nil {
 		return ""
 	}
-	// Prefer the literal "Id" key — that's what the parser writes
-	// when the report's detailColumns contains "Id".
 	if v, ok := row["Id"]; ok {
 		if s, _ := v.(string); s != "" && (len(s) == 15 || len(s) == 18) {
 			return s
@@ -245,11 +228,6 @@ func reportRowID(row map[string]any) string {
 	return ""
 }
 
-// reportRowDisplayName picks a user-facing label for a row. Tries
-// "Name" first (most reports include it on tabular projections),
-// then walks the column list for anything that looks named-shaped
-// (Subject, Title, CaseNumber). Falls back to the Id when nothing
-// readable is found — better than empty.
 func reportRowDisplayName(row map[string]any, cols []sf.ReportColumn, id string) string {
 	if row == nil {
 		return id
@@ -261,8 +239,6 @@ func reportRowDisplayName(row map[string]any, cols []sf.ReportColumn, id string)
 			}
 		}
 	}
-	// Walk the projection in declared order — first non-Id column
-	// with a string value wins. Catches custom-projection reports.
 	for _, c := range cols {
 		if c.APIName == "Id" {
 			continue
@@ -276,11 +252,6 @@ func reportRowDisplayName(row map[string]any, cols []sf.ReportColumn, id string)
 	return id
 }
 
-// resolveSObjectFromID returns the sObject API name a Salesforce Id
-// belongs to, by looking up its 3-char key prefix in the cached
-// SObjects describe list. Returns "" when SObjects haven't been
-// fetched or when the prefix doesn't match anything (custom orgs
-// can have prefixes for sObjects we haven't crawled).
 func resolveSObjectFromID(d *orgData, id string) string {
 	if d == nil || len(id) < 3 {
 		return ""
@@ -293,9 +264,6 @@ func resolveSObjectFromID(d *orgData, id string) string {
 	return prefixMap[prefix]
 }
 
-// reportDetailFetchedAt resolves the /report drill's primary
-// freshness stamp: the cached run when one exists, else the report
-// list (extracted in the registry-purity pass).
 func reportDetailFetchedAt(m Model, d *orgData) time.Time {
 	if d.ReportCur != "" {
 		if r, ok := d.ReportRuns[d.ReportCur]; ok {

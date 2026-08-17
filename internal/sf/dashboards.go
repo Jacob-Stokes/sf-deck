@@ -1,9 +1,5 @@
 package sf
 
-// Dashboards — list of saved Lightning dashboards via SOQL on the
-// Dashboard sObject. Listed for browsing + open-in-Lightning; sf-deck
-// doesn't attempt to render dashboard components in a terminal.
-
 // DashboardRow is one dashboard in the org list.
 type DashboardRow struct {
 	ID                 string

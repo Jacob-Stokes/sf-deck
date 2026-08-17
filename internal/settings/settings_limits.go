@@ -1,9 +1,5 @@
 package settings
 
-// Per-surface row/fetch limit accessors (recent records, deploy
-// history, notifications, reference picker, …). Split out of
-// settings.go.
-
 func (s *Settings) LimitRecentRecords() int {
 	if s == nil {
 		return LimitRecentRecordsFallback

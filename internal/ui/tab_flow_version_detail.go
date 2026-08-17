@@ -1,16 +1,5 @@
 package ui
 
-// Flow-version definition viewer (TabFlowVersionDetail) — the in-
-// terminal counterpart to `o` (which opens Flow Builder in the
-// browser). Enter on a version row in TabFlowDetail drills here and
-// renders that version's full Tooling `Metadata` object as pretty-
-// printed JSON, scrollable + yankable — matching how Apex/LWC/Aura
-// already show source without leaving the terminal.
-//
-// JSON, not XML: the Tooling API returns the flow definition as a
-// structured object; pretty-printed JSON is faithful and needs no
-// re-serialisation to Metadata-API XML.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -23,20 +12,12 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/highlight"
 )
 
-// activateFlowVersionDetail is Enter on a flow version row. Its
-// behaviour is user-configurable (Settings → Navigation & input):
-// by default it opens the version in Flow Builder (the same as `o`);
-// when FlowVersionEnterOpens is false it drills into the in-terminal
-// definition viewer instead. The footer hint follows the setting.
 func (m *Model) activateFlowVersionDetail() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil || d.FlowCur == "" {
 		return nil
 	}
 	if m.settings.FlowVersionEnterOpens() {
-		// Open in Flow Builder. Mirror openDefault's core on the pointer
-		// receiver so the flash + recent-visit recording persist (calling
-		// the value-receiver openDefault would drop those on the copy).
 		o, ok := m.currentOrg()
 		if !ok {
 			return nil
@@ -62,9 +43,6 @@ func (m *Model) activateFlowVersionDetail() tea.Cmd {
 	return m.drillFlowVersion(v.ID)
 }
 
-// drillFlowVersion stashes versionID and switches to the in-terminal
-// definition viewer. Shared by Enter (view mode) and the ctrl+o open
-// menu's "View definition" target.
 func (m *Model) drillFlowVersion(versionID string) tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil || versionID == "" {
@@ -84,9 +62,6 @@ func flowVersionDefBodyID(versionID string) string {
 	return "flowver:" + versionID
 }
 
-// flowVersionDefBody pretty-prints the version's Metadata map as JSON.
-// Returns "" when the map is nil/empty. Deterministic (json marshals
-// map keys sorted) so the cursor cache key stays stable across renders.
 func flowVersionDefBody(meta map[string]any) string {
 	if len(meta) == 0 {
 		return ""
@@ -98,8 +73,6 @@ func flowVersionDefBody(meta map[string]any) string {
 	return string(b)
 }
 
-// ensureFlowVersionDetailData fires the lazy definition fetch when the
-// viewer is entered.
 func (m *Model) ensureFlowVersionDetailData(d *orgData, o sf.Org) tea.Cmd {
 	if d.FlowVersionCur == "" {
 		return nil
@@ -108,7 +81,6 @@ func (m *Model) ensureFlowVersionDetailData(d *orgData, o sf.Org) tea.Cmd {
 	return r.Ensure(m.cache)
 }
 
-// refreshFlowVersionDetailData re-fetches the current version's def.
 func (m Model) refreshFlowVersionDetailData(d *orgData) tea.Cmd {
 	if d.FlowVersionCur == "" {
 		return nil
@@ -119,7 +91,6 @@ func (m Model) refreshFlowVersionDetailData(d *orgData) tea.Cmd {
 	return nil
 }
 
-// moveFlowVersionDetailCursor scrolls the JSON body (j/k/G).
 func (m *Model) moveFlowVersionDetailCursor(delta int) {
 	d := m.activeOrgData()
 	if d == nil || d.FlowVersionCur == "" {
@@ -136,8 +107,6 @@ func (m *Model) moveFlowVersionDetailCursor(delta int) {
 	m.codeViewMoveCursor(d, flowVersionDefBodyID(d.FlowVersionCur), lineCount(body), delta)
 }
 
-// renderFlowVersionDetail draws the version viewer: a short header
-// (which flow / version) then the pretty-printed definition JSON.
 func (m Model) renderFlowVersionDetail(w, innerH int) string {
 	inner := w - 4
 	if len(m.orgs) == 0 {
@@ -148,8 +117,6 @@ func (m Model) renderFlowVersionDetail(w, innerH int) string {
 		return theme.Subtle.Render("  no flow version drilled in")
 	}
 
-	// Header: resolve the flow + version from the cached lists so the
-	// title reads "<Flow> · v<N> (<status>)" without an extra fetch.
 	title := "Flow version"
 	if vr, ok := d.FlowVersions[d.FlowCur]; ok && !vr.FetchedAt().IsZero() {
 		for _, v := range vr.Value() {
@@ -204,8 +171,6 @@ func (m Model) renderFlowVersionDetail(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// yankFlowVersionDefinition copies the full definition JSON to the
-// clipboard (the `y` action on the version viewer).
 func (m *Model) yankFlowVersionDefinition() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil || d.FlowVersionCur == "" {

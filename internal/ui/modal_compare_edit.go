@@ -1,17 +1,5 @@
 package ui
 
-// compareEditModal — a focused modal for editing/cloning a SAVED
-// comparison before re-running it. Mirrors the New setup form (source /
-// target / scope / method) plus an overwrite-vs-clone toggle, but lives
-// as transient modal state rather than on the persistent per-org run.
-//
-// A modal owns edit origin state for its lifetime and disposes of it on close.
-// The New subtab remains dedicated to composing or displaying an active run.
-//
-// On Compare: the modal seeds d.Run (source/target/scope/method +
-// OriginSavedID + SaveAsNew), closes, and starts the comparison — the
-// user lands on the New subtab watching progress → inventory, clean.
-
 import (
 	"strings"
 
@@ -21,7 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// compareEditRow identifies one navigable row of the edit modal.
 type compareEditRow int
 
 const (
@@ -37,8 +24,6 @@ func compareEditRows() []compareEditRow {
 	return []compareEditRow{editRowMode, editRowSource, editRowTarget, editRowScope, editRowMethod, editRowCompare}
 }
 
-// compareEditModalState is the live modal. It holds an editable copy of
-// the comparison config; nothing persists until Compare.
 type compareEditModalState struct {
 	OriginID   string // saved-comparison id being edited
 	OriginName string
@@ -53,7 +38,6 @@ type compareEditModalState struct {
 	Err    string
 }
 
-// openCompareEditModal opens the modal seeded from a saved comparison.
 func (m *Model) openCompareEditModal(sc compareEditSeed) {
 	m.compareEdit = &compareEditModalState{
 		OriginID:   sc.OriginID,
@@ -67,7 +51,6 @@ func (m *Model) openCompareEditModal(sc compareEditSeed) {
 	}
 }
 
-// compareEditSeed is the config the modal opens with.
 type compareEditSeed struct {
 	OriginID   string
 	OriginName string
@@ -81,8 +64,6 @@ func editRowCompareIndex() int {
 	rows := compareEditRows()
 	return len(rows) - 1
 }
-
-// --- render ---------------------------------------------------------------
 
 func (m Model) renderCompareEditModal() string {
 	st := m.compareEdit
@@ -150,8 +131,6 @@ func scopeLabelOrNone(scope []string) string {
 	return scopeLabel(scope)
 }
 
-// --- keys -----------------------------------------------------------------
-
 func (m Model) handleCompareEditKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	st := m.compareEdit
 	if st == nil {
@@ -197,8 +176,6 @@ func (m *Model) activateCompareEditRow(row compareEditRow) (Model, tea.Cmd) {
 	}
 	return *m, nil
 }
-
-// --- modal-scoped pickers (write back to the modal, not d.Run) -----------
 
 func (m *Model) openCompareEditOrgPicker(isSource bool) tea.Cmd {
 	st := m.compareEdit
@@ -285,8 +262,6 @@ func (m *Model) openCompareEditMethodPicker() tea.Cmd {
 	})
 }
 
-// runCompareEdit validates, seeds d.Run from the modal, closes the
-// modal, and starts the comparison (user lands on New watching it).
 func (m *Model) runCompareEdit() (Model, tea.Cmd) {
 	st := m.compareEdit
 	if st.Target.IsZero() {
@@ -317,13 +292,10 @@ func (m *Model) runCompareEdit() (Model, tea.Cmd) {
 		run.OriginSavedID = st.OriginID
 		run.OriginSavedName = st.OriginName
 	} else {
-		// Clone → new: keep the name to seed the "save as new" default,
-		// but no origin id so saving inserts a fresh row.
 		run.OriginSavedName = st.OriginName
 		run.SaveAsNew = true
 	}
 	d.Run = run
 	m.compareEdit = nil
-	// startCompare switches to the Result subtab itself.
 	return *m, m.startCompare(d)
 }

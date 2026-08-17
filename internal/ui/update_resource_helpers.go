@@ -29,10 +29,6 @@ func (m Model) applyOrgPrefixResourceMsg(d *orgData, msg resource.UpdatedMsg) (b
 		{Prefix: "describe_v3:", Handle: func(name string) (bool, tea.Cmd) {
 			handled, refresh := applyAndMaybeRefreshResource(m, d.Describes[name], msg)
 			if handled {
-				// SOQL autocomplete may be waiting on this describe
-				// to resolve a relationship hop or surface picklist
-				// values. Invalidate so the next render re-runs
-				// Classify+Suggest against the freshly loaded data.
 				(&m).autocompleteInvalidate()
 				// When the describe for the currently-drilled
 				// record's sObject lands, the per-record reference
@@ -126,12 +122,6 @@ func (m Model) applyOrgPrefixResourceMsg(d *orgData, msg resource.UpdatedMsg) (b
 		{Prefix: "recently_viewed_per_sobject:", Handle: func(sobj string) (bool, tea.Cmd) {
 			handled, refresh := applyAndMaybeRefreshResource(m, d.RecentlyViewedPerSObject[sobj], msg)
 			if handled {
-				// When the active records surface is this sObject in SF
-				// mode with the synthetic Recently Viewed chip selected,
-				// rebuild the chip-records Resource now that visited IDs
-				// are in hand. EnsureChipRecords' fetch closure captures
-				// the chip predicate, and this synthetic chip keeps the
-				// same ID while its Id IN (...) payload changes.
 				if d2, sobj2 := m.activeRecordsSObject(); sobj2 == sobj &&
 					currentChipMode(d2, sobj2) == ChipModeSalesforce &&
 					selectedRecordsChip(d2, sobj2) == sfRecentlyViewedChipID {
@@ -162,9 +152,6 @@ func (m Model) applyOrgPrefixResourceMsg(d *orgData, msg resource.UpdatedMsg) (b
 		}},
 		{Prefix: "usersessions:", Handle: func(key string) (bool, tea.Cmd) {
 			handled, refresh := applyAndMaybeRefreshResource(m, d.UserSessions[key], msg)
-			// Mirror the just-applied session rows into the shared
-			// UserSessionList when this is the drilled-in user, so the
-			// list surface re-renders.
 			if handled && key == d.SessionUserID {
 				d.SyncUserSessionList()
 			}

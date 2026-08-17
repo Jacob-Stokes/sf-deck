@@ -126,9 +126,6 @@ func emitNode(node Node, parentPrec int) string {
 		return emitCompare(n)
 	case AndNode:
 		if len(n.Children) == 0 {
-			// Vacuous AND: SOQL has no "TRUE" so we use a tautology.
-			// Callers that recognise IsEmpty() typically skip the
-			// WHERE clause entirely so this is rarely emitted.
 			return "Id != null"
 		}
 		parts := make([]string, len(n.Children))
@@ -153,7 +150,6 @@ func emitNode(node Node, parentPrec int) string {
 		}
 		out := strings.Join(parts, " OR ")
 		if parentPrec >= 2 {
-			// Under an AND — paren to preserve precedence.
 			return "(" + out + ")"
 		}
 		return out
@@ -169,9 +165,6 @@ func emitNode(node Node, parentPrec int) string {
 func emitCompare(c CompareNode) string {
 	switch c.Op {
 	case OpDateLiteral:
-		// Salesforce date literals (TODAY, LAST_N_DAYS:30, …) emit
-		// verbatim with the standard `=` operator. Match what the
-		// list-view describe API gives us so re-importing is lossless.
 		return c.Field + " = " + toString(c.Value)
 	case OpIsNull:
 		return c.Field + " = null"
@@ -209,15 +202,9 @@ func emitCompare(c CompareNode) string {
 	return ""
 }
 
-// emitLiteral renders a CompareNode value as SOQL. Strings are
-// quoted; numbers + booleans render verbatim.
 func emitLiteral(v any) string {
 	switch x := v.(type) {
 	case string:
-		// Heuristic: Salesforce date / datetime / id literals don't
-		// take quotes (e.g. `LastModifiedDate > 2025-01-01T00:00:00Z`).
-		// We sniff for ISO-8601-shaped strings and emit them bare.
-		// Plain strings get quoted normally.
 		if looksLikeDate(x) {
 			return x
 		}
@@ -254,9 +241,6 @@ func emitStringLiteral(s string) string {
 	return "'" + s + "'"
 }
 
-// looksLikeDate is the cheap "should I quote this?" heuristic.
-// Matches `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SS(Z)` shapes — anything
-// else is treated as a regular string and quoted.
 func looksLikeDate(s string) bool {
 	if len(s) < 10 || len(s) > 30 {
 		return false

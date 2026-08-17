@@ -60,7 +60,6 @@ func TestRegistryMatchesStruct(t *testing.T) {
 // New conflicts MUST NOT be added: pick a different key, split the When
 // context, or reorder the dispatcher.
 var knownConflicts = map[string]string{
-	// Documented global ↔ context shadows created by dispatcher order.
 	"shadow|refresh|obj_perm_read|r":           "perm grid uses different dispatch order",
 	"shadow|refresh|fls_toggle_read|r":         "FLS grid uses different dispatch order",
 	"shadow|yank_default|soql_yank_cell|y":     "SOQL Editor handler runs before global yank",
@@ -77,20 +76,13 @@ var knownConflicts = map[string]string{
 	"shadow|refresh|bundle_retrieve|r":                "tab=bundles handler runs before global refresh",
 	"shadow|refresh|download_reveal|r":                "downloads handler runs before global refresh",
 	"shadow|open_tags|subtab_3|#":                     "subtab_3 only fires on subtabbed tabs; # opens tag manager elsewhere",
-	// Org Manager modal owns its own dispatcher — runs in handleKey
-	// BEFORE the global switch when m.orgManageModal != nil. The
-	// keys below only shadow when the modal isn't open, in which
-	// case the global handler is the right one.
-	"shadow|go_top|org_move_to_group|g":          "modal handler consumes g before global go_top",
-	"shadow|prev_view|org_group_reorder_up|[":    "modal handler consumes [ before global prev_view",
-	"shadow|next_view|org_group_reorder_down|]":  "modal handler consumes ] before global next_view",
-	"shadow|open_dev_projects|org_unset_alias|-": "modal handler consumes - before global open_dev_projects",
-	"shadow|search_clear|theme_picker_clear|C":   "theme picker modal handler runs before global search_clear",
-	// OpenSettings moved off ctrl+, (not encodeable without CSI-u) onto
-	// ctrl+s. Three scoped ctrl+s handlers were already in place; each
-	// runs before the global OpenSettings case in the dispatcher.
-	"shadow|open_settings|chip_wizard_save|ctrl+s": "chip-wizard modal overlay runs before the global switch",
-	"shadow|open_settings|record_edit_save|ctrl+s": "tab=record handler at update_keys.go:658 fires before the OpenSettings case",
+	"shadow|go_top|org_move_to_group|g":               "modal handler consumes g before global go_top",
+	"shadow|prev_view|org_group_reorder_up|[":         "modal handler consumes [ before global prev_view",
+	"shadow|next_view|org_group_reorder_down|]":       "modal handler consumes ] before global next_view",
+	"shadow|open_dev_projects|org_unset_alias|-":      "modal handler consumes - before global open_dev_projects",
+	"shadow|search_clear|theme_picker_clear|C":        "theme picker modal handler runs before global search_clear",
+	"shadow|open_settings|chip_wizard_save|ctrl+s":    "chip-wizard modal overlay runs before the global switch",
+	"shadow|open_settings|record_edit_save|ctrl+s":    "tab=record handler at update_keys.go:658 fires before the OpenSettings case",
 }
 
 // TestNoConflictsWithinContext asserts that no two commands in the
@@ -132,7 +124,6 @@ func TestNoConflictsWithinContext(t *testing.T) {
 		}
 	}
 
-	// Phase 2: global keys that shadow context-specific bindings.
 	globals := byContext["global"]
 	for _, g := range globals {
 		for _, k := range g.Default {
@@ -169,7 +160,6 @@ func TestEveryCategoryNonEmpty(t *testing.T) {
 	if len(seen) == 0 {
 		t.Fatal("no categories in registry")
 	}
-	// Order them for stable output.
 	cats := make([]string, 0, len(seen))
 	for k := range seen {
 		cats = append(cats, k)

@@ -2,9 +2,6 @@ package ui
 
 import tea "charm.land/bubbletea/v2"
 
-// handleOverlayKey gives visible modals and overlays first crack at
-// key input. Order matters: nested/interactive surfaces go before
-// lower-priority dismissible modals.
 func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.commandPalette != nil {
 		mm := m
@@ -44,12 +41,6 @@ func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		next, cmd := m.handleCacheSettingsKey(msg)
 		return next, cmd, true
 	}
-	// chipWizard only claims keys when nothing is layered on top of it.
-	// The scope chooser (S) opens a choiceModal — and its multi-org
-	// branch opens an orgPicker — over the still-visible wizard;
-	// without this gate the wizard would eat the sub-modal's arrows /
-	// space / enter (mirrors the compareEdit-vs-sub-pickers comment
-	// further down).
 	if m.chipWizard != nil && m.choiceModal == nil && m.orgPicker == nil {
 		next, cmd := m.handleChipWizardKey(msg)
 		return next, cmd, true
@@ -70,16 +61,10 @@ func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		next, cmd := m.handleChoiceModalKey(msg)
 		return next, cmd, true
 	}
-	// compareScope (multi-select) can be layered on top of the edit
-	// modal, so it's checked first.
 	if m.compareScope != nil {
 		next, cmd := m.handleCompareScopeKey(msg)
 		return next, cmd, true
 	}
-	// compareEdit is checked AFTER choiceModal/orgPicker/compareScope so
-	// the modal-scoped pickers it opens (source/target/scope/method)
-	// receive keys; the edit modal only handles input when no picker is
-	// layered on top.
 	if m.compareEdit != nil {
 		next, cmd := m.handleCompareEditKey(msg)
 		return next, cmd, true

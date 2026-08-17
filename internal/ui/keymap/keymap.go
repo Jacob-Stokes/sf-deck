@@ -34,7 +34,6 @@ import (
 // The `toml:` tags are the on-disk config field names. They use
 // snake_case for readability in user-edited TOML.
 type Keymap struct {
-	// Process / panes
 	Quit                 []string `toml:"quit"`
 	FocusOrgs            []string `toml:"focus_orgs"`      // jumps to + selects the Orgs utility
 	FocusBookmarks       []string `toml:"focus_bookmarks"` // jumps to + selects the Bookmarks utility
@@ -46,7 +45,6 @@ type Keymap struct {
 	Help                 []string `toml:"help"`                   // opens the per-view info modal
 	InspectPanel         []string `toml:"inspect_panel"`          // opens the full sidebar/context info in a modal (escape hatch when the panel truncates)
 
-	// List nav
 	MoveUp        []string `toml:"move_up"`
 	MoveDown      []string `toml:"move_down"`
 	JumpUp        []string `toml:"jump_up"`   // ctrl+up / K — finer than page, coarser than single-step
@@ -59,8 +57,6 @@ type Keymap struct {
 	Refresh       []string `toml:"refresh"`
 	GlobalRefresh []string `toml:"global_refresh"` // re-fetch all loaded data for active org
 
-	// Tab switching (1..9 by default, mapping to the TabsForNumbers
-	// list in tab.go — Tab1 is index 0 of that slice).
 	Tab1 []string `toml:"tab_1"`
 	Tab2 []string `toml:"tab_2"`
 	Tab3 []string `toml:"tab_3"`
@@ -72,15 +68,6 @@ type Keymap struct {
 	Tab9 []string `toml:"tab_9"`
 	Tab0 []string `toml:"tab_0"`
 
-	// Subtab switching (shift+1..9). When the active tab has multiple
-	// subtabs, the number row "shifts down" to address them: top-tab
-	// pills lose their leading number, subtab pills gain it. shift+N
-	// jumps directly to subtab index N-1.
-	//
-	// Two binding shapes are accepted: the typed shifted character on
-	// a US layout ("!" / "@" / "#" / "$" / "%" / "^" / "&" / "*" /
-	// "(") AND the modifier-aware form ("shift+1" .. "shift+9") for
-	// terminals with the kitty / iTerm modify-other-keys protocols.
 	Subtab1 []string `toml:"subtab_1"`
 	Subtab2 []string `toml:"subtab_2"`
 	Subtab3 []string `toml:"subtab_3"`
@@ -95,23 +82,19 @@ type Keymap struct {
 	// has overflow subtabs; otherwise the keypress is a no-op.
 	Subtab0 []string `toml:"subtab_0"`
 
-	// Open / yank
 	OpenDefault []string `toml:"open_default"`
 	OpenMenu    []string `toml:"open_menu"`
 	YankDefault []string `toml:"yank_default"`
 	YankMenu    []string `toml:"yank_menu"`
 
-	// Search
 	SearchStart      []string `toml:"search_start"`
 	SearchClear      []string `toml:"search_clear"`
 	GlobalSearch     []string `toml:"global_search"`      // cross-cutting modal search: sobjects, fields, flows, …
 	SearchToggleMode []string `toml:"search_toggle_mode"` // inside the global-search modal: toggle between metadata + records modes
 
-	// FLS grid.
 	FLSToggleRead []string `toml:"fls_toggle_read"` // toggle Read on cursored field
 	FLSToggleEdit []string `toml:"fls_toggle_edit"` // toggle Edit (implies Read)
 
-	// Object permissions grid (TabPermParentDetail + SubtabParentObjects).
 	ObjPermRead      []string `toml:"obj_perm_read"`       // toggle Read
 	ObjPermCreate    []string `toml:"obj_perm_create"`     // toggle Create
 	ObjPermEdit      []string `toml:"obj_perm_edit"`       // toggle Edit
@@ -119,22 +102,17 @@ type Keymap struct {
 	ObjPermViewAll   []string `toml:"obj_perm_view_all"`   // toggle ViewAllRecords
 	ObjPermModifyAll []string `toml:"obj_perm_modify_all"` // toggle ModifyAllRecords
 
-	// System permissions grid (TabPermParentDetail + SubtabParentSystem).
 	SysPermToggle []string `toml:"sys_perm_toggle"` // toggle the selected system perm
 
-	// View-chip navigation on two-zone tabs (Objects, Records).
 	PrevView        []string `toml:"prev_view"`         // cycle backward through chips
 	NextView        []string `toml:"next_view"`         // cycle forward through chips
 	ToggleDashboard []string `toml:"toggle_dashboard"`  // collapse/expand dashboard
 	ToggleQueryLine []string `toml:"toggle_query_line"` // hide/show the SOQL query line on records surfaces
 
-	// Global settings modal (= to open).
 	OpenSettings []string `toml:"open_settings"`
 
-	// Debug panel showing the ring-buffer of recent API calls.
 	OpenAPILog []string `toml:"open_api_log"`
 
-	// Downloads overlay listing in-flight + recent exports.
 	OpenDownloads []string `toml:"open_downloads"`
 
 	// Toggle the chip-strip mode (sf-deck chips ↔ Salesforce list
@@ -148,8 +126,6 @@ type Keymap struct {
 	LensModeToggle       []string `toml:"chip_mode_toggle"`
 	LegacyLensModeToggle []string `toml:"lens_mode_toggle,omitempty"`
 
-	// Open the chip manager modal (list / new / edit / delete /
-	// import-from-Salesforce). Same rename as ChipModeToggle.
 	OpenLensManager       []string `toml:"open_chip_manager"`
 	LegacyOpenLensManager []string `toml:"open_lens_manager,omitempty"`
 
@@ -167,11 +143,9 @@ type Keymap struct {
 	// flows) silently refuse the toggle.
 	ToggleChipFavourite []string `toml:"toggle_chip_favourite"`
 
-	// Subtab navigation (when a drilled-in tab has multiple subtabs).
 	PrevSubtab []string `toml:"prev_subtab"` // cycle to previous subtab
 	NextSubtab []string `toml:"next_subtab"` // cycle to next subtab
 
-	// Per-tab extras
 	FilterCycle       []string `toml:"filter_cycle"` // sobjects: manageable/all/custom — LEGACY, now handled via PrevView/NextView
 	SOQLEdit          []string `toml:"soql_edit"`
 	SOQLToggleTooling []string `toml:"soql_toggle_tooling"`
@@ -187,12 +161,10 @@ type Keymap struct {
 	SOQLYankRow       []string `toml:"soql_yank_row"`    // Y — yank cursored row as TSV (results pane)
 	SOQLYankColumn    []string `toml:"soql_yank_column"` // ctrl+y — yank column as ('id1','id2',…) IN-clause (results pane)
 
-	// /record — inline field edit.
 	RecordEditField     []string `toml:"record_edit_field"`      // e — enter edit mode on the cursored field
 	RecordEditSave      []string `toml:"record_edit_save"`       // ctrl+s — PATCH all dirty fields
 	RecordEditCancelAll []string `toml:"record_edit_cancel_all"` // ctrl+X — discard every dirty edit
 
-	// /exec — anonymous Apex.
 	ExecEdit           []string `toml:"exec_edit"`            // e — focus the editor textarea
 	ExecExternalEditor []string `toml:"exec_external_editor"` // ctrl+e — open $EDITOR with the current body
 	ExecToggleLog      []string `toml:"exec_toggle_log"`      // ctrl+d — toggle debug-log capture for the next run
@@ -202,10 +174,8 @@ type Keymap struct {
 	ExecDuplicate      []string `toml:"exec_duplicate"`       // c — duplicate cursored saved snippet
 	ExecRename         []string `toml:"exec_rename"`          // R — rename cursored saved snippet
 
-	// Reports-specific.
 	ReportExport []string `toml:"report_export"` // x — export with saved post-processors (unified with dev-project export)
 
-	// Dev-projects.
 	NewProject         []string `toml:"new_project"`          // n — new dev project on /dev-projects
 	EditProject        []string `toml:"edit_project"`         // e — rename / edit description on /dev-projects
 	DeleteProject      []string `toml:"delete_project"`       // d — delete; refuses when project has items (cascade with shift+D)
@@ -245,19 +215,13 @@ type Keymap struct {
 	ProjectColumn   []string `toml:"project_column"`    // ctrl+p — toggle the project-membership gutter on/off across all lists
 	FlagColumn      []string `toml:"flag_column"`       // ctrl+g — cycle the FLAGS column (full / letter / hidden)
 
-	// Command palette — fuzzy-find modal over every Tab + every
-	// command in the registry. Bound to ; and ctrl+k by default;
-	// the registry pattern means new commands get reachable
-	// through the palette automatically.
 	CommandPalette []string `toml:"command_palette"`
 
-	// Bundles list (tab=bundles).
 	BundleOpen     []string `toml:"bundle_open"`     // o — open bundle directory
 	BundleUnlink   []string `toml:"bundle_unlink"`   // d — unlink bundle from project (leaves dir on disk)
 	BundleRetrieve []string `toml:"bundle_retrieve"` // r — sf project retrieve into the bundle dir
 	BundleDeploy   []string `toml:"bundle_deploy"`   // D — sf project deploy from the bundle dir
 
-	// Bundle detail (tab=bundle-detail).
 	BundleYankPath    []string `toml:"bundle_yank_path"`    // y — yank bundle path
 	BundleValidate    []string `toml:"bundle_validate"`     // v — validate-only deploy
 	BundleRefreshDiff []string `toml:"bundle_refresh_diff"` // R — force re-fetch the cached diff
@@ -267,34 +231,24 @@ type Keymap struct {
 	FlowRename        []string `toml:"flow_rename"`         // e — rename the flow's display label
 	FlowVersionDelete []string `toml:"flow_version_delete"` // D — delete the cursored inactive version
 
-	// Downloads modal + /home Downloads subtab (modal=downloads, tab=home-downloads).
 	DownloadOpen     []string `toml:"download_open"`      // o — open the exported file
 	DownloadReveal   []string `toml:"download_reveal"`    // r — reveal in Finder
 	DownloadYankPath []string `toml:"download_yank_path"` // y — yank file path
 	DownloadRemove   []string `toml:"download_remove"`    // d — remove from history (Done/Failed only)
 
-	// Theme picker (modal=theme-picker).
 	ThemePickerFavourite []string `toml:"theme_picker_favourite"` // f / F — toggle favourite
 	ThemePickerClear     []string `toml:"theme_picker_clear"`     // C — clear search
 
-	// Cache settings (modal=cache-settings).
 	CacheResetTTL []string `toml:"cache_reset_ttl"` // r — reset cursored TTL to default
 
-	// Chip wizard internals (modal=chip-wizard).
 	ChipWizardLookup []string `toml:"chip_wizard_lookup"` // ctrl+l — open lookup
 	ChipWizardDelete []string `toml:"chip_wizard_delete"` // ctrl+x — delete current row
 	ChipWizardSave   []string `toml:"chip_wizard_save"`   // ctrl+s — save the chip
 	ChipWizardMode   []string `toml:"chip_wizard_mode"`   // ctrl+t — toggle row mode
 
-	// Orgs panel (focus=orgs). The rail itself owns only fold/expand
-	// + the modal trigger; every edit action lives in the org-manage
-	// modal so the narrow rail stays a quick-nav surface.
 	OrgGroupToggle []string `toml:"org_group_toggle"` // space — collapse/expand cursored group
 	OrgManageOpen  []string `toml:"org_manage_open"`  // ctrl+e — open the org-management modal
 
-	// Org-management modal (modal=org-manage). All edit actions live
-	// here so the keybindings are visible alongside a roomy view of
-	// the grouped org tree.
 	OrgAddOrg           []string `toml:"org_add_org"`            // A — start the add-org auth flow
 	OrgGroupCreate      []string `toml:"org_group_create"`       // n — new group
 	OrgGroupRename      []string `toml:"org_group_rename"`       // R — rename cursored group
@@ -528,7 +482,6 @@ func mergeKeymap(dst *Keymap, src Keymap) {
 		if !df.IsValid() || !sf.IsValid() || !df.CanSet() {
 			continue
 		}
-		// src.X != nil (a user-supplied override) replaces dst.X.
 		if sf.Kind() == reflect.Slice && !sf.IsNil() {
 			df.Set(sf)
 		}
@@ -552,8 +505,6 @@ func mergeKeymap(dst *Keymap, src Keymap) {
 			continue
 		}
 		if sf.Kind() == reflect.Slice && !sf.IsNil() {
-			// Only overwrite if the canonical field wasn't already
-			// set (canonical wins when both are present).
 			canonV := srcV.FieldByName(c.FieldName)
 			if !canonV.IsValid() || canonV.Kind() != reflect.Slice || canonV.IsNil() {
 				df.Set(sf)

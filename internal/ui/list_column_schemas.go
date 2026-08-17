@@ -110,18 +110,10 @@ func flowColumnSchema() tablemodel.Schema[sf.Flow] {
 				Render: func(f sf.Flow) string { return f.Status },
 			},
 			"Version": {
-				Header: "VERSION",
-				// Cell is "v3" / "—" normally, or "v3 (v4)" when the
-				// newest version is a later draft than the active one.
-				// Ideal fits the bracketed form; Min still fits the
-				// header + a bare "v3" when space is tight.
-				Width:  tablemodel.Width{Min: 5, Ideal: 9},
-				Style:  lipgloss.NewStyle().Foreground(theme.Muted),
-				Render: flowVersionCell,
-				// Sort by the effective version number (active, or
-				// latest when there's no active version), zero-padded
-				// so it orders numerically — the rendered "v3 (v4)"
-				// label would sort lexically ("v10" before "v2").
+				Header:  "VERSION",
+				Width:   tablemodel.Width{Min: 5, Ideal: 9},
+				Style:   lipgloss.NewStyle().Foreground(theme.Muted),
+				Render:  flowVersionCell,
 				SortKey: func(f sf.Flow) string { return fmt.Sprintf("%06d", flowSortVersion(f)) },
 			},
 			"Label": {
@@ -182,11 +174,6 @@ func apexClassColumnSchema() tablemodel.Schema[sf.ApexClassRow] {
 				Render:  func(a sf.ApexClassRow) string { return apiVersionCell(a.ApiVersion) },
 				SortKey: func(a sf.ApexClassRow) string { return fmt.Sprintf("%08.1f", a.ApiVersion) },
 			},
-			// SIZE, not LINES: the source is ApexClass.LengthWithoutComments,
-			// which is the CHARACTER count of the body minus comments — not
-			// a line count. Labelling it "LINES" made every class look
-			// 30-50x too big (a ~14k-line class reports ~990k). Rendered as
-			// a compact char count ("3.2K", "992K").
 			"Size": {
 				Header: "SIZE",
 				Width:  tablemodel.Width{Min: 7, Ideal: 7},
@@ -437,10 +424,6 @@ func resolvedCellForListColumn[T any](
 	return resolvedCellByID(resolved, items[row], cols[col].Name)
 }
 
-// resolvedSortCellForListColumn is the sort-path counterpart to
-// resolvedCellForListColumn — resolves via SortKey so column sorts
-// order by the raw value, not the rendered label. See
-// resolvedSortCellByID.
 func resolvedSortCellForListColumn[T any](
 	resolved tablemodel.Resolved[T],
 	items []T,
@@ -453,16 +436,6 @@ func resolvedSortCellForListColumn[T any](
 	return resolvedSortCellByID(resolved, items[row], cols[col].Name)
 }
 
-// devProjectItemColumnSchema drives the /dev-projects detail Items
-// table. Unified schema covering all 19 ItemKinds via kind-aware
-// renderers so a flow row, a field row, and a saved-SOQL row can
-// share one sortable table without per-kind layout hacks.
-//
-// Default columns: Kind, Name, Reference, Type, Added. Origin /
-// Managed / Notes are hidden by default but addable via chip
-// --columns when the user wants them. The five defaults are the
-// minimum that lets a user identify any item in the project at a
-// glance.
 func devProjectItemColumnSchema() tablemodel.Schema[devproject.Item] {
 	return tablemodel.Schema[devproject.Item]{
 		DefaultColumns: func(scope string) []string {
@@ -566,9 +539,6 @@ func devProjectManagedColumnDef() tablemodel.ColumnDef[devproject.Item] {
 	}
 }
 
-// devProjectKindLabel renders the user-visible kind label. Mirrors
-// the labels already in use on the kind-filter chip strip so the
-// column and the chip read the same way.
 func devProjectKindLabel(k devproject.ItemKind) string {
 	switch k {
 	case devproject.KindSObject:

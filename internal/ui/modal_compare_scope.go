@@ -1,21 +1,5 @@
 package ui
 
-// compareScopeModal — a multi-select picker for the comparison scope.
-//
-// Replaces the old "X only / All types" preset radio list, which
-// couldn't express "Apex AND fields AND flows". This is a checkbox
-// list: space toggles the cursored type, `a` toggles all/none, enter
-// confirms. The result feeds back via onConfirm, so both the New setup
-// form and the edit modal reuse it without knowing where the scope is
-// stored.
-//
-// The candidate type list is discovered per-org via describeMetadata,
-// which is slow (~1.5s shelling `sf`). So the modal opens IMMEDIATELY in
-// a "loading…" state and the type list arrives asynchronously via
-// compareTypesLoadedMsg (see openCompareScopeModal + Update). The list
-// can be long (~250 types in a mature org), so it renders in a
-// fixed-height scroll window and `/` filters it by substring.
-
 import (
 	"strings"
 
@@ -25,9 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// scopeAllRowIdx is the cursor index of the "All types" toggle row,
-// which sits above the individual types. Type i (in the FILTERED view)
-// is at cursor index i+1.
 const scopeAllRowIdx = 0
 
 // scopeVisibleRows is the fixed number of type rows shown at once (the
@@ -35,16 +16,12 @@ const scopeAllRowIdx = 0
 // types the org has, so it never runs off-screen.
 const scopeVisibleRows = 12
 
-// compareScopeModalState is the live multi-select modal.
 type compareScopeModalState struct {
 	Loading bool            // true until the type list arrives (shows a spinner-ish notice)
 	Alias   string          // org whose catalog we requested (guards stale loaded msgs)
 	Types   []string        // all candidate metadata types (master list, in order)
 	Checked map[string]bool // currently-ticked types
 
-	// Search is the active `/` filter. searchActive means keystrokes go
-	// to the query rather than navigation. When non-empty, Filtered()
-	// narrows the visible types; the All-row toggles only the filtered set.
 	Search       string
 	searchActive bool
 
@@ -54,20 +31,12 @@ type compareScopeModalState struct {
 	OnConfirm func(selected []string) // called with the chosen types on enter
 }
 
-// compareTypesLoadedMsg delivers the discovered type catalog to the open
-// scope modal. Carries the alias it was fetched for so a stale result
-// (org switched, modal reopened) is ignored.
 type compareTypesLoadedMsg struct {
 	Alias string
 	Types []string
 	Err   error
 }
 
-// openCompareScopeModal opens the scope multi-select in its loading
-// state and returns a cmd that fetches the org's comparable types
-// (cache-or-describe, off the UI loop). onConfirm receives the final
-// selection (always ≥1 type — confirming with none keeps the previous
-// scope). Callers thread the returned cmd back through Update.
 func (m *Model) openCompareScopeModal(current []string, onConfirm func([]string)) tea.Cmd {
 	checked := map[string]bool{}
 	for _, t := range current {
@@ -77,15 +46,12 @@ func (m *Model) openCompareScopeModal(current []string, onConfirm func([]string)
 	if len(m.orgs) > 0 && m.selected >= 0 && m.selected < len(m.orgs) {
 		alias = m.orgs[m.selected].Username
 	}
-	// No default-all: a fresh comparison opens with nothing ticked, so
-	// the user explicitly chooses which types to compare.
 	m.compareScope = &compareScopeModalState{
 		Loading:   true,
 		Alias:     alias,
 		Checked:   checked,
 		OnConfirm: onConfirm,
 	}
-	// Fetch off the UI loop; the result lands as compareTypesLoadedMsg.
 	mc := *m
 	return func() tea.Msg {
 		types, err := mc.loadComparableTypes(alias)
@@ -93,9 +59,6 @@ func (m *Model) openCompareScopeModal(current []string, onConfirm func([]string)
 	}
 }
 
-// applyCompareTypesLoaded fills an open scope modal with its discovered
-// types. Ignores stale results (modal closed, or fetched for a different
-// org than the one now open).
 func (m *Model) applyCompareTypesLoaded(msg compareTypesLoadedMsg) {
 	st := m.compareScope
 	if st == nil || st.Alias != msg.Alias {
@@ -103,9 +66,6 @@ func (m *Model) applyCompareTypesLoaded(msg compareTypesLoadedMsg) {
 	}
 	st.Types = msg.Types
 	st.Loading = false
-	// Drop pre-ticks for types this org doesn't actually offer (e.g. when
-	// reopening a saved comparison against a different org), so the
-	// "N of M selected" count stays truthful.
 	valid := map[string]bool{}
 	for _, t := range st.Types {
 		valid[t] = true
@@ -117,8 +77,6 @@ func (m *Model) applyCompareTypesLoaded(msg compareTypesLoadedMsg) {
 	}
 }
 
-// filtered returns the types matching the active `/` search (all types
-// when the query is empty), preserving master order.
 func (st *compareScopeModalState) filtered() []string {
 	if st.Search == "" {
 		return st.Types
@@ -156,7 +114,6 @@ func (m Model) renderCompareScopeModal() string {
 	n := st.countChecked()
 	lines = append(lines, theme.Subtle.Render(itoa(n)+" of "+itoa(len(st.Types))+" types selected"))
 
-	// Search line: an editable query when `/` is active, else a hint.
 	if st.searchActive || st.Search != "" {
 		q := st.Search
 		if st.searchActive {
@@ -188,8 +145,6 @@ func (m Model) renderCompareScopeModal() string {
 		return prefix + box + " " + nameStyle.Render(label)
 	}
 
-	// Row 0 = the "All types" toggle (operates on the FILTERED set when a
-	// search is active); rows 1..N = the visible (windowed) filtered types.
 	allOn := len(filtered) > 0 && st.allFilteredChecked(filtered)
 	allLabel := "All types"
 	if st.Search != "" {
@@ -230,8 +185,6 @@ func (m Model) renderCompareScopeModal() string {
 	return modalBox(strings.Join(lines, "\n"), w)
 }
 
-// allFilteredChecked reports whether every type in the filtered set is
-// currently ticked.
 func (st *compareScopeModalState) allFilteredChecked(filtered []string) bool {
 	for _, t := range filtered {
 		if !st.Checked[t] {
@@ -241,8 +194,6 @@ func (st *compareScopeModalState) allFilteredChecked(filtered []string) bool {
 	return true
 }
 
-// toggleAtCursor toggles whatever the cursor is on: the All row (cursor
-// 0 → toggle the whole FILTERED set) or a single filtered type.
 func (st *compareScopeModalState) toggleAtCursor() {
 	filtered := st.filtered()
 	if st.Cursor == scopeAllRowIdx {
@@ -303,7 +254,6 @@ func (m Model) handleCompareScopeKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// While loading, only esc does anything (cancel).
 	if st.Loading {
 		if s := msg.String(); s == "esc" || s == "ctrl+c" {
 			m.compareScope = nil
@@ -311,18 +261,15 @@ func (m Model) handleCompareScopeKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Search-entry mode: keystrokes edit the query.
 	if st.searchActive {
 		switch msg.String() {
 		case "esc":
-			// Clear the search and leave entry mode.
 			st.searchActive = false
 			st.Search = ""
 			st.Cursor = scopeAllRowIdx
 			st.Offset = 0
 			return m, nil
 		case "enter":
-			// Apply the filter: leave entry mode, keep the query.
 			st.searchActive = false
 			st.Cursor = scopeAllRowIdx
 			st.Offset = 0
@@ -347,7 +294,6 @@ func (m Model) handleCompareScopeKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "ctrl+c":
 		if st.Search != "" {
-			// First esc clears an applied filter; next esc closes.
 			st.Search = ""
 			st.Cursor = scopeAllRowIdx
 			st.Offset = 0
@@ -370,7 +316,6 @@ func (m Model) handleCompareScopeKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		st.toggleAtCursor()
 		return m, nil
 	case "a":
-		// Toggle the whole FILTERED set regardless of cursor position.
 		filtered := st.filtered()
 		on := st.allFilteredChecked(filtered)
 		for _, t := range filtered {

@@ -31,7 +31,6 @@ type describeCall struct {
 // formula/autonumber/encryption markers, and the SOQL-relevant
 // capability flags (filterable / sortable / etc.).
 type Field struct {
-	// Identity
 	Name           string `json:"name"`
 	Label          string `json:"label"`
 	Type           string `json:"type"`
@@ -40,22 +39,15 @@ type Field struct {
 	Custom         bool   `json:"custom"`
 	InlineHelpText string `json:"inlineHelpText"`
 
-	// Constraints
-	Nillable   bool `json:"nillable"`
-	Unique     bool `json:"unique"`
-	ExternalID bool `json:"externalId"`
-	// Permissionable: whether FLS applies to this field at all.
-	// System fields (Id, audit stamps) are always-visible and have
-	// no FieldPermissions rows — the FLS grid renders them as "—"
-	// instead of a misleading deniable-looking [·].
+	Nillable       bool `json:"nillable"`
+	Unique         bool `json:"unique"`
+	ExternalID     bool `json:"externalId"`
 	Permissionable bool `json:"permissionable"`
 
-	// Numeric precision
 	Precision int `json:"precision"`
 	Scale     int `json:"scale"`
 	Digits    int `json:"digits"`
 
-	// Reference metadata
 	ReferenceTo             []string `json:"referenceTo"`
 	RelationshipName        string   `json:"relationshipName"`
 	RelationshipOrder       *int     `json:"relationshipOrder"`
@@ -63,13 +55,11 @@ type Field struct {
 	RestrictedDelete        bool     `json:"restrictedDelete"`
 	WriteRequiresMasterRead bool     `json:"writeRequiresMasterRead"`
 
-	// Picklist metadata
 	PicklistValues     []PicklistValue `json:"picklistValues"`
 	RestrictedPicklist bool            `json:"restrictedPicklist"`
 	ControllerName     string          `json:"controllerName"`
 	DependentPicklist  bool            `json:"dependentPicklist"`
 
-	// Formula / default / autonumber
 	CalculatedFormula   string `json:"calculatedFormula"`
 	DefaultValue        any    `json:"defaultValue"`
 	DefaultValueFormula string `json:"defaultValueFormula"`
@@ -81,7 +71,6 @@ type Field struct {
 	HTMLFormatted bool `json:"htmlFormatted"`
 	NameField     bool `json:"nameField"`
 
-	// SOQL capabilities
 	Createable   bool `json:"createable"`
 	Updateable   bool `json:"updateable"`
 	Filterable   bool `json:"filterable"`
@@ -133,7 +122,6 @@ func (f Field) Field(name string) (any, bool) {
 		return (f.Type == "reference" || len(f.ReferenceTo) > 0) &&
 			(f.WriteRequiresMasterRead || f.CascadeDelete || f.RestrictedDelete), true
 	case "IsLookup":
-		// Lookup = a reference that is NOT master-detail.
 		isRef := f.Type == "reference" || len(f.ReferenceTo) > 0
 		isMD := f.WriteRequiresMasterRead || f.CascadeDelete || f.RestrictedDelete
 		return isRef && !isMD, true
@@ -151,21 +139,15 @@ type PicklistValue struct {
 
 // SObjectDescribe is a trimmed subset of `sf sobject describe` output.
 type SObjectDescribe struct {
-	Name        string `json:"name"`
-	Label       string `json:"label"`
-	LabelPlural string `json:"labelPlural"`
-	Custom      bool   `json:"custom"`
-	KeyPrefix   string `json:"keyPrefix"`
-	Queryable   bool   `json:"queryable"`
-	Creatable   bool   `json:"createable"`
-	Updatable   bool   `json:"updateable"`
-	Deletable   bool   `json:"deletable"`
-	// MruEnabled — whether Salesforce tracks "most recently used" /
-	// recently-viewed for this object. False objects (e.g.
-	// BatchProcessJobDefinition, many setup entities) have no
-	// LastViewedDate field, so querying RecentlyViewed-style SOQL
-	// against them throws INVALID_FIELD. Gate the Recently-Viewed
-	// chip on this.
+	Name               string              `json:"name"`
+	Label              string              `json:"label"`
+	LabelPlural        string              `json:"labelPlural"`
+	Custom             bool                `json:"custom"`
+	KeyPrefix          string              `json:"keyPrefix"`
+	Queryable          bool                `json:"queryable"`
+	Creatable          bool                `json:"createable"`
+	Updatable          bool                `json:"updateable"`
+	Deletable          bool                `json:"deletable"`
 	MruEnabled         bool                `json:"mruEnabled"`
 	Fields             []Field             `json:"fields"`
 	ChildRelationships []ChildRelationship `json:"childRelationships"`
@@ -176,25 +158,12 @@ type SObjectDescribe struct {
 // record detail "RELATED" panel + used by the child-count helper
 // to drive (SELECT COUNT() FROM <RelationshipName>) subqueries.
 type ChildRelationship struct {
-	// RelationshipName is the SOQL-friendly name (e.g. "Opportunities"
-	// for Account → Opportunity). Used directly in subquery SOQL.
-	// Empty when SF didn't generate one (rare; mostly internal/system
-	// relationships).
-	RelationshipName string `json:"relationshipName"`
-	// ChildSObject is the API name of the child (e.g. "Opportunity").
-	ChildSObject string `json:"childSObject"`
-	// Field is the lookup/master-detail field on the child that
-	// references the parent (e.g. "AccountId").
-	Field string `json:"field"`
-	// CascadeDelete + RestrictedDelete mirror the standard
-	// describe flags so callers can render badges (master-detail
-	// cascades, restricted-delete badges).
-	CascadeDelete    bool `json:"cascadeDelete"`
-	RestrictedDelete bool `json:"restrictedDelete"`
-	// DeprecatedAndHidden filters out childRelationships SF
-	// reports but tells us not to surface. UI should skip these
-	// in the standard view.
-	DeprecatedAndHidden bool `json:"deprecatedAndHidden"`
+	RelationshipName    string `json:"relationshipName"`
+	ChildSObject        string `json:"childSObject"`
+	Field               string `json:"field"`
+	CascadeDelete       bool   `json:"cascadeDelete"`
+	RestrictedDelete    bool   `json:"restrictedDelete"`
+	DeprecatedAndHidden bool   `json:"deprecatedAndHidden"`
 }
 
 type describeWrapper struct {
@@ -235,9 +204,6 @@ func Describe(target, sobjectName string) (SObjectDescribe, error) {
 	return call.result, call.err
 }
 
-// doDescribe is the un-coalesced REST/CLI fetch. Always issues a
-// network call. The singleflight wrapper in Describe is the only
-// caller.
 func doDescribe(target, sobjectName string) (SObjectDescribe, error) {
 	if c, err := RESTClient(target); err == nil {
 		return c.DescribeREST(sobjectName)

@@ -2,17 +2,6 @@ package ui
 
 // TabValidationDetail — full-pane view of a single ValidationRule.
 // Drill from the Validation subtab's list (enter on a row).
-//
-// Layout parallels TabFieldDetail / TabObjectDetail: every editable
-// property is a navigable row in the MAIN pane (active toggle, error
-// message, condition formula, description) plus a DANGER ZONE delete
-// at the bottom. Arrow keys walk the rows; Enter fires the edit /
-// toggle / delete modal. The right sidebar is INFO-ONLY (reflects
-// which action the cursored row maps to) so it can be hidden safely.
-//
-// validationDetailRows is the single source of truth — both this
-// renderer and the cursor/activate hooks consume it so the visible
-// order and the navigable index can't drift.
 
 import (
 	"fmt"
@@ -39,7 +28,6 @@ type detailRow struct {
 	Locked    bool
 }
 
-// Validation action indices — track validationActionsFor's order.
 const (
 	vrActToggleActive = 0
 	vrActErrorMsg     = 1
@@ -48,8 +36,6 @@ const (
 	vrActDelete       = 4
 )
 
-// validationDetailRows builds the ordered row model. det is the
-// fetched rule Metadata, rowName the display name for the title.
 func validationDetailRows(sobject, rowName string, det sf.ValidationRuleDetail, fetchedAt detailMeta, inner int) []detailRow {
 	b := newDetailRowBuilder(inner)
 
@@ -63,39 +49,31 @@ func validationDetailRows(sobject, rowName string, det sf.ValidationRuleDetail, 
 		humanAge(fetchedAt.FetchedAt) + stateSuffix(fetchedAt.Busy, fetchedAt.Err))
 	b.blank()
 
-	// STATUS — the active toggle.
 	b.title("STATUS")
 	b.kv("active", yesNo(det.Active), vrActToggleActive)
 	b.blank()
 
-	// ERROR MESSAGE
 	b.title("ERROR MESSAGE")
 	b.kvWrapped("message", det.ErrorMessage, vrActErrorMsg)
 	b.blank()
 
-	// ERROR FIELD (read-only — not separately editable here).
 	if det.ErrorDisplayField != "" {
 		b.title("ERROR FIELD")
 		b.kv("field", det.ErrorDisplayField, noAction)
 		b.blank()
 	}
 
-	// CONDITION FORMULA
 	b.title("CONDITION FORMULA")
 	b.kvWrapped("formula", det.ErrorConditionFormula, vrActFormula)
 	b.blank()
 
-	// DESCRIPTION
 	b.title("DESCRIPTION")
 	b.kvWrapped("description", det.Description, vrActDescription)
 
-	// DANGER ZONE
 	b.dangerSection("delete rule", vrActDelete)
 	return b.rows
 }
 
-// renderValidationDetail is the main-pane renderer for
-// TabValidationDetail.
 func (m Model) renderValidationDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -175,16 +153,12 @@ func (m Model) validationDetailActionForCursor() (int, bool) {
 	return detailActionForCursor(rows, m.validationActionCur)
 }
 
-// sidebarValidationActions renders the TabValidationDetail right
-// sidebar — a context panel for the cursored row.
 func (m Model) sidebarValidationActions(inner int) string {
 	ctx := m.validationRowContext()
 	ctx.Hints = detailNavHints(true)
 	return m.sidebarRowContext("RULE · CONTEXT", inner, ctx)
 }
 
-// validationRowContext builds the context panel for the cursored rule
-// row. Writes route through the Tooling ValidationRule entity.
 func (m Model) validationRowContext() rowContext {
 	idx, ok := m.validationDetailActionForCursor()
 	if !ok {
@@ -223,7 +197,6 @@ func (m Model) validationRowContext() rowContext {
 	return ctx
 }
 
-// currentValidationDetail returns the drilled rule's fetched Metadata.
 func (m Model) currentValidationDetail() (sf.ValidationRuleDetail, bool) {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -254,17 +227,12 @@ func validationActionCurrentValue(idx int, det sf.ValidationRuleDetail) string {
 	return ""
 }
 
-// --- shared detail-row builder + render helpers -------------------------
-
-// detailMeta carries a Resource's render-relevant state.
 type detailMeta struct {
 	FetchedAt time.Time
 	Busy      bool
 	Err       error
 }
 
-// detailRowBuilder accumulates detailRow values with consistent
-// styling. Shared by the three registry-backed detail surfaces.
 type detailRowBuilder struct {
 	rows  []detailRow
 	inner int
@@ -282,8 +250,6 @@ func (b *detailRowBuilder) dim(s string) {
 	b.rows = append(b.rows, detailRow{Text: dimLine(s, b.inner)})
 }
 
-// kv adds a navigable key/value row wired to action (noAction =
-// read-only). Long values truncate to one line.
 func (b *detailRowBuilder) kv(k, val string, action int) {
 	b.rows = append(b.rows, detailRow{
 		Text:      kvLine(k, dashIfEmpty(val), b.inner),
@@ -292,8 +258,6 @@ func (b *detailRowBuilder) kv(k, val string, action int) {
 	})
 }
 
-// kvWrapped is like kv but for the long free-text fields (error
-// message, formula, description) — still one navigable row, truncated.
 func (b *detailRowBuilder) kvWrapped(k, val string, action int) {
 	display := val
 	if display == "" {
@@ -319,8 +283,6 @@ func (b *detailRowBuilder) dangerSection(label string, action int) {
 	})
 }
 
-// detailNavIndex returns the absolute row indices of the navigable
-// rows, in order.
 func detailNavIndex(rows []detailRow) []int {
 	var idx []int
 	for i, row := range rows {
@@ -331,8 +293,6 @@ func detailNavIndex(rows []detailRow) []int {
 	return idx
 }
 
-// detailActionForCursor maps a navigable-row cursor to the action it
-// fires, or (noAction, false) for read-only / out-of-range.
 func detailActionForCursor(rows []detailRow, cur int) (int, bool) {
 	navAbs := detailNavIndex(rows)
 	if cur < 0 || cur >= len(navAbs) {
@@ -345,10 +305,6 @@ func detailActionForCursor(rows []detailRow, cur int) (int, bool) {
 	return row.ActionIdx, true
 }
 
-// renderDetailRows lays out the detail rows with cursor highlighting,
-// scrolling the view to keep the cursored row visible when the row set
-// is taller than height. curNav is the navigable-row cursor; active
-// brightens the bar when the pane has focus.
 func renderDetailRows(rows []detailRow, curNav int, active bool, inner, height int) string {
 	navAbs := detailNavIndex(rows)
 	if curNav < 0 {
@@ -368,13 +324,6 @@ func renderDetailRows(rows []detailRow, curNav int, active bool, inner, height i
 	return scrollLinesToCursor(out, cursorRow, height)
 }
 
-// scrollLinesToCursor returns a viewport slice of lines that keeps the
-// row at cursorAbs visible, given height visible lines. When the
-// content fits, all lines are returned unchanged. Uses the same
-// 1/3-from-top bias as the list scroller so the feel matches other
-// surfaces. A scroll affordance ("· N more ↑/↓") replaces the first /
-// last visible line when content is clipped in that direction, so the
-// user can tell the view is windowed.
 func scrollLinesToCursor(lines []string, cursorAbs, height int) string {
 	n := len(lines)
 	if height <= 0 || n <= height {
@@ -386,8 +335,6 @@ func scrollLinesToCursor(lines []string, cursorAbs, height int) string {
 	}
 	start, end := scrollWindow(sel, n, height)
 	win := append([]string(nil), lines[start:end]...)
-	// Replace the top / bottom line with a "more" marker when clipped,
-	// so the windowing is visible without stealing extra height.
 	if start > 0 && len(win) > 0 {
 		win[0] = sideDim(fmt.Sprintf("  ↑ %d more", start), 9999)
 	}
@@ -397,12 +344,6 @@ func scrollLinesToCursor(lines []string, cursorAbs, height int) string {
 	return strings.Join(win, "\n")
 }
 
-// scrollLinesKeepTop is a top-anchored variant of scrollLinesToCursor:
-// it keeps row 0 visible until the cursor would fall below the bottom
-// of the window, then scrolls just enough to keep the cursor on screen
-// (no 1/3-from-top bias). Used by surfaces with a tall fixed header
-// (the /home logo) where snapping the cursor to 1/3 would hide the
-// header on first paint even though nothing needs scrolling yet.
 func scrollLinesKeepTop(lines []string, cursorAbs, height int) string {
 	n := len(lines)
 	if height <= 0 || n <= height {
@@ -431,7 +372,6 @@ func scrollLinesKeepTop(lines []string, cursorAbs, height int) string {
 	if end > n {
 		end = n
 	}
-	// If scrolling up put the cursor on the top marker row, nudge down.
 	if start > 0 && cursorAbs == start {
 		start++
 		end = start + height
@@ -468,7 +408,6 @@ func renderDetailLine(row detailRow, cursored, active bool, inner int) string {
 		if row.Danger {
 			hintTxt = "  ⚠ ↵ delete"
 		} else if row.ActionIdx == 0 {
-			// First action on these surfaces is the active/status toggle.
 			hintTxt = "  ↵ toggle"
 		}
 		if row.Locked {

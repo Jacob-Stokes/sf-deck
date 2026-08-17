@@ -3,7 +3,6 @@ package sf
 import "testing"
 
 func TestDemoTargetRegistry(t *testing.T) {
-	// Clean slate for isolation.
 	UnregisterDemoTargets("demo-alias", "demo@x.example")
 
 	if isDemoTarget("demo-alias") {

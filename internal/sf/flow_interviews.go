@@ -5,16 +5,6 @@ import (
 	"time"
 )
 
-// flow_interviews.go — reader for the FlowInterview standard object.
-//
-// FlowInterview holds every in-flight or stuck flow run: interviews
-// waiting on a Pause element, and — more usefully — interviews that
-// ERRORED mid-run and are sitting there invisible. The web UI buries
-// these under Setup > Paused Flow Interviews; nobody sees an errored
-// interview until a user complains something didn't happen. Surfacing
-// them as a live, status-filterable list (with the CurrentElement the
-// run died on) turns a silent backlog into something you can triage.
-
 // FlowInterviewRow is one in-flight / paused / errored flow run.
 type FlowInterviewRow struct {
 	ID          string

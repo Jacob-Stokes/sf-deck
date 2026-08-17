@@ -30,9 +30,6 @@ func (m Model) renderPermsDashboard(w, innerH int) string {
 	strip := renderSubtabStrip(subs, sel, w-4)
 	body := innerH - subtabReserve(strip)
 
-	// Chip dashboard for the active subtab (PermSets/PSGs/Profiles).
-	// Built from the subtab's chip registry + the synthetic project
-	// chip when an org-project is loaded with members of that kind.
 	var chipDash string
 	switch subs[sel].ID {
 	case SubtabPermSets:
@@ -74,9 +71,6 @@ func (m Model) renderPermsDashboard(w, innerH int) string {
 	return strings.Join(parts, "\n")
 }
 
-// renderPermsChipDashboard wraps the standard chip dashboard for the
-// /perms subtabs. Returns "" when the registry has no rows yet (empty
-// strip wouldn't add information).
 func (m Model) renderPermsChipDashboard(domain chipDomain, sel, inner int) string {
 	chips := m.stripRows(domain, "*")
 	if len(chips) == 0 {

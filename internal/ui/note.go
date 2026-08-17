@@ -3,16 +3,6 @@ package ui
 // Item notes — one free-text note per cursored item, stored locally in
 // the devproject store (same (kind, ref, org) identity as tags, no
 // project membership needed).
-//
-//   q-n         open the note modal (add / edit; save empty to remove)
-//   sidebar     the cursored item's note renders in a NOTE box —
-//               right ~1/4 of the panel (full height) in stacked mode;
-//               content-sized at the bottom (10-row floor, 1/3 cap) in
-//               beside mode — with a q-n hint when clipped.
-//
-// Lookup is per-frame (the sidebar renders on every tick), so the body
-// read goes through a memo on orgData keyed by item identity + store
-// generation: SQLite is only touched on cursor move or after a write.
 
 import (
 	"strings"
@@ -26,10 +16,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// cursorNoteTarget resolves the cursored item to the (kind, ref, name)
-// identity notes are keyed by. Same resolution order as collect:
-// Openable first (carries the richer name), Identity fallback for
-// kinds with no Lightning URL.
 func (m Model) cursorNoteTarget() (kind devproject.ItemKind, ref, name string, ok bool) {
 	if target := m.cursorOpenable(); target != nil {
 		if k, r, _, nm, o := devproject.FromOpenable(target); o {

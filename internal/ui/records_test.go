@@ -30,11 +30,8 @@ func TestRecordsRenders(t *testing.T) {
 		Status:      "Connected", LastUsed: time.Now().Format(time.RFC3339),
 	}}
 	mm.focus = focusMain
-	// queryLineHidden defaults to true; this test asserts the SOQL
-	// line IS visible, so flip it back for the assertion below.
 	mm.queryLineHidden = false
 
-	// Picker mode — seed sobjects.
 	d := mm.ensureOrgDataRef("u@t.com")
 	d.Tab = TabRecords
 	sobs := []sf.SObject{{Name: "Account", Label: "Account", IsCustomizable: true}}
@@ -53,7 +50,6 @@ func TestRecordsRenders(t *testing.T) {
 		t.Error("picker mode should list Account")
 	}
 
-	// Record-list mode — drill into Account.
 	d.RecordsSObjectCur = "Account"
 	// Default chip is now Recently viewed; pin "Changed" explicitly
 	// so the test exercises the legacy records-list rendering path

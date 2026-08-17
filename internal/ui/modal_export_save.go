@@ -3,17 +3,6 @@ package ui
 // Export save dialog — the second-step modal that runs after the
 // user has picked format/scope on a report (or other) export. It has
 // one required field and one optional field:
-//
-//   1. Save path — single-line text editor pre-populated with the
-//      configured default. User can rename or change directory.
-//   2. Open after save — an optional checkbox, on by default. When set,
-//      sf-deck calls openPath() on the resulting file as soon as
-//      the export completes successfully.
-//
-// Why a dedicated modal type and not a reuse of editModalState: the
-// overwrite check must be race-safe and shared by every file export,
-// while some callers also need the checkbox. A purpose-built form
-// keeps those guarantees in one place.
 
 import (
 	"errors"
@@ -27,35 +16,17 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// exportSaveState is the live state for the save-export modal. The
-// modal owns its own focus cursor (0 = path field, 1 = open
-// checkbox) so tab/shift+tab cycles cleanly without leaking into the
-// surrounding key dispatch. Enter confirms from either focus.
 type exportSaveState struct {
 	Title string
 
-	// Path is the editable save path. Modified in place as the user
-	// types; submitted via Confirm.
-	Path string
-	// pathCursor is the character cursor within Path. Always in
-	// [0, len(Path)].
+	Path       string
 	pathCursor int
 
-	// OpenAfter is the auto-open toggle. True by default.
-	OpenAfter bool
-	// ShowOpenAfter controls whether the open-after-save checkbox is part of
-	// the form. Some exports (for example DevProject reference lists) only
-	// need the shared path validation and overwrite confirmation.
+	OpenAfter     bool
 	ShowOpenAfter bool
 
-	// focus tracks which field has the cursor: 0 = path, 1 = open
-	// toggle (when ShowOpenAfter is true). Confirm is bound to enter on
-	// any focus.
 	focus int
 
-	// Confirm fires on enter (any focus). Receives the final
-	// (path, openAfter) values. The closure is responsible for
-	// dispatching whatever message kicks off the actual export.
 	Confirm func(path string, openAfter bool, overwrite bool) tea.Cmd
 
 	// overwritePath records the path for which the user has seen the
@@ -63,21 +34,15 @@ type exportSaveState struct {
 	// path before Confirm receives overwrite=true.
 	overwritePath string
 
-	// Err is the last validation error (empty path, etc.). Cleared
-	// on the next Confirm attempt.
 	Err string
 }
 
-// openExportSaveModal mounts the modal and returns nil (no async
-// work needed at open time).
 func (m *Model) openExportSaveModal(state exportSaveState) tea.Cmd {
 	state.pathCursor = len([]rune(state.Path)) // rune index, not bytes
 	m.exportSave = &state
 	return nil
 }
 
-// renderExportSaveModal is called from render.go's overlay layer
-// when m.exportSave is non-nil.
 func (m Model) renderExportSaveModal() string {
 	es := m.exportSave
 	if es == nil {
@@ -92,7 +57,6 @@ func (m Model) renderExportSaveModal() string {
 	lines = append(lines, titleStyle.Render(es.Title))
 	lines = append(lines, "")
 
-	// Path field
 	pathLabel := "  Save to"
 	if es.focus == 0 {
 		pathLabel = lipgloss.NewStyle().Foreground(theme.BorderHi).Render("▌") + " Save to"
@@ -108,7 +72,6 @@ func (m Model) renderExportSaveModal() string {
 	lines = append(lines, "")
 
 	if es.ShowOpenAfter {
-		// Checkbox field
 		box := "[ ]"
 		if es.OpenAfter {
 			box = "[x]"
@@ -147,9 +110,6 @@ func (m Model) renderExportSaveModal() string {
 	return box2
 }
 
-// handleExportSaveKey routes keystrokes to the export-save modal
-// when it has focus. Always returns ok=true (the modal swallows
-// unhandled keys so they don't leak to the surface below).
 func (m Model) handleExportSaveKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	es := m.exportSave
 	if es == nil {
@@ -243,18 +203,12 @@ func (m Model) handleExportSaveKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	// Printable input → insert at the cursor when the path field has
-	// focus. KeyPressMsg.Text carries the typed rune(s) (empty for
-	// control/named keys); this covers multi-byte input (é, ü, CJK,
-	// emoji in a folder name) that the old len(key)==1 ASCII check
-	// silently dropped.
 	if es.focus == 0 {
 		if press, ok := msg.(tea.KeyPressMsg); ok && press.Text != "" {
 			es.insertAtCursor(press.Text)
 			return m, nil
 		}
 	}
-	// Swallow anything else so it doesn't leak to the surface below.
 	return m, nil
 }
 
@@ -278,7 +232,6 @@ func (es *exportSaveState) insertAtCursor(s string) {
 	es.pathCursor += len(ins)
 }
 
-// backspaceAtCursor removes the rune immediately before the cursor.
 func (es *exportSaveState) backspaceAtCursor() {
 	if es.pathCursor <= 0 {
 		return

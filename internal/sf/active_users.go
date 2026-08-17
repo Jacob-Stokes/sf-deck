@@ -7,22 +7,7 @@ import (
 )
 
 // active_users.go — "who's active right now", derived from AuthSession.
-//
-// Salesforce keeps a live row per session in AuthSession. It's queryable
-// but almost nobody looks — the web UI has no "who's online" view. One
-// person shows MANY sessions (every UI framework spins its own: Aura,
-// Visualforce, OAuth, …), so a raw session list reads as a crowd when
-// it's a handful of people. We therefore GROUP BY USER here: one row per
-// person, represented by their most-recent session, with a session count
-// and an "any session skipped MFA" rollup.
-//
-// Caveat baked into the model: a session lingers until timeout (up to
-// ~2h after last activity), so "active" means "has a live session", not
-// "clicking right now". LastActive (newest LastModifiedDate) is the best
-// presence proxy; the "Recently active" chip narrows to a tight window.
 
-// activeSessionTypes is the base scope: UI-family sessions plus API /
-// OAuth integration sessions, so the API/integration chip has data.
 var activeSessionTypes = []string{
 	"UI", "Aura", "Visualforce", "UIFrontdoor", "TempUIFrontdoor",
 	"API", "Oauth2", "SAML",
@@ -45,16 +30,8 @@ type ActiveUserRow struct {
 	AnyLowMFA     bool      // true if ANY of the user's sessions is LOW security
 	IsAPI         bool      // true if the representative session is an API/integration type
 
-	// freshnessMinutes is minutes since LastActive, stamped at fetch
-	// time so the "Recently active" chip can filter (Where RecentMinutes
-	// <= 15) without needing the wall-clock at match time. Internal
-	// filter aid, not a displayed column.
 	freshnessMinutes int
 
-	// repIsReal marks that the representative session is a real
-	// (UI/browser) session rather than an API/internal one — so the
-	// grouping only upgrades the representative once, on the first real
-	// session it sees. Internal bookkeeping.
 	repIsReal bool
 }
 
@@ -83,8 +60,6 @@ func (r ActiveUserRow) Field(name string) (any, bool) {
 		return r.AnyLowMFA, true
 	case "IsAPI":
 		return r.IsAPI, true
-	// RecentMinutes lets a chip say "active within the last N minutes"
-	// (Where RecentMinutes <= 15), using the fetch-time-stamped value.
 	case "RecentMinutes":
 		return r.freshnessMinutes, true
 	}
@@ -143,10 +118,6 @@ func ActiveUsers(target string, now time.Time) ([]ActiveUserRow, error) {
 	return groupSessionsByUser(q.Records, now), nil
 }
 
-// groupSessionsByUser collapses raw session rows into one row per user.
-// Records arrive newest-first (ORDER BY LastModifiedDate DESC), so the
-// FIRST session seen for a user is their representative (newest) one;
-// later sessions only bump the count and the AnyLowMFA rollup.
 func groupSessionsByUser(records []map[string]any, now time.Time) []ActiveUserRow {
 	byUser := map[string]*ActiveUserRow{}
 	order := []string{}
@@ -170,8 +141,6 @@ func groupSessionsByUser(records []map[string]any, now time.Time) []ActiveUserRo
 			if low {
 				existing.AnyLowMFA = true
 			}
-			// LastActive tracks the NEWEST activity across all of the
-			// user's sessions, independent of which one represents them.
 			if last.After(existing.LastActive) {
 				existing.LastActive = last
 				if !last.IsZero() {
@@ -223,17 +192,12 @@ func groupSessionsByUser(records []map[string]any, now time.Time) []ActiveUserRo
 	for _, uid := range order {
 		out = append(out, *byUser[uid])
 	}
-	// order already reflects newest-first (records were sorted), but be
-	// explicit so the contract survives a fetch-order change.
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].LastActive.After(out[j].LastActive)
 	})
 	return out
 }
 
-// formatGeo composes a compact "City, ISO" location from a session's
-// LoginGeo relationship. City is often null even when the country
-// resolves, so we degrade gracefully: "Manchester, GB" → "GB" → "".
 func formatGeo(rec map[string]any) string {
 	geo, ok := rec["LoginGeo"].(map[string]any)
 	if !ok {

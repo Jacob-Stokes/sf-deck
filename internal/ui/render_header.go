@@ -1,24 +1,5 @@
 package ui
 
-// Top chrome row: the persistent header bar at the top of the TUI.
-//
-// Rendered as two rows (filled bar + separator) so the body sits between
-// two persistent chrome rows (this + the status bar at the bottom).
-// Three zones, all driven by Model state:
-//
-//   LEFT    logo · org pill · view/breadcrumb
-//   MIDDLE  live activity ("⟳ syncing X…" / red error)
-//   RIGHT   tooling badge · API usage · clock
-//
-// Narrowing policy:
-//   width < 110  → drop the sf-deck API count
-//   width < 100  → drop clock
-//   width < 95   → drop "refreshed Xm ago"
-//   width < 90   → drop API bar
-//   width < 70   → drop middle activity (errors still surface via banner)
-//
-// Left segment truncates last so ambient info stays visible.
-
 import (
 	"fmt"
 	"image/color"
@@ -54,8 +35,6 @@ func (m Model) renderHeader() string {
 
 	left := logo + " " + title
 	if Demo {
-		// Always-on badge so no frame of a recording (or a trial
-		// session) can be mistaken for a real org connection.
 		left += " " + lipgloss.NewStyle().
 			Foreground(theme.Bg).
 			Background(theme.Magenta).
@@ -65,8 +44,6 @@ func (m Model) renderHeader() string {
 	if pill := m.headerOrgPill(); pill != "" {
 		left += "  " + pill
 	}
-	// Loaded-project navigation lives in renderRightNavPills; the header
-	// remains focused on org identity.
 	if crumb := m.headerBreadcrumb(); crumb != "" {
 		left += "  " + theme.Subtle.Render("·") + "  " + crumb
 	}
@@ -74,8 +51,6 @@ func (m Model) renderHeader() string {
 	middle := m.headerActivity()
 	right := m.headerRight()
 
-	// Narrowing — drop the least essential bits first so ambient info
-	// stays visible on tight terminals.
 	if m.width < 110 {
 		right = stripUsage(right)
 	}
@@ -98,13 +73,9 @@ func (m Model) renderHeader() string {
 		Background(theme.Panel).
 		Width(m.width).
 		MaxWidth(m.width)
-	// No separator row below the header — the tab bar (render_tabs.go)
-	// sits directly underneath and provides its own visual boundary.
 	return style.Render(bar)
 }
 
-// headerOrgPill renders the selected org as a status-colored pill:
-// e.g. " ● acme-dev  DEV ".
 func (m Model) headerOrgPill() string {
 	if len(m.orgs) == 0 {
 		if m.orgsRes.Busy() {
@@ -120,7 +91,6 @@ func (m Model) headerOrgPill() string {
 	}
 	name := lipgloss.NewStyle().Foreground(theme.Fg).Bold(true).Render(label)
 
-	// Org-kind badge.
 	var badgeFg, badgeBg color.Color
 	var badgeText string
 	switch {
@@ -154,11 +124,6 @@ func (m Model) headerOrgPill() string {
 	lvl := m.safetyFor(o)
 	safetyBadge := renderSafetyPill(lvl)
 
-	// "0 orgs" — the focus-orgs key, advertised where the org
-	// identity lives now that the footer hint moved out of the bar.
-	// Keycap + dim label, same chip language as the footer, so the
-	// bare key isn't cryptic ("what does 0 do?" — field feedback
-	// 2026-06-12 on the label-less first version).
 	keycap := lipgloss.NewStyle().
 		Foreground(theme.Fg).
 		Background(theme.Border).
@@ -166,9 +131,6 @@ func (m Model) headerOrgPill() string {
 		Render(" " + firstPretty(Keys.FocusOrgs) + " ")
 	keyLabel := lipgloss.NewStyle().Foreground(theme.Muted).Render("orgs")
 
-	// "; cmd" — command-menu key, paired with the orgs hint so the two
-	// primary cross-cutting affordances live together and the footer stays
-	// available for tab-local hints.
 	cmdKeycap := lipgloss.NewStyle().
 		Foreground(theme.Fg).
 		Background(theme.Border).
@@ -205,9 +167,6 @@ func renderSafetyPill(lvl settings.SafetyLevel) string {
 		Render(lvl.Label())
 }
 
-// headerBreadcrumb renders "view › segment › segment" with the view name
-// colored magenta. Per-view logic reaches into whatever state carries
-// the "current drill target" for that view.
 func (m Model) headerBreadcrumb() string {
 	view := lipgloss.NewStyle().
 		Foreground(theme.Magenta).
@@ -222,9 +181,6 @@ func (m Model) headerBreadcrumb() string {
 	return out
 }
 
-// resolveBreadcrumb walks the spec resolver chain (subtab → tab) and
-// returns the first non-nil Breadcrumb closure's segment list. Empty
-// when no resolver applies — the header still renders the tab name.
 func (m Model) resolveBreadcrumb() []string {
 	spec, sub := m.activeSpec()
 	if sub != nil && sub.Breadcrumb != nil {
@@ -236,8 +192,6 @@ func (m Model) resolveBreadcrumb() []string {
 	return nil
 }
 
-// headerActivity renders the "what's happening right now" middle zone.
-// Empty when nothing is active, so narrow terminals collapse gracefully.
 func (m Model) headerActivity() string {
 	var parts []string
 
@@ -264,7 +218,6 @@ func (m Model) headerActivity() string {
 	return strings.Join(parts, "   ")
 }
 
-// headerRight renders the ambient-info right zone.
 func (m Model) headerRight() string {
 	var parts []string
 
@@ -299,14 +252,10 @@ func (m Model) headerRight() string {
 		parts = append(parts, fresh)
 	}
 
-	// Notifications indicator — sits just before the API summary on the
-	// top line so unread org notifications are always in view.
 	if notif := m.headerNotifications(); notif != "" {
 		parts = append(parts, notif)
 	}
 
-	// "API calls today" combines sf-deck's count with the org quota in one
-	// label.
 	if api := m.headerAPISummary(); api != "" {
 		parts = append(parts, api)
 	}
@@ -314,11 +263,6 @@ func (m Model) headerRight() string {
 	return strings.Join(parts, "   ")
 }
 
-// headerFreshness surfaces the current view's primary resource's
-// fetch age ("loaded 3m ago"). Picked per-tab/subtab so drilling
-// into a field shows the describe's age; drilling into a trigger
-// shows the trigger body's age. Returns "" when the view doesn't
-// have a single obvious primary resource yet (SOQL, projects, etc).
 func (m Model) headerFreshness() string {
 	t := m.primaryFetchedAt()
 	if t.IsZero() {
@@ -329,13 +273,6 @@ func (m Model) headerFreshness() string {
 	return label + " " + age
 }
 
-// primaryFetchedAt returns the fetch time of whichever resource is
-// the "main data on screen" for the current view. Returns zero time
-// when the view doesn't map to a single resource or nothing's loaded.
-//
-// Drives off TabSpec.PrimaryFetchedAt (subtab variant takes precedence)
-// — see internal/ui/tab_registry.go for the hook. Each tab registers a
-// one-liner there instead of a case arm here.
 func (m Model) primaryFetchedAt() time.Time {
 	if len(m.orgs) == 0 {
 		return time.Time{}
@@ -354,16 +291,6 @@ func (m Model) primaryFetchedAt() time.Time {
 	return time.Time{}
 }
 
-// headerAPISummary combines sf-deck's own call count for today with
-// the org's DailyApiRequests quota into one label:
-//
-//	"API calls today · sf-deck: 59 · org: 151.8k/15.6m"
-//
-// Either half is optional — when no usage tracker is installed the
-// sf-deck count drops; when Home data hasn't loaded the org quota
-// drops; both missing returns "". The org figure colour-codes by
-// quota usage (green / yellow / red) so a glance still flags
-// "you're burning through this org's daily budget."
 func (m Model) headerAPISummary() string {
 	if len(m.orgs) == 0 {
 		return ""
@@ -371,10 +298,6 @@ func (m Model) headerAPISummary() string {
 	muted := lipgloss.NewStyle().Foreground(theme.Muted)
 	mine := ""
 	if Usage != nil {
-		// Count under BOTH the org's short alias and its username — calls
-		// get recorded under either depending on the code path (e.g.
-		// /compare records under the username), so summing both keys keeps
-		// the counter honest.
 		o := m.orgs[m.selected]
 		if n := Usage.TodayForOrgKeys(o.Alias, o.Username); n > 0 {
 			val := lipgloss.NewStyle().Foreground(theme.Cyan).Bold(true).Render(shortCount(n))
@@ -470,9 +393,6 @@ func currentTabSyncingLabel(m Model, _ Tab, d *orgData, soqlRunning bool) string
 	return label
 }
 
-// currentTabError returns the most relevant error for the active
-// view, or "" if none. Resolves through TabSpec.ErrorLabel /
-// SubtabSpec.ErrorLabel.
 func currentTabError(m Model) string {
 	if len(m.orgs) == 0 {
 		// The /home onboarding panel handles the "no orgs / sf
@@ -491,8 +411,6 @@ func currentTabError(m Model) string {
 	}
 	return ""
 }
-
-// --- layout primitives (composeBar + narrow-strippers) ------------------
 
 // composeBar lays out left / middle / right into exactly `width` visible
 // columns (including 1-col gutters on each end). Truncates left first
@@ -521,13 +439,11 @@ func composeBar(width int, left, middle, right string) string {
 	// width — was crowding the status out.
 	const minLeft = 4 // room for at least "x…" of breadcrumb
 	if middle != "" && lw+mw+rw+2 > avail {
-		// Can middle survive if we shrink left to its floor?
 		if minLeft+mw+rw+2 <= avail {
 			keep := avail - mw - rw - 2
 			left = ansi.Truncate(left, keep, "…")
 			lw = ansi.StringWidth(left)
 		} else {
-			// Not even a stub of left fits alongside middle — drop middle.
 			middle = ""
 			mw = 0
 		}
@@ -568,9 +484,6 @@ func composeBar(width int, left, middle, right string) string {
 	return strings.Repeat(" ", gutter) + body + strings.Repeat(" ", gutter)
 }
 
-// stripAPIBar removes the API segment from the right zone when the
-// terminal is too narrow to show it. Identified by literal "API "
-// substring in the segment's visible text.
 func stripAPIBar(right string) string {
 	parts := strings.Split(right, "   ")
 	out := parts[:0]
@@ -583,8 +496,6 @@ func stripAPIBar(right string) string {
 	return strings.Join(out, "   ")
 }
 
-// stripUsage drops the "sf-deck NNN" count segment. Identified by the
-// literal "sf-deck" substring.
 func stripUsage(right string) string {
 	parts := strings.Split(right, "   ")
 	out := parts[:0]
@@ -597,8 +508,6 @@ func stripUsage(right string) string {
 	return strings.Join(out, "   ")
 }
 
-// stripFreshness drops the "refreshed Xm ago" segment. Identified
-// by the "refreshed" label substring.
 func stripFreshness(right string) string {
 	parts := strings.Split(right, "   ")
 	out := parts[:0]
@@ -611,7 +520,6 @@ func stripFreshness(right string) string {
 	return strings.Join(out, "   ")
 }
 
-// stripClock drops the clock (always the last segment).
 func stripClock(right string) string {
 	parts := strings.Split(right, "   ")
 	if len(parts) <= 1 {
@@ -620,7 +528,6 @@ func stripClock(right string) string {
 	return strings.Join(parts[:len(parts)-1], "   ")
 }
 
-// shortCount formats large integers as 1.2k / 3.4m so "API 412/15k" fits.
 func shortCount(n int) string {
 	switch {
 	case n >= 1_000_000:
@@ -634,12 +541,6 @@ func shortCount(n int) string {
 		return fmt.Sprintf("%d", n)
 	}
 }
-
-// --- header-freshness hooks (PrimaryFetchedAt) ---------------------------
-//
-// Extracted per the registry purity rule (closures max 5 lines). Each
-// resolves the drilled-in entity's own resource, falling back to the
-// list the row came from where that's the honest age.
 
 func deployDetailFetchedAt(m Model, d *orgData) time.Time {
 	if r, ok := d.DeployDetailMap[d.DeployCur]; ok && r != nil {
@@ -655,8 +556,6 @@ func apexDetailFetchedAt(m Model, d *orgData) time.Time {
 	return d.ApexClasses.FetchedAt()
 }
 
-// componentsDetailFetchedAt mirrors renderComponentsDetail's kind pick:
-// presence in the AuraDetail map wins (LWCCur holds either kind's Id).
 func componentsDetailFetchedAt(m Model, d *orgData) time.Time {
 	if r, ok := d.AuraDetail[d.LWCCur]; ok && r != nil {
 		return r.FetchedAt()
@@ -688,8 +587,6 @@ func communityDetailFetchedAt(m Model, d *orgData) time.Time {
 	return d.Community.FetchedAt()
 }
 
-// allUsersFetchedAt: the All-users subtab is chip-driven — the age is
-// the ACTIVE chip's resource, matching what's actually on screen.
 func allUsersFetchedAt(m Model, d *orgData) time.Time {
 	if r, ok := d.ChipUsers[activeUsersChipID(d)]; ok && r != nil {
 		return r.FetchedAt()

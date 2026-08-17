@@ -105,20 +105,16 @@ CREATE TABLE IF NOT EXISTS kv (
 );
 `
 
-// --- org list cache -------------------------------------------------------
-
 type OrgRow struct {
-	Username    string
-	Alias       string
-	InstanceURL string
-	OrgID       string
-	IsSandbox   bool
-	IsScratch   bool
-	IsDevHub    bool
-	Status      string
-	LastUsed    string
-	// ExpirationDate (scratch only) + the sf CLI default markers —
-	// see sf.Org for semantics.
+	Username        string
+	Alias           string
+	InstanceURL     string
+	OrgID           string
+	IsSandbox       bool
+	IsScratch       bool
+	IsDevHub        bool
+	Status          string
+	LastUsed        string
 	ExpirationDate  string
 	IsDefault       bool
 	IsDefaultDevHub bool
@@ -197,12 +193,6 @@ func (c *Cache) GetOrgs() ([]OrgRow, time.Time, error) {
 	return out, t, rows.Err()
 }
 
-// --- generic per-org JSON kv ---------------------------------------------
-//
-// Use for anything else we want to cache per org — sobject lists, field
-// descriptions, counts, recent deploys. Keeps the schema thin while we're
-// still figuring out what's worth storing relationally.
-
 func (c *Cache) PutJSON(orgUsername, key string, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -276,8 +266,6 @@ func (c *Cache) ClearAll() (int, error) {
 	// is safe to issue directly. Reclaims the on-disk space the deleted
 	// blobs occupied (otherwise the file stays ~37MB of free pages).
 	if _, err := c.db.Exec(`VACUUM`); err != nil {
-		// Rows are already gone; a failed VACUUM only means the file
-		// didn't shrink. Report it but don't pretend nothing cleared.
 		return int(n), fmt.Errorf("cache cleared (%d rows) but VACUUM failed: %w", n, err)
 	}
 	return int(n), nil

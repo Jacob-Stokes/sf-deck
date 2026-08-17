@@ -71,7 +71,6 @@ func TestListViewSetSameSliceKeepsCursor(t *testing.T) {
 		t.Fatalf("after re-Set(same slice) Cursor() = %d, want 2 (cursor wiped)", got)
 	}
 
-	// A genuinely new slice still resets — Set's documented behaviour.
 	lv.Set([]int{1, 2, 3, 4})
 	if got := lv.Cursor(); got != 0 {
 		t.Fatalf("after Set(new slice) Cursor() = %d, want 0", got)
@@ -158,8 +157,6 @@ func TestListViewOrderAppliesAfterRelevance(t *testing.T) {
 	lv.Search.SetBuffer("x")
 	lv.Search.Active = true
 	lv.SetOrder(func(items []string) []int {
-		// Relevance would produce ccc, bb, a. This order then puts
-		// the shortest displayed row first.
 		return []int{2, 1, 0}
 	}, "short-first")
 	got := lv.Filtered()

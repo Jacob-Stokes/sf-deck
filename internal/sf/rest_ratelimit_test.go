@@ -27,8 +27,6 @@ func TestRateLimitClassifiers(t *testing.T) {
 		t.Error("non-daily-limit classified as daily-limit")
 	}
 
-	// classifyQueryErr wraps only the daily-limit case with a clear message,
-	// preserving the original via errors.Is/unwrap.
 	wrapped := classifyQueryErr(daily)
 	if !strings.Contains(wrapped.Error(), "daily API request limit") {
 		t.Errorf("daily-limit error not clarified: %v", wrapped)

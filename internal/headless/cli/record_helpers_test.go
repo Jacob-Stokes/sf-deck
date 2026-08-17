@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// kvFlag is the repeated --field K=V flag handler shared by
-// record.create / record.update. Pure value type — test in
-// isolation.
-
 func TestKVFlag_AcceptsPairs(t *testing.T) {
 	var k kvFlag
 	for _, s := range []string{"Name=Acme", "Industry=Logistics", "Phone=555-0100"} {
@@ -55,7 +51,6 @@ func TestKVFlag_RepeatedKeyOverwrites(t *testing.T) {
 }
 
 func TestKVFlag_ValueWithEquals(t *testing.T) {
-	// Values may contain '=' (e.g. base64 padding) — we split on the FIRST '='.
 	var k kvFlag
 	if err := k.Set("Token=abc=def="); err != nil {
 		t.Fatal(err)
@@ -95,8 +90,6 @@ func TestKVFlag_KeysExtractor(t *testing.T) {
 		t.Errorf("keys = %v", keys)
 	}
 }
-
-// ----- record CLI validation -----
 
 func TestRecordUpdate_MissingIDFails(t *testing.T) {
 	a := newTestApp()

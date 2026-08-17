@@ -1,9 +1,5 @@
 package ui
 
-// /meta list surfaces: the Browse type catalogue + per-type component
-// list, and the six rich subtabs. All spec-derived; no chips (search
-// via / covers filtering needs at these list sizes).
-
 import (
 	"fmt"
 
@@ -11,8 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/tablemodel"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
-
-// --- Browse: type catalogue -----------------------------------------------
 
 func metaTypesColumnSchema() tablemodel.Schema[sf.MetadataTypeInfo] {
 	return tablemodel.Schema[sf.MetadataTypeInfo]{
@@ -50,8 +44,6 @@ var metaTypesTableSpec = ListViewTableSpec[sf.MetadataTypeInfo]{
 }
 
 var metaTypesListSurface = listSurfaceFromSpec(metaTypesTableSpec)
-
-// --- Browse: drilled type's components --------------------------------------
 
 func metaTypeItemsColumnSchema() tablemodel.Schema[sf.MetadataItem] {
 	return tablemodel.Schema[sf.MetadataItem]{
@@ -92,8 +84,6 @@ var metaTypeItemsTableSpec = ListViewTableSpec[sf.MetadataItem]{
 
 var metaTypeItemsListSurface = listSurfaceFromSpec(metaTypeItemsTableSpec)
 
-// --- Custom Labels -----------------------------------------------------------
-
 func customLabelColumnSchema() tablemodel.Schema[sf.CustomLabelRow] {
 	return tablemodel.Schema[sf.CustomLabelRow]{
 		DefaultColumns: func(scope string) []string {
@@ -127,8 +117,6 @@ var customLabelsTableSpec = ListViewTableSpec[sf.CustomLabelRow]{
 }
 
 var customLabelsListSurface = listSurfaceFromSpec(customLabelsTableSpec)
-
-// --- Custom Metadata types + Custom Settings (shared schema) ----------------
 
 func metaEntityColumnSchema() tablemodel.Schema[sf.MetaEntityRow] {
 	return tablemodel.Schema[sf.MetaEntityRow]{
@@ -170,8 +158,6 @@ var customSettingsTableSpec = ListViewTableSpec[sf.MetaEntityRow]{
 
 var customSettingsListSurface = listSurfaceFromSpec(customSettingsTableSpec)
 
-// --- Static Resources --------------------------------------------------------
-
 func staticResourceColumnSchema() tablemodel.Schema[sf.StaticResourceRow] {
 	return tablemodel.Schema[sf.StaticResourceRow]{
 		DefaultColumns: func(scope string) []string {
@@ -204,8 +190,6 @@ var staticResourcesTableSpec = ListViewTableSpec[sf.StaticResourceRow]{
 
 var staticResourcesListSurface = listSurfaceFromSpec(staticResourcesTableSpec)
 
-// --- Named Credentials --------------------------------------------------------
-
 func namedCredColumnSchema() tablemodel.Schema[sf.NamedCredentialRow] {
 	return tablemodel.Schema[sf.NamedCredentialRow]{
 		DefaultColumns: func(scope string) []string {
@@ -233,8 +217,6 @@ var namedCredsTableSpec = ListViewTableSpec[sf.NamedCredentialRow]{
 }
 
 var namedCredsListSurface = listSurfaceFromSpec(namedCredsTableSpec)
-
-// --- Remote Sites --------------------------------------------------------------
 
 func remoteSiteColumnSchema() tablemodel.Schema[sf.RemoteSiteRow] {
 	return tablemodel.Schema[sf.RemoteSiteRow]{

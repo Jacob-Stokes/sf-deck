@@ -1,21 +1,6 @@
 package ui
 
 // Chip scope chooser — a small flow that picks a settings.ChipShare.
-//
-// Called from three places (all wire up the same way):
-//   - chip wizard, when creating a new chip (initial = single active org)
-//   - chip wizard, when editing an existing chip's scope (initial = current)
-//   - manage-chips "other orgs" sub-modal, "Add to scope…" action
-//
-// Flow:
-//   1. KIND picker (choiceModal): This org / These orgs / Org group / Global.
-//   2a. If "These orgs":   multi-select org picker.
-//   2b. If "Org group":    single-select group picker.
-//   2c. If "This org" or "Global": no sub-picker — result is final.
-//   3. A chipScopeChosenMsg applies the resulting ChipShare on Update.
-//
-// The chooser deliberately uses messages instead of callbacks for
-// committing, because choiceModal Save runs inside a tea.Cmd goroutine.
 
 import (
 	"fmt"
@@ -32,7 +17,6 @@ const (
 	chipScopeTargetOtherOrg chipScopeTargetKind = "other_org"
 )
 
-// chipScopeTarget identifies where a chosen share should be applied.
 type chipScopeTarget struct {
 	kind   chipScopeTargetKind
 	domain chipDomain
@@ -99,9 +83,6 @@ func (m *Model) openChipScopeChooser(
 	return m.openChoiceModal(state)
 }
 
-// applyChipScopeKindPicked takes the kind the user picked at step 1 and
-// either resolves the share immediately (org/global) or opens the
-// matching sub-picker (orgs/group), always on the Update goroutine.
 func (m *Model) applyChipScopeKindPicked(msg chipScopeKindPickedMsg) tea.Cmd {
 	switch msg.kind {
 	case settings.ChipShareOrg:
@@ -121,8 +102,6 @@ func (m *Model) applyChipScopeKindPicked(msg chipScopeKindPickedMsg) tea.Cmd {
 		return chipScopeChosenCmd(settings.ChipShare{Kind: settings.ChipShareGlobal}, msg.target)
 
 	case settings.ChipShareOrgs:
-		// Multi-select org picker; preselect current orgs if the previous
-		// share already had a list (so editing keeps the user's picks).
 		preselect := map[string]bool{}
 		if msg.initial.Kind == settings.ChipShareOrgs || msg.initial.Kind == settings.ChipShareOrg {
 			for _, u := range msg.initial.Orgs {
@@ -139,8 +118,6 @@ func (m *Model) applyChipScopeKindPicked(msg chipScopeKindPickedMsg) tea.Cmd {
 			Items: items,
 			OnCommit: func(picked []string) tea.Cmd {
 				if len(picked) == 0 {
-					// No orgs ticked → treat as cancel rather than orphaning
-					// the chip. Caller keeps its pre-chooser state intact.
 					return nil
 				}
 				return chipScopeChosenCmd(settings.ChipShare{Kind: settings.ChipShareOrgs, Orgs: picked}, msg.target)
@@ -149,7 +126,6 @@ func (m *Model) applyChipScopeKindPicked(msg chipScopeKindPickedMsg) tea.Cmd {
 		return m.openOrgPicker(state)
 
 	case settings.ChipShareGroup:
-		// Single-select group picker.
 		groups := m.chipScopeGroupOptions()
 		if len(groups) == 0 {
 			m.flash("no org groups defined — create one in Org Manager first")
@@ -189,8 +165,6 @@ func chipScopeChosenCmd(share settings.ChipShare, target chipScopeTarget) tea.Cm
 	}
 }
 
-// applyChipScopeChosen commits the resolved share to the target that
-// opened the chooser. It runs only from Update-side message dispatch.
 func (m *Model) applyChipScopeChosen(msg chipScopeChosenMsg) tea.Cmd {
 	switch msg.target.kind {
 	case chipScopeTargetWizard:
@@ -223,10 +197,6 @@ func (m *Model) applyChipScopeChosen(msg chipScopeChosenMsg) tea.Cmd {
 	return nil
 }
 
-// --- helpers ----------------------------------------------------------
-
-// chipScopeHintThisOrg labels the "This org" option with the active
-// org's friendly name when known, so the user sees what they're picking.
 func chipScopeHintThisOrg(m *Model) string {
 	if u := m.activeOrgUserForChips(); u != "" {
 		if friendly := chipScopeFriendlyOrgName(m, u); friendly != "" {
@@ -237,8 +207,6 @@ func chipScopeHintThisOrg(m *Model) string {
 	return "(no active org)"
 }
 
-// chipScopeHintGroup tells the user how many groups they have, since the
-// group option is only useful with at least one defined.
 func chipScopeHintGroup(m *Model) string {
 	n := len(m.chipScopeGroupOptions())
 	switch n {
@@ -251,8 +219,6 @@ func chipScopeHintGroup(m *Model) string {
 	}
 }
 
-// chipScopeGroupOptHint summarises a group as "N orgs" so the picker
-// communicates its breadth without a giant member list.
 func chipScopeGroupOptHint(g settings.OrgGroupConfig) string {
 	switch len(g.Members) {
 	case 1:
@@ -262,8 +228,6 @@ func chipScopeGroupOptHint(g settings.OrgGroupConfig) string {
 	}
 }
 
-// chipScopeFriendlyOrgName returns the alias when known, else the
-// username. Tiny helper to keep the kind-picker hints human-readable.
 func chipScopeFriendlyOrgName(m *Model, username string) string {
 	for _, o := range m.orgs {
 		if o.Username == username {
@@ -276,8 +240,6 @@ func chipScopeFriendlyOrgName(m *Model, username string) string {
 	return ""
 }
 
-// chipScopeGroupOptions returns the user's org groups in display order
-// — the same source the Org Manager uses, so naming is consistent.
 func (m Model) chipScopeGroupOptions() []settings.OrgGroupConfig {
 	if m.settings == nil {
 		return nil

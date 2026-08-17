@@ -283,9 +283,6 @@ func projectImportBundle(a *app.App, rest []string, stdout io.Writer, mode headl
 	return headless.ExitCodeFor(r)
 }
 
-// writeProjectErr maps service errors → typed headless codes. Three
-// special cases: ErrNotFound → not_found, ErrNotEmpty → invalid_argument
-// (caller can retry with --force), ErrInvalidKind → invalid_argument.
 func writeProjectErr(command string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	var notFound projects.ErrNotFound
 	if errors.As(err, &notFound) {

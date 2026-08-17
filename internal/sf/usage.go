@@ -2,11 +2,6 @@ package sf
 
 import "time"
 
-// Tiny hook point for usage tracking. Keeps `sf/` free of a cache
-// dependency: main wires a `OnCallFunc` at startup and every call
-// (REST direct or sf CLI shell-out) fires it. The UI reads the
-// accumulated count from the usage package directly.
-
 // OnCallFunc is invoked once per completed API call (success OR
 // failure — we count attempts, since every attempt is an API call
 // as far as Salesforce is concerned). `alias` is the org the call
@@ -18,7 +13,6 @@ type OnCallFunc func(alias string, args []string, err error, dur time.Duration)
 // OnCall is the registered hook. Nil by default = no tracking.
 var OnCall OnCallFunc
 
-// fireOnCall safely invokes the hook if one is set.
 func fireOnCall(alias string, args []string, err error, dur time.Duration) {
 	if OnCall != nil {
 		OnCall(alias, args, err, dur)

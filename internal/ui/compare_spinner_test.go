@@ -6,7 +6,6 @@ import (
 )
 
 func TestCompareSpinnerCycles(t *testing.T) {
-	// Spinner advances and wraps with the frame.
 	a := compareSpinner(0)
 	b := compareSpinner(1)
 	if a == b {
@@ -26,7 +25,6 @@ func TestCompareDots(t *testing.T) {
 }
 
 func TestCompareAnimatedBarFilledReflectsProgress(t *testing.T) {
-	// 0 done → no full cells; all done → all full cells.
 	none := compareAnimatedBar(0, 10, 20, 0)
 	if strings.Count(none, "█") != 0 {
 		t.Errorf("0%% bar has %d filled cells, want 0", strings.Count(none, "█"))
@@ -35,7 +33,6 @@ func TestCompareAnimatedBarFilledReflectsProgress(t *testing.T) {
 	if strings.Count(full, "█") != 20 {
 		t.Errorf("100%% bar has %d filled cells, want 20", strings.Count(full, "█"))
 	}
-	// Shimmer moves with the frame in the unfilled track.
 	b0 := compareAnimatedBar(2, 10, 20, 0)
 	b1 := compareAnimatedBar(2, 10, 20, 1)
 	if b0 == b1 {

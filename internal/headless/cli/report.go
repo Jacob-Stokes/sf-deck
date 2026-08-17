@@ -144,15 +144,10 @@ func reportExport(a *app.App, rest []string, stdout io.Writer, mode headless.Wri
 	}
 	switch strings.ToLower(*view) {
 	case "formatted", "details":
-		// ok
 	default:
 		return writeArgErr("report.export",
 			fmt.Errorf("invalid --view %q (want formatted|details)", *view), stdout, mode)
 	}
-	// File format inferred from --output extension. Salesforce only
-	// serves xlsx natively; csv goes through internal/postprocess
-	// which is the TUI's path — not wired through to the headless
-	// flow yet. Restrict to xlsx for now.
 	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(*output), "."))
 	if ext != "xlsx" {
 		return writeArgErr("report.export",

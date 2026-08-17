@@ -1,16 +1,5 @@
 package ui
 
-// Two-zone layout primitives.
-//
-// Several tabs (Objects, Records, the per-sObject detail drills) share
-// a shape: a **dashboard** zone at the top (stats + view chips) and a
-// **listable** zone below (the actual rows). This file holds the
-// shared chip-strip renderer and the helpers tabs call into.
-//
-// Per-tab: each tab declares its own list of chipRow entries and
-// tracks a selected-index in its own Model state. Cycling happens via
-// left/right arrow keys when the main pane is focused.
-
 import (
 	"fmt"
 	"strings"
@@ -21,7 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// chipRow is one predefined filter shown in the dashboard zone.
 type chipRow struct {
 	ID    string // stable identifier (used for keymap / persistence)
 	Label string // user-visible, e.g. "Custom"
@@ -54,19 +42,11 @@ func renderChipStrip(chips []chipRow, selected int, width int, trailingHint stri
 	ellipsis := lipgloss.NewStyle().Foreground(theme.FgDim).Render("…")
 	ellipsisW := ansi.StringWidth(ellipsis)
 
-	// Reserve trailing-hint width up-front so chip fitting accounts
-	// for it. The hint right-aligns to the far edge of the strip
-	// (separated by a stretch of whitespace) rather than sitting
-	// immediately after the last chip — visually a "left = chips,
-	// right = hint" layout. The hint is dropped (returned as "")
-	// when its width would push the chips past the pane.
 	hintStyled := ""
 	hintW := 0
 	if trailingHint != "" {
 		styled := lipgloss.NewStyle().Foreground(theme.FgDim).Render(trailingHint)
 		w := ansi.StringWidth(styled)
-		// Reserve room for the hint + at least 2 cells of breathing
-		// space between it and the rightmost chip.
 		if w+3 < width {
 			hintStyled = styled
 			hintW = w + 2 // +2 for the minimum gap
@@ -96,8 +76,6 @@ func renderChipStrip(chips []chipRow, selected int, width int, trailingHint stri
 		fitEnd = overflowIdx
 	}
 
-	// Greedy fit from the left. If the selected chip would be dropped,
-	// re-run starting from `selected` so it stays visible.
 	fit := func(start int) (end int, needsEllipsis bool) {
 		used := 0
 		for i := start; i < fitEnd; i++ {
@@ -120,8 +98,6 @@ func renderChipStrip(chips []chipRow, selected int, width int, trailingHint stri
 		end, needsEllipsis = fit(selected)
 	}
 
-	// Reserve room for the ellipsis on the right if some chips are
-	// hidden. Shrink `end` until the fit + ellipsis fit in chipBudget.
 	if needsEllipsis {
 		for end > start+1 {
 			used := 0
@@ -148,9 +124,6 @@ func renderChipStrip(chips []chipRow, selected int, width int, trailingHint stri
 	}
 	out := strings.Join(parts, " ")
 	if hintStyled != "" {
-		// Pad the chip cluster out to (width - hintWidth) cells so
-		// the hint ends up flush-right. ansi.StringWidth gives us
-		// the cell count excluding ANSI escapes.
 		chipsW := ansi.StringWidth(out)
 		gap := width - chipsW - ansi.StringWidth(hintStyled)
 		if gap < 2 {
@@ -170,9 +143,6 @@ func renderChip(c chipRow, active bool) string {
 	preview := c.Count == chipRowKindPreview
 	switch {
 	case active && preview:
-		// Active + cross-org preview: cyan background marks it as the
-		// ephemeral row from another org you're peeking at. The label
-		// already carries "(from <org>)" so origin is always visible.
 		return lipgloss.NewStyle().
 			Foreground(theme.Bg).
 			Background(theme.Cyan).
@@ -180,8 +150,6 @@ func renderChip(c chipRow, active bool) string {
 			Padding(0, 1).
 			Render(label)
 	case active && transient:
-		// Active + transient: yellow background says "this is the
-		// session-only chip you're looking at". Press F to pin it.
 		return lipgloss.NewStyle().
 			Foreground(theme.Bg).
 			Background(theme.Yellow).
@@ -196,17 +164,12 @@ func renderChip(c chipRow, active bool) string {
 			Padding(0, 1).
 			Render(label)
 	case preview:
-		// Inactive preview — cyan italic accent so the user can spot
-		// the cross-org peek even when their cursor is elsewhere.
 		return lipgloss.NewStyle().
 			Foreground(theme.Cyan).
 			Italic(true).
 			Padding(0, 1).
 			Render(label)
 	case transient:
-		// Inactive transient — yellow accent so the user can tell at
-		// a glance which chip is the session-only one even when their
-		// cursor is on a different favourite.
 		return lipgloss.NewStyle().
 			Foreground(theme.Yellow).
 			Padding(0, 1).
@@ -234,12 +197,6 @@ func (m Model) renderDashboard(title string, chips []chipRow, selected int, widt
 	}
 	hint := m.viewStripHint()
 
-	// Cache the assembled dashboard string. The chip strip + title
-	// + rule fire on every render but their inputs change rarely:
-	// the chip selection moves on chip-cycle (~once per minute), the
-	// chip composition changes on chip create/delete (rare), the
-	// hint depends on stable tab/sObject context. During scroll
-	// none of these change — same dashboard every frame.
 	if m.renderCache != nil {
 		key := dashboardCacheKey{
 			title:     title,
@@ -268,10 +225,6 @@ func (m Model) renderDashboard(title string, chips []chipRow, selected int, widt
 	return buildDashboard(title, chips, selected, width, hint)
 }
 
-// buildDashboard is the actual rendering body; renderDashboard wraps
-// it with the cache. Split out so the cache miss path stays a one-
-// liner and the no-cache fallback (when renderCache is nil — tests)
-// still has the same logic.
 func buildDashboard(title string, chips []chipRow, selected int, width int, hint string) string {
 	var lines []string
 	if title != "" {
@@ -315,7 +268,6 @@ func hashChipRows(rows []chipRow) uint64 {
 			h *= fnvPrime
 		}
 		h ^= 0xff
-		// Count is int — fold its bits.
 		c := uint64(uint32(r.Count))
 		h ^= c
 		h *= fnvPrime
@@ -324,20 +276,7 @@ func hashChipRows(rows []chipRow) uint64 {
 	return h
 }
 
-// viewStripHint returns the trailing key-hint shown to the right of
-// the chip strip. Records-shaped surfaces get L (source toggle) plus
-// V (manage). /objects, /flows, /users · All users just get V —
-// they're single-source surfaces with no live SF list-view preview
-// mode to toggle into. Empty string for surfaces without a chip-
-// driven view system (defensive — callers only invoke renderDashboard
-// on chip-driven tabs today).
 func (m Model) viewStripHint() string {
-	// Prepend the view-cycle key when the tab has any chip surface at
-	// all. The previous predicate (tabHasDashboard) was a hardcoded
-	// short list — Objects, Records, ObjectDetail, Flows — which
-	// excluded chip-bearing tabs like Apex, Users, Perms, Reports. The
-	// hint is meaningful wherever `[` / `]` actually cycles
-	// something, so drive it from resolveChipSurface() directly.
 	viewCycle := ""
 	if m.resolveChipSurface() != nil {
 		// Separate the two key labels with a spaced "or", not ", " or
@@ -363,11 +302,6 @@ func (m Model) viewStripHint() string {
 	}
 
 	if d, sobj := m.activeRecordsSObject(); sobj != "" {
-		// Append the currently-active mode in dim brackets so the L
-		// keystroke hint conveys "what will I be toggling TO" at a
-		// glance.  Color tracks the mode — Cyan for sf-deck, Yellow
-		// for Salesforce — both rendered with FgDim weight so the
-		// hint sits behind the keycap.
 		modeLabel := "[sf-deck]"
 		modeColor := theme.Cyan
 		if currentChipMode(d, sobj) == ChipModeSalesforce {
@@ -381,9 +315,6 @@ func (m Model) viewStripHint() string {
 			firstPretty(Keys.OpenLensManager)+" manage",
 		)
 	}
-	// Any chip-driven tab (Objects/Flows/Users) gets the manage hint —
-	// driven by TabSpec.Chips presence rather than a hard-coded switch
-	// so adding a new chip-driven tab gets the hint for free.
 	spec := lookupTabSpec(m.tab())
 	if spec == nil {
 		return viewCycle
@@ -391,9 +322,6 @@ func (m Model) viewStripHint() string {
 	if spec.Chips != nil {
 		return join(viewCycle, firstPretty(Keys.OpenLensManager)+" manage")
 	}
-	// Subtab-level Chips (TabUsers' All-users subtab — the other
-	// subtabs don't render a chip strip so renderDashboard isn't
-	// called there).
 	if sub := spec.activeSubtabSpec(m); sub != nil && sub.Chips != nil {
 		return join(viewCycle, firstPretty(Keys.OpenLensManager)+" manage")
 	}

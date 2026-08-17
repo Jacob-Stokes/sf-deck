@@ -5,17 +5,6 @@ package query
 // ("kind") plus the union of fields any concrete node might need.
 // Empty fields are omitted via toml omitempty so the on-disk form
 // stays human-readable.
-//
-// Round-trip flow:
-//
-//	Node          → YAMLFromNode  → NodeYAML (toml)
-//	NodeYAML      → NodeFromYAML  → Node
-//
-// Both directions are total — invalid persisted data converts to a
-// vacuous AndNode (matches everything) rather than panicking, so a
-// hand-edited settings.toml that's slightly wrong never crashes
-// startup. The conversion is paired with debug logging so the
-// failure is visible.
 
 // NodeYAML is the on-disk form of a Node. One concrete shape covers
 // every variant — emitters write only the fields that apply to the
@@ -26,20 +15,12 @@ package query
 type NodeYAML struct {
 	Kind string `toml:"kind"`
 
-	// Compare-only fields.
 	Field string `toml:"field,omitempty"`
 	Op    string `toml:"op,omitempty"`
-	// Value is stored as the concrete go type the AST carries — TOML
-	// handles strings, ints, bools, and []string natively; other
-	// types are rejected at write time. We keep it as `any` so the
-	// reader can decode without prior knowledge, then the converter
-	// validates.
-	Value any `toml:"value,omitempty"`
+	Value any    `toml:"value,omitempty"`
 
-	// And / Or only.
 	Children []NodeYAML `toml:"children,omitempty"`
 
-	// Not only.
 	Child *NodeYAML `toml:"child,omitempty"`
 }
 

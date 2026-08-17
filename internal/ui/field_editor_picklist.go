@@ -2,19 +2,6 @@ package ui
 
 // Picklist + multipicklist editors. Two implementations because the
 // UI shape diverges meaningfully:
-//
-//   - picklistEditor: single value, cycle via arrow keys when the
-//     picklist has ≤ picklistCycleThreshold (8) values. Larger
-//     picklists open the anchored picker on Enter so the user
-//     doesn't have to arrow through 30 options.
-//   - multipicklistEditor: many values selected together. Always
-//     opens the picker. Selected values are shown as comma-joined
-//     in the cell when collapsed.
-//
-// Both editors honour the Active flag on each describe option —
-// inactive values still exist on the record but can't be picked
-// fresh. (We surface the existing inactive value as the current
-// pick but exclude it from the picker.)
 
 import (
 	"fmt"
@@ -27,26 +14,16 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// picklistCycleThreshold is the option-count cutoff below which the
-// editor cycles inline with arrow keys. Above it, Enter opens the
-// anchored picker. Tuned to "you can hold the values in your head"
-// — bigger lists need a search-as-you-type picker.
 const picklistCycleThreshold = 8
 
-// picklistEditor handles single-value picklists.
 type picklistEditor struct{}
 
-// multipicklistEditor handles multi-value picklists. Values are
-// stored as the API expects (semicolon-separated on the wire) and
-// rendered comma-separated in the cell.
 type multipicklistEditor struct{}
 
 func init() {
 	registerFieldEditor(&picklistEditor{}, "picklist")
 	registerFieldEditor(&multipicklistEditor{}, "multipicklist")
 }
-
-// ---- picklistEditor ------------------------------------------
 
 func (e *picklistEditor) CanEdit(f sf.Field) bool {
 	return f.Updateable && len(f.PicklistValues) > 0
@@ -119,7 +96,6 @@ func (e *picklistEditor) HandleKey(s *EditState, msg tea.KeyMsg) (bool, tea.Cmd)
 		s.Error = ""
 		return true, nil
 	case "ctrl+u":
-		// Clear (sets to no selection — nillable only).
 		s.Raw = ""
 		s.Cursor = -1
 		s.Error = ""
@@ -139,15 +115,12 @@ func (e *picklistEditor) Commit(s *EditState) (CommitMode, any, error) {
 	return CommitValue, s.Raw, nil
 }
 
-// ---- multipicklistEditor -------------------------------------
-
 func (e *multipicklistEditor) CanEdit(f sf.Field) bool {
 	return f.Updateable && len(f.PicklistValues) > 0
 }
 
 func (e *multipicklistEditor) Init(f sf.Field, current any) EditState {
 	raw := stringifyFieldValue(current)
-	// SF returns multipicklist values as semicolon-joined.
 	var selected []string
 	for _, v := range strings.Split(raw, ";") {
 		if v = strings.TrimSpace(v); v != "" {
@@ -198,7 +171,6 @@ func (e *multipicklistEditor) HandleKey(s *EditState, msg tea.KeyMsg) (bool, tea
 		s.Error = ""
 		return true, nil
 	case "space", " ", "x", "X":
-		// Toggle the cursored option in the selected slice.
 		val := options[s.Cursor].Value
 		idx := -1
 		for i, v := range s.Selected {
@@ -233,12 +205,6 @@ func (e *multipicklistEditor) Commit(s *EditState) (CommitMode, any, error) {
 	return CommitValue, strings.Join(s.Selected, ";"), nil
 }
 
-// ---- helpers ----------------------------------------------------
-
-// activePicklistValues filters out the inactive options. Inactive
-// values stay on the record (an admin disabled them after the
-// record was created) but the editor shouldn't offer them as a
-// fresh pick. Order of remaining values is preserved.
 func activePicklistValues(f sf.Field) []sf.PicklistValue {
 	out := make([]sf.PicklistValue, 0, len(f.PicklistValues))
 	for _, pv := range f.PicklistValues {

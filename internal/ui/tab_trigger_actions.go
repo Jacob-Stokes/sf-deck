@@ -109,12 +109,10 @@ func triggerActionsFor(ctx triggerCtx) []Action[triggerCtx] {
 
 	return []Action[triggerCtx]{
 		NewBooleanAction(BooleanActionSpec[triggerCtx]{
-			ID:    "trigger-toggle-status",
-			Label: "Toggle status",
-			Hint:  "Switches between Active and Inactive.",
-			Title: titleFor("Toggle status"),
-			// ApexTrigger.status is a string column, not a bool — the
-			// ChoiceOpt Value is literally "Active"/"Inactive".
+			ID:          "trigger-toggle-status",
+			Label:       "Toggle status",
+			Hint:        "Switches between Active and Inactive.",
+			Title:       titleFor("Toggle status"),
 			TrueOption:  ChoiceOpt{Label: "Active", Hint: "Fires on matching DML.", Value: "Active"},
 			FalseOption: ChoiceOpt{Label: "Inactive", Hint: "Defined but dormant.", Value: "Inactive"},
 			Current:     func(c triggerCtx) bool { return c.Trigger.Status == "Active" },
@@ -174,8 +172,6 @@ func triggerDeletedCmd(c triggerCtx) tea.Cmd {
 	}
 }
 
-// triggerPoppedMsg signals that a trigger was deleted and we should
-// pop back from TabTriggerDetail to TabObjectDetail + Triggers subtab.
 type triggerPoppedMsg struct {
 	alias    string
 	id       string

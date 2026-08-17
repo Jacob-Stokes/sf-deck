@@ -1,25 +1,5 @@
 package uilayout
 
-// RowMark — generic per-row visual annotation system.
-//
-// Existing surfaces tinted/badged rows in ad-hoc ways: /objects tinted
-// custom-sObject names cyan, /dev-project-detail appended a yellow
-// `[ns]` badge to managed-package items, /home Limits row-tinted
-// thresholds, etc. Six different implementations all reaching for
-// theme colors and stitching the result into the row body.
-//
-// RowMark is the shared primitive: a named rule pairing a per-row
-// match closure with a Treatment. Specs declare their marks once;
-// the renderer applies all matching marks per row, composing
-// treatments deterministically. Adding a new visual annotation
-// becomes one struct literal instead of six lines spread across
-// the row builder.
-//
-// Treatments compose:
-//   - NameColor: last-applied wins (caller orders marks by precedence)
-//   - Badges: stack as `[mark1] [mark2]` after the name
-//   - Dim: any matching mark with Dim=true wins (all-or-nothing)
-//
 import (
 	"image/color"
 	"strings"
@@ -31,23 +11,12 @@ import (
 // Each tab declares the marks it wants on its ListTableSpec; the
 // renderer walks them per row and composes the matching ones.
 type RowMark struct {
-	// ID is a stable identifier ("custom-sobject", "managed-package",
-	// "loaded-project-member"). Used for legend deduplication and
-	// future settings UI / TOML config. Lower-kebab-case by convention.
 	ID string
 
-	// Label is the human-readable name shown in the auto-generated
-	// legend chip ("custom", "managed package", "in loaded project").
-	// Should fit in a chip — short.
 	Label string
 
-	// Matches is the per-row predicate. row is the row index passed
-	// to the surrounding ListTableSpec.Cell. Should be fast (no I/O,
-	// no lookups against the network); typically reads a slice index
-	// or map lookup the caller closed over.
 	Matches func(row int) bool
 
-	// Treatment is what to apply when Matches returns true.
 	Treatment Treatment
 }
 
@@ -58,12 +27,8 @@ type RowMark struct {
 // A dedicated Marks column displays `RowMark.Label`, with BadgeColor as its
 // text colour. Surfaces needing column-0 tinting use NameColor.
 type Treatment struct {
-	// NameColor tints the primary identifier column (column 0). Nil
-	// = leave the column's declared style alone.
 	NameColor color.Color
 
-	// Dim renders the whole row in muted shade — used for "this row
-	// exists but isn't actionable" semantics (e.g. stale bundles).
 	Dim bool
 
 	// BadgeColor tints the mark's label text in the dedicated Marks
@@ -157,9 +122,6 @@ func RenderMarksCellMode(marks []RowMark, row int, mode MarksCellMode) string {
 	return strings.Join(parts, sep)
 }
 
-// firstLetterUpper returns the first rune of s uppercased. Skips
-// leading whitespace; returns "" for empty input. Used for
-// MarksCellModeLetter glyphs.
 func firstLetterUpper(s string) string {
 	for _, r := range s {
 		if r == ' ' || r == '\t' {
@@ -173,9 +135,6 @@ func firstLetterUpper(s string) string {
 	return ""
 }
 
-// renderMarkLabel styles one mark label for the Marks column. Picks
-// BadgeColor when set, falls back to NameColor, then to bold default
-// so a mark always reads as a distinct annotation (not body text).
 func renderMarkLabel(text string, badgeColor, nameColor color.Color) string {
 	c := badgeColor
 	if c == nil {

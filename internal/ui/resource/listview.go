@@ -12,9 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// nowMonotonic + elapsedMs are tiny wrappers around time.Now so the
-// filter-timing call sites read cleanly. Returns ms (rounded down)
-// so they fit cleanly into SearchState.lastDurationMs (int).
 func nowMonotonic() time.Time {
 	return time.Now()
 }
@@ -42,29 +39,10 @@ type SearchState struct {
 	Input     textinput.Model
 	Inited    bool // true once `Input` has been constructed
 
-	// effective is the search text the filter cache currently keys
-	// on. Decoupled from Input.Value() so big-list filters can be
-	// debounced: keystrokes update Input immediately (textinput
-	// stays snappy) but `effective` lags behind until the user
-	// pauses, batching multiple keystrokes into one filter pass.
-	//
-	// Adaptive: when the last filter ran faster than the small-list
-	// threshold (settings.SearchFastFilterThresholdMs, default
-	// 50ms), `effective` is bumped synchronously on every keystroke
-	// — feels identical to the un-debounced behaviour. Only when
-	// the filter starts costing more does the debounce window kick
-	// in.
 	effective string
 
-	// lastDurationMs is the wall-time the most recent filter pass
-	// took. Read by callers to decide whether to debounce the next
-	// update. Written by the projection / Filtered() path after the
-	// filter completes.
 	lastDurationMs int
 
-	// debouncePending, when true, means the buffer has changed since
-	// `effective` was last synced and the model's debounce-tick
-	// dispatcher should promote Buffer→effective on the next tick.
 	debouncePending bool
 }
 
@@ -139,9 +117,6 @@ func (s SearchState) Effective() string {
 	if s.debouncePending {
 		return s.effective
 	}
-	// Fast path: no debounce pending, effective tracks Buffer().
-	// We still return effective rather than Buffer() so the cache
-	// key is stable across renders within the same logical state.
 	if s.effective == "" {
 		return s.Input.Value()
 	}
@@ -189,15 +164,10 @@ func (s *SearchState) NoteBufferChanged(fastThresholdMs int) {
 	s.EnsureInit()
 	current := s.Input.Value()
 	if fastThresholdMs <= 0 || s.lastDurationMs <= fastThresholdMs {
-		// Last filter was fast (or no measurement yet) — sync
-		// effective synchronously so the next render shows
-		// updated results with no perceptible delay.
 		s.effective = current
 		s.debouncePending = false
 		return
 	}
-	// Slow last filter → defer. Tick dispatcher will sync
-	// effective once the debounce window elapses.
 	s.debouncePending = true
 }
 
@@ -241,21 +211,10 @@ type ListView[T any] struct {
 	cursor int
 	Search SearchState
 
-	// match is the user-supplied substring predicate. q is already
-	// lowercased. nil → search is a no-op (list unfiltered). Private
-	// so callers go through SetMatch which bumps the cache version.
 	match func(item T, q string) bool
 
-	// score is the optional relevance ranker used to sort filtered
-	// results when search is active. Higher = better match. nil →
-	// no ranking (filtered results stay in source order, which is
-	// the original behaviour). Set via SetScorer.
 	score func(item T, q string) int
 
-	// extra is the optional pre-filter applied before Search (e.g. a
-	// chip predicate). Private so callers go through SetExtra, which
-	// bumps the cache version. Direct assignment would silently leave
-	// stale rows in the Filtered() cache.
 	extra func(item T) bool
 
 	// order is an optional display-order permutation applied after
@@ -266,10 +225,6 @@ type ListView[T any] struct {
 	order    func(items []T) []int
 	orderKey string
 
-	// defaultOrder is a fallback permutation used only when `order` is
-	// nil. Lets chip-driven views impose a domain-specific order (e.g.
-	// the Recently Viewed chip wants most-recent-first) without
-	// fighting the column-sort path, which still owns `order`.
 	defaultOrder    func(items []T) []int
 	defaultOrderKey string
 
@@ -279,11 +234,6 @@ type ListView[T any] struct {
 	// "version unchanged → filter inputs unchanged."
 	version int
 
-	// filteredCache memoises the most recent Filtered() result so
-	// per-frame call sites (MoveBy, BuildRenderModel, Selected, …) all
-	// share one O(N) scan rather than re-running the chip predicate
-	// 2-3+ times. Invalidated implicitly when version or search buffer
-	// disagrees with the cached key on the next Filtered() call.
 	filteredCache  []T
 	filteredKeyVer int
 	filteredKeyBuf string
@@ -374,9 +324,6 @@ func (lv *ListView[T]) SetDefaultOrder(fn func(items []T) []int, key string) {
 
 func (lv *ListView[T]) DefaultOrderKey() string { return lv.defaultOrderKey }
 
-// activeOrder returns the order fn + key that should drive Filtered(),
-// preferring an explicit `order` set by column sort, falling back to
-// `defaultOrder` (e.g. Recently Viewed recency).
 func (lv *ListView[T]) activeOrder() (func(items []T) []int, string) {
 	if lv.order != nil {
 		return lv.order, lv.orderKey
@@ -439,10 +386,6 @@ func (lv *ListView[T]) ExtraCount() int {
 // Important: the returned slice is the cached pointer — callers must
 // treat it as read-only. Mutating it would corrupt the next render.
 func (lv *ListView[T]) Filtered() []T {
-	// Cache key on the EFFECTIVE buffer (debounce-aware), not the
-	// raw input buffer. While the user is typing past the fast-
-	// filter threshold, Effective() lags one tick behind so we
-	// don't run the expensive sweep on every keystroke.
 	buf := ""
 	if lv.Search.EffectiveApplied() {
 		buf = lv.Search.Effective()
@@ -479,10 +422,6 @@ func (lv *ListView[T]) Filtered() []T {
 		}
 		out = append(out, it)
 	}
-	// Relevance ranking: when search is active and a scorer is
-	// installed, sort hits high-to-low. Stable sort preserves the
-	// source order for ties (so a tie-band still respects the
-	// underlying alphabetical / fetch order).
 	if q != "" && lv.score != nil && len(out) > 1 {
 		scores := make([]int, len(out))
 		for i, it := range out {

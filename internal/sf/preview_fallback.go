@@ -1,26 +1,6 @@
 package sf
 
 // Manifest-driven preview fallback for non-source-tracked orgs.
-//
-// `sf project retrieve preview` only works on orgs with source
-// tracking enabled — scratch orgs, Developer/Developer Pro
-// sandboxes (after explicit opt-in). Production, Partial Copy and
-// Full sandboxes can never enable it. For those orgs we compute a
-// best-effort diff ourselves: read the bundle's package.xml, query
-// the Tooling API for each component's LastModifiedDate, compare
-// against the local files' mtimes.
-//
-// Limitations vs the real preview:
-//   - No conflict detection (the real preview tracks who-changed-what
-//     server-side; we can only see "are mtimes different")
-//   - Can't detect deletions in the org (a component that existed
-//     when retrieved but was deleted later shows as "still in your
-//     bundle"; the real preview would flag it for delete)
-//   - Some metadata types don't expose LastModifiedDate via Tooling
-//     (most do, but exceptions are silently treated as unchanged)
-//
-// In exchange: works on every org regardless of tracking state, and
-// makes ~one Tooling query per metadata type rather than per file.
 
 import (
 	"encoding/xml"
@@ -77,9 +57,6 @@ func ManifestPreviewFallback(bundleDir, orgAlias string, lastRetrievedAt time.Ti
 		return ManifestPreview{}, err
 	}
 
-	// One goroutine per metadata type so big bundles stay snappy.
-	// Max ~20 types in a typical bundle, so we don't bother with a
-	// pool — just unbounded goroutines + WaitGroup.
 	var (
 		wg         sync.WaitGroup
 		mu         sync.Mutex
@@ -108,8 +85,6 @@ func ManifestPreviewFallback(bundleDir, orgAlias string, lastRetrievedAt time.Ti
 	if firstErr != nil {
 		return ManifestPreview{}, firstErr
 	}
-	// Stable ordering: type then fullName so the rendered table is
-	// deterministic between refreshes.
 	sortPreviewItems(toRetrieve)
 	sortPreviewItems(toDeploy)
 	sortPreviewItems(ignored)
@@ -120,13 +95,10 @@ func ManifestPreviewFallback(bundleDir, orgAlias string, lastRetrievedAt time.Ti
 	}, nil
 }
 
-// packageManifest is the parsed shape of a sfdx package.xml.
 type packageManifest struct {
 	Types []manifestType `xml:"types"`
 }
 
-// manifestType is one <types> block: a metadata type + the list of
-// component fullNames in scope.
 type manifestType struct {
 	Name    string   `xml:"name"`
 	Members []string `xml:"members"`
@@ -165,16 +137,9 @@ func compareTypeAgainstOrg(c *Client, bundleDir string, t manifestType, floor ti
 	}
 	tooling, supported := toolingTableFor(t.Name)
 	if !supported {
-		// Not all metadata types have a Tooling-API counterpart.
-		// Treat as "unknown state" by reporting them as unchanged
-		// — a future iteration could fall back to MetadataAPI's
-		// listMetadata for these.
 		return nil, nil, nil, nil
 	}
 
-	// Build the SOQL: fetch every member's LastModifiedDate.
-	// "WHERE DeveloperName IN (...)" works for most types; CustomObject
-	// uses Name. The toolingTableFor mapping declares which.
 	nameCol := tooling.NameColumn
 	quoted := make([]string, 0, len(t.Members))
 	memberIndex := map[string]string{} // lookup-name → original member
@@ -183,10 +148,6 @@ func compareTypeAgainstOrg(c *Client, bundleDir string, t manifestType, floor ti
 		quoted = append(quoted, "'"+sqlEscape(key)+"'")
 		memberIndex[strings.ToLower(key)] = mem
 	}
-	// NamespacePrefix exists on every Tooling API type that supports
-	// managed packages. Querying it always (vs conditionally) is
-	// cheaper than maintaining a per-type allow-list and a missing
-	// column at query time errors loudly anyway.
 	soql := fmt.Sprintf(
 		"SELECT %s, LastModifiedDate, NamespacePrefix FROM %s WHERE %s IN (%s)",
 		nameCol, tooling.Object, nameCol, strings.Join(quoted, ","),
@@ -196,10 +157,6 @@ func compareTypeAgainstOrg(c *Client, bundleDir string, t manifestType, floor ti
 		return nil, nil, nil, fmt.Errorf("%s query: %w", t.Name, err)
 	}
 
-	// Map org-side records by their lookup name so we can pair them
-	// with manifest entries. Captures both LastModifiedDate (for the
-	// diff comparison) + NamespacePrefix (for managed-package
-	// detection).
 	type orgRecord struct {
 		modified  time.Time
 		namespace string
@@ -238,9 +195,6 @@ func compareTypeAgainstOrg(c *Client, bundleDir string, t manifestType, floor ti
 		orgTime := rec.modified
 		localPath, localTime, found := findLocalFile(bundleDir, t.Name, mem)
 		if !found {
-			// In the manifest + org but no local file. Common right
-			// after a fresh export but before retrieve runs; treat as
-			// "should retrieve".
 			toRetrieve = append(toRetrieve, ManifestPreviewItem{
 				FullName: mem,
 				Type:     t.Name,
@@ -248,8 +202,6 @@ func compareTypeAgainstOrg(c *Client, bundleDir string, t manifestType, floor ti
 			})
 			continue
 		}
-		// Round both to the second so sub-millisecond serialization
-		// quirks don't cause spurious "newer" reports.
 		orgRounded := orgTime.Truncate(time.Second)
 		localRounded := localTime.Truncate(time.Second)
 
@@ -301,46 +253,22 @@ func compareTypeAgainstOrg(c *Client, bundleDir string, t manifestType, floor ti
 				Path:     localPath,
 			})
 		}
-		// Both unchanged → omitted from all slices (clean state).
-		// Both changed → appears in BOTH retrieve and deploy lists,
-		// which is the closest we can get to "conflict" without
-		// source-tracking. Renderer can flag dupes in a future pass.
 	}
 	return toRetrieve, toDeploy, ignored, nil
 }
 
-// toolingTypeMap is the per-metadata-type lookup info for the Tooling
-// query. Different types live under different sObjects + index by
-// different name columns.
 type toolingTypeMap struct {
 	Object     string                             // tooling sObject (e.g. "Flow", "ApexClass")
 	NameColumn string                             // column to filter on
 	NameKeyFor func(manifestMember string) string // transform manifest member → query key
 }
 
-// toolingTableFor returns the Tooling-API mapping for a metadata
-// type, plus a bool indicating whether the fallback is supported
-// for that type. Supported list grows as metadata types are added
-// to the FormatSfdxProjectRetrieve workflow.
-//
-// Many SF metadata types use different naming conventions in the
-// MetadataAPI (the manifest) vs the Tooling API (the query):
-//   - CustomObject: manifest "Account" → Tooling Name "Account"
-//   - CustomField: manifest "Account.Industry" → Tooling DeveloperName "Industry" + TableEnumOrId
-//     (custom fields are awkward; we treat them as unsupported for now)
-//   - Flow: manifest "MyFlow" → Tooling DeveloperName "MyFlow"
-//   - ApexClass: manifest "MyClass" → Tooling Name "MyClass"
-//
-// Identity transform is the default. Add explicit cases when a type
-// needs a different Tooling shape.
 func toolingTableFor(metadataType string) (toolingTypeMap, bool) {
 	identity := func(m string) string { return m }
 	switch metadataType {
 	case "CustomObject":
 		return toolingTypeMap{Object: "CustomObject", NameColumn: "DeveloperName",
 			NameKeyFor: func(m string) string {
-				// CustomObject's DeveloperName is the API name without
-				// the trailing "__c" custom-object suffix.
 				return strings.TrimSuffix(m, "__c")
 			}}, true
 	case "Flow":
@@ -390,21 +318,6 @@ func toolingTableFor(metadataType string) (toolingTypeMap, bool) {
 	return toolingTypeMap{}, false
 }
 
-// findLocalFile walks force-app/ looking for the file that matches a
-// (type, fullName) pair from the manifest. Returns the path, mtime,
-// and a found bool. Naive — we walk everything and match by suffix
-// — but the bundles are typically small enough that it's fine.
-//
-// File-name conventions per type:
-//   - Flow                 → flows/<name>.flow-meta.xml
-//   - ApexClass            → classes/<name>.cls
-//   - ApexTrigger          → triggers/<name>.trigger
-//   - CustomObject         → objects/<name>/<name>.object-meta.xml
-//   - LightningComponentBundle → lwc/<name>/ (use directory mtime)
-//   - PermissionSet        → permissionsets/<name>.permissionset-meta.xml
-//
-// Falls back to "first file matching the fullName + a known suffix"
-// when an exact rule isn't declared.
 func findLocalFile(bundleDir, metadataType, fullName string) (string, time.Time, bool) {
 	root := filepath.Join(bundleDir, "force-app")
 	if _, err := os.Stat(root); err != nil {
@@ -414,7 +327,6 @@ func findLocalFile(bundleDir, metadataType, fullName string) (string, time.Time,
 	if suffix == "" {
 		return "", time.Time{}, false
 	}
-	// Most types: look for <fullName><suffix> anywhere under force-app.
 	target := fullName + suffix
 	var hit string
 	var hitTime time.Time
@@ -438,9 +350,6 @@ func findLocalFile(bundleDir, metadataType, fullName string) (string, time.Time,
 	return hit, hitTime, true
 }
 
-// fileSuffixForType maps a metadata type to its on-disk filename
-// suffix (the bit after fullName). "" means we don't know the
-// convention → fall through to "unsupported".
 func fileSuffixForType(metadataType string) string {
 	switch metadataType {
 	case "Flow":
@@ -471,8 +380,6 @@ func fileSuffixForType(metadataType string) string {
 	return ""
 }
 
-// sortPreviewItems sorts a slice of preview items by Type then
-// FullName for deterministic rendering.
 func sortPreviewItems(items []ManifestPreviewItem) {
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].Type != items[j].Type {
@@ -482,10 +389,6 @@ func sortPreviewItems(items []ManifestPreviewItem) {
 	})
 }
 
-// parseLastModified parses the SF datetime string. SF returns
-// timestamps in ISO-8601 UTC ("2026-04-30T12:34:56.000+0000"), but
-// the +0000 / Z variants both occur. time.Parse handles both with
-// the right layout fallback.
 func parseLastModified(s string) time.Time {
 	if s == "" {
 		return time.Time{}

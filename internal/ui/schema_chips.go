@@ -4,11 +4,6 @@ package ui
 // Schema). Lightweight by design: stock built-in chips only (see
 // qchip.FieldBuiltins) — no project / visited / custom-chip / manager
 // plumbing, none of which is meaningful for a per-sObject field list.
-//
-// The selected chip ID lives per-sObject on describeFieldState.ChipID
-// (empty = the locked "all" default). Its predicate is pushed onto the
-// field ListView's Extra slot each render, so the shared list engine's
-// cached filter reflects the chip selection.
 
 import (
 	tea "charm.land/bubbletea/v2"
@@ -25,8 +20,6 @@ func schemaChipID(fs *describeFieldState) string {
 	return fs.ChipID
 }
 
-// applySchemaChip writes the selected chip's predicate into the field
-// ListView's Extra pre-filter. "all" (or an unknown id) clears it.
 func (m Model) applySchemaChip(fs *describeFieldState) {
 	if fs == nil {
 		return
@@ -37,15 +30,9 @@ func (m Model) applySchemaChip(fs *describeFieldState) {
 		fs.List.SetExtra(nil)
 		return
 	}
-	// chipMatcherFor returns nil for a predicate-less chip (the "all"
-	// chip), which SetExtra treats as "no pre-filter" — exactly right.
 	fs.List.SetExtra(chipMatcherFor[sf.Field](c, chipSubs(m.activeOrgData())))
 }
 
-// cycleSchemaChip advances the Schema field-filter selection by delta
-// through the strip-visible (favourite) chips, wrapping. Mirrors the
-// records/objects ←/→ cycle but scoped to the per-sObject field state.
-// No-op when there are no chips or no describe.
 func (m *Model) cycleSchemaChip(delta int) {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" {
@@ -60,8 +47,6 @@ func (m *Model) cycleSchemaChip(delta int) {
 	cur := findChipIndex(nav, schemaChipID(fs))
 	cur = wrapIdx(cur+delta, len(nav))
 	fs.ChipID = nav[cur].ID
-	// Chip changed → reset the cursor to the top of the new filtered set
-	// and re-apply the predicate so the next render filters immediately.
 	m.applySchemaChip(fs)
 	fs.List.ResetCursor()
 }

@@ -1,17 +1,5 @@
 package ui
 
-// URL/Id recognition for the global search modal.
-//
-// Pasting a Salesforce URL or bare Id into ctrl+f shouldn't make the
-// user think — sf-deck recognises the shape, shows a small pill so
-// they see what was detected, and Enter navigates straight to the
-// resource instead of running a fuzzy search.
-//
-// Detection is per-keystroke: every input change runs sfurl.Parse. A
-// successful parse pre-empts the fuzzy-search Enter path. Failure
-// (or text that doesn't look URL/Id-shaped) leaves the modal in
-// normal search mode.
-
 import (
 	tea "charm.land/bubbletea/v2"
 
@@ -38,10 +26,6 @@ func recognizeURL(input string) *globalSearchURL {
 	}
 }
 
-// urlPillLabel formats a one-line summary the modal renders above
-// the input — "RECORD · Account" / "FLOW" / "FIELD · Account.<id>"
-// etc. Stays compact; the user just needs to see "yes the parse
-// recognised this."
 func urlPillLabel(p sfurl.Parsed) string {
 	switch p.Kind {
 	case devproject.KindRecord:
@@ -89,15 +73,6 @@ func urlPillLabel(p sfurl.Parsed) string {
 	return "URL"
 }
 
-// navigateFromParsed returns the Enter closure that jumps to the
-// parsed resource. Reuses the open*Cmd helpers the existing search
-// hits already use, so URL navigation lands on the same surfaces as
-// fuzzy-search navigation.
-//
-// Returns nil when the parsed kind has no navigation contract today
-// (or when required fields are missing — record without an Id, for
-// instance). Caller renders the recognition pill but Enter is a
-// no-op.
 func navigateFromParsed(p sfurl.Parsed) func(m *Model) tea.Cmd {
 	switch p.Kind {
 	case devproject.KindRecord:
@@ -121,9 +96,6 @@ func navigateFromParsed(p sfurl.Parsed) func(m *Model) tea.Cmd {
 		if p.SObject == "" {
 			return nil
 		}
-		// Field URLs identify the field by a 15/18-char Id, not by
-		// API name. Until we wire an Id→name lookup, route to the
-		// parent sObject's Fields subtab and let the user pick.
 		return openObjectCmd(p.SObject)
 	case devproject.KindFlow:
 		if p.ID == "" {

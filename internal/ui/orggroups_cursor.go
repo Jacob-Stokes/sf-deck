@@ -1,22 +1,9 @@
 package ui
 
-// orggroups_cursor.go — rail cursor helpers + moveOrgRailCursor.
-//
-// The cursor (m.orgRailCursor) addresses the row list returned by
-// buildRailRows (see orggroups.go). Headers and orgs share one
-// flat space; m.selected stays in lockstep with the cursor's
-// underlying org index so existing "current org" callers don't
-// need to change.
-
-// currentOrgRailRows rebuilds the rail's row list from the current
-// orgs + persisted groups. Cheap — used by every cursor handler so
-// header insertions/removals are reflected on the next keystroke.
 func (m Model) currentOrgRailRows() []orgRailRow {
 	return buildRailRows(m.orgs, m.settings.OrgGroups())
 }
 
-// orgRailCursorOnHeader reports whether the rail cursor currently
-// addresses a group header row.
 func (m Model) orgRailCursorOnHeader() bool {
 	rows := m.currentOrgRailRows()
 	if len(rows) == 0 {
@@ -29,9 +16,6 @@ func (m Model) orgRailCursorOnHeader() bool {
 	return rows[c].Kind == railRowGroupHeader
 }
 
-// cursoredGroupID returns the group id the cursor is "in" — when on
-// a header, that header's id; when on an org, the containing group's
-// id (or ungroupedID). Returns "" when the rail is empty.
 func (m Model) cursoredGroupID() string {
 	rows := m.currentOrgRailRows()
 	if len(rows) == 0 {
@@ -87,20 +71,9 @@ func (m *Model) syncOrgRailCursorToSelected() {
 			return
 		}
 	}
-	// m.selected isn't currently rendered (collapsed group). Snap
-	// to the nearest org row so subsequent j/k feels sane.
 	m.clampOrgRailCursor()
 }
 
-// stepOrgRailCursor advances the rail cursor by `delta` org rows,
-// skipping group headers entirely. Returns true when the
-// underlying selected org changed (caller fires onOrgChanged).
-//
-// Skipping headers in the rail is a UX choice — they're visual
-// dividers only at this surface; every editing action lives in
-// the org-manage modal which uses its own cursor that DOES land
-// on headers. j/k in the rail therefore behaves like an org-only
-// list.
 func (m *Model) stepOrgRailCursor(delta int) bool {
 	rows := m.currentOrgRailRows()
 	if len(rows) == 0 {
@@ -108,8 +81,6 @@ func (m *Model) stepOrgRailCursor(delta int) bool {
 	}
 	prev := m.selected
 
-	// Walk |delta| org rows in the right direction, hopping over
-	// any header rows we encounter.
 	step := 1
 	if delta < 0 {
 		step = -1
@@ -139,10 +110,6 @@ func (m *Model) stepOrgRailCursor(delta int) bool {
 	return m.selected != prev
 }
 
-// nearestOrgRow returns the index of the closest org row to `from`
-// in the row list. Searches in `dir` first (1 forward, -1 back);
-// falls back to the opposite direction when the first one runs out.
-// Returns `from` unchanged when no org row exists at all.
 func nearestOrgRow(rows []orgRailRow, from, dir int) int {
 	if dir == 0 {
 		dir = 1

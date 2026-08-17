@@ -3,14 +3,6 @@
 // shape. Format-specific writing happens upstream in the exporters
 // package; this file concerns itself only with "what columns + values
 // do we want for a project export?"
-//
-// Used by:
-//   - The TUI's `e` (export) key on /dev-projects → opens a format
-//     picker → calls Rows() with the active project + URL resolver,
-//     then exporters.Write().
-//   - Future: package.xml export (Gearset workflow). Will be a
-//     sibling file in this package that consumes the same Item
-//     slice but produces a manifest XML, not ExportRows.
 package devproject
 
 import (
@@ -134,9 +126,6 @@ func kindLabel(k devproject.ItemKind) string {
 	return string(k)
 }
 
-// formatTime returns an ISO-8601 timestamp suitable for spreadsheet
-// columns. Empty when the time is zero (unset) so blank cells render
-// rather than "0001-01-01T00:00:00Z".
 func formatTime(t time.Time) string {
 	if t.IsZero() {
 		return ""

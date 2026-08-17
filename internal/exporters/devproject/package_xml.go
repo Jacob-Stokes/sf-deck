@@ -2,33 +2,6 @@ package devproject
 
 // package.xml emitter — turns a slice of DevProject Items into the
 // Salesforce MetadataAPI manifest format.
-//
-// Output is the standard XML accepted by:
-//   - sfdx ("sf project retrieve start --manifest package.xml")
-//   - Gearset Pro Deploy's manifest upload
-//   - Migration Tool / ANT
-//   - MetadataAPI directly
-//
-// The manifest is *just a list* — no source code, no records data. It
-// names what to fetch/deploy; consumers fetch from the org. See
-// internal/ui/devproject_export.go's TUI flow for how it's invoked.
-//
-// Two notable behaviours:
-//
-//   1. KindRecord items (data, not metadata) are excluded from
-//      package.xml and reported separately so the caller can warn or
-//      emit a sibling records.csv. Records belong in Data Loader,
-//      not the metadata pipeline.
-//
-//   2. Some kinds need DeveloperName resolution: Apex classes /
-//      triggers / LWC / Aura bundles in our store carry the
-//      Salesforce Id (e.g. "01p..."). MetadataAPI manifests need
-//      DeveloperName ("AccountUtil"). The Item.Name field captures
-//      the user-facing label at collect time — for these kinds,
-//      Name IS the DeveloperName, so we use it directly. The
-//      lookup-table approach keeps this file pure (no Salesforce
-//      round-trip required at export time); future kinds where Name
-//      != DeveloperName would need a resolver injection.
 
 import (
 	"encoding/xml"
@@ -49,8 +22,6 @@ const DefaultAPIVersion = "62.0"
 
 // PackageXMLOptions tunes manifest emission.
 type PackageXMLOptions struct {
-	// APIVersion is the <version> element. Empty defaults to
-	// DefaultAPIVersion.
 	APIVersion string
 }
 
@@ -92,9 +63,6 @@ func WritePackageXML(w io.Writer, items []devproject.Item, opts PackageXMLOption
 
 	var result PackageXMLResult
 
-	// Group members by MetadataAPI type. We use a map of slices —
-	// multiple items can produce the same (type, member) pair (e.g. a
-	// re-collect with the same ref); dedupe at the end.
 	groups := map[string]map[string]struct{}{}
 
 	for _, it := range items {
@@ -123,7 +91,6 @@ func WritePackageXML(w io.Writer, items []devproject.Item, opts PackageXMLOption
 		result.IncludedCount++
 	}
 
-	// Sort types alphabetically for stable output.
 	types := make([]string, 0, len(groups))
 	for t := range groups {
 		types = append(types, t)
@@ -163,9 +130,6 @@ func WritePackageXML(w io.Writer, items []devproject.Item, opts PackageXMLOption
 	return result, nil
 }
 
-// pkgXML mirrors the Salesforce manifest schema. The xmlns lives on
-// the root <Package> element; <types> blocks each carry a list of
-// <members> plus a <name>.
 type pkgXML struct {
 	XMLName xml.Name   `xml:"Package"`
 	Xmlns   string     `xml:"xmlns,attr"`
@@ -189,8 +153,6 @@ type pkgTypes struct {
 func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 	switch it.Kind {
 	case devproject.KindSObject:
-		// Object API name; for custom objects this is e.g.
-		// "MyObject__c", standard objects e.g. "Account".
 		if it.Ref == "" {
 			return "", "", false
 		}
@@ -205,8 +167,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "CustomObject", it.Ref, true
 
 	case devproject.KindField:
-		// Ref is "<sObject>.<FieldApiName>". MetadataAPI's CustomField
-		// member format is the same — pass through.
 		if it.Ref == "" {
 			return "", "", false
 		}
@@ -231,19 +191,9 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "Flow", name, true
 
 	case devproject.KindFlowVersion:
-		// Flow versions don't get separate manifest entries — fold
-		// into the Flow definition. Item.Type carries the parent
-		// DefinitionId; we'd ideally have the flow's DeveloperName
-		// but Item.Name on a flow version is the masterLabel of the
-		// version, not the definition's DeveloperName. Best-effort:
-		// emit nothing, mark unsupported, and let the user re-collect
-		// the parent flow. Better to be honest about a manifest gap
-		// than emit a wrong member name.
 		return "", "", false
 
 	case devproject.KindApexClass:
-		// ApexClass member is the class name. Item.Name is the class
-		// name as captured at collect time; use it.
 		if it.Name == "" {
 			return "", "", false
 		}
@@ -273,8 +223,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "Report", folder + "/" + it.Name, true
 
 	case devproject.KindPermissionSet:
-		// PermissionSet member is the API Name. Item.Type captures the Name
-		// at collect time; Item.Name provides a best-effort label fallback.
 		name := nonEmpty(it.Type, it.Name)
 		if name == "" {
 			return "", "", false
@@ -282,8 +230,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "PermissionSet", name, true
 
 	case devproject.KindPermissionSetGroup:
-		// PSG member is DeveloperName; Item.Type is DeveloperName per
-		// FromOpenable.
 		name := nonEmpty(it.Type, it.Name)
 		if name == "" {
 			return "", "", false
@@ -291,32 +237,24 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "PermissionSetGroup", name, true
 
 	case devproject.KindProfile:
-		// Profile members are the profile name. Item.Name is the
-		// profile name at collect time.
 		if it.Name == "" {
 			return "", "", false
 		}
 		return "Profile", it.Name, true
 
 	case devproject.KindValidationRule:
-		// Member is "<sObject>.<ValidationRuleName>". Item.Type is
-		// the parent sObject; Item.Name is the validation rule's
-		// ValidationName.
 		if it.Type == "" || it.Name == "" {
 			return "", "", false
 		}
 		return "ValidationRule", it.Type + "." + it.Name, true
 
 	case devproject.KindRecordType:
-		// Member is "<sObject>.<RecordTypeDeveloperName>".
 		if it.Type == "" || it.Name == "" {
 			return "", "", false
 		}
 		return "RecordType", it.Type + "." + it.Name, true
 
 	case devproject.KindLWC:
-		// LightningComponentBundle member is the bundle DeveloperName.
-		// Item.Type captured DeveloperName at collect time.
 		name := nonEmpty(it.Type, it.Name)
 		if name == "" {
 			return "", "", false
@@ -324,7 +262,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "LightningComponentBundle", name, true
 
 	case devproject.KindAura:
-		// Same shape for Aura.
 		name := nonEmpty(it.Type, it.Name)
 		if name == "" {
 			return "", "", false
@@ -332,8 +269,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "AuraDefinitionBundle", name, true
 
 	case devproject.KindQueue:
-		// Queue is metadata-deployable as Group with Type='Queue'. The
-		// MetadataAPI type is just "Queue" though.
 		name := nonEmpty(it.Type, it.Name)
 		if name == "" {
 			return "", "", false
@@ -341,7 +276,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 		return "Queue", name, true
 
 	case devproject.KindPublicGroup:
-		// Public groups deploy as Group; member is DeveloperName.
 		name := nonEmpty(it.Type, it.Name)
 		if name == "" {
 			return "", "", false
@@ -387,8 +321,6 @@ func metadataMember(it devproject.Item) (mtype, member string, ok bool) {
 // auto-generated ones never end in __c, so the suffix check below
 // gives us correctness without catching custom objects.
 func isNonDeployableSObject(name string) bool {
-	// Custom objects always end in __c; they are deployable. Skip the
-	// pattern check for them outright.
 	if strings.HasSuffix(name, "__c") {
 		return false
 	}
@@ -400,9 +332,6 @@ func isNonDeployableSObject(name string) bool {
 	return false
 }
 
-// nonEmpty returns the first non-empty string. Used to express
-// per-kind preferences ("prefer Item.Type for the API name; fall
-// back to Item.Name if Type is empty") without nesting if-chains.
 func nonEmpty(xs ...string) string {
 	for _, s := range xs {
 		if s != "" {

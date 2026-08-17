@@ -52,7 +52,6 @@ func (m *Model) applyListTableWidthPrefs(ctx listTableContext) {
 	m.applyPerViewSort(ctx)
 }
 
-// sortPref is a stashed (column, direction) sort for one view.
 type sortPref struct {
 	Column string
 	Desc   bool
@@ -78,7 +77,6 @@ func (m *Model) applyPerViewSort(ctx listTableContext) {
 	if m.perViewSort == nil {
 		m.perViewSort = map[string]sortPref{}
 	}
-	// Save the sort that belonged to the previously-active view.
 	if m.perViewSortKey != "" {
 		m.perViewSort[m.perViewSortKey] = sortPref{
 			Column: ctx.State.SortColumn, Desc: ctx.State.SortDesc,
@@ -138,8 +136,6 @@ func foldLegacyChipScope(scope string) string {
 	if isLegacyChipScopeBase(scope) {
 		return scope
 	}
-	// Longest matching base wins so "users:recent:<chip>" folds to
-	// "users:recent", not "users".
 	best := ""
 	for _, base := range legacyChipScopeBases {
 		if strings.HasPrefix(scope, base+":") && len(base) > len(best) {

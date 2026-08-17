@@ -58,7 +58,6 @@ func CreateToolingMetadata(target, sobjectType, fullName string, metadata map[st
 	if err != nil {
 		return "", upgradeToSFError(err)
 	}
-	// Tooling create returns {id, success, errors[]}.
 	var out struct {
 		ID      string `json:"id"`
 		Success bool   `json:"success"`
@@ -110,7 +109,6 @@ func UpdateToolingMetadata(target, sobjectType, id string, patch map[string]any)
 	}
 	path := c.ToolingPath("sobjects/" + sobjectType + "/" + id)
 
-	// GET → decode FullName + Metadata.
 	raw, err := c.get(path, nil)
 	if err != nil {
 		return upgradeToSFError(err)
@@ -126,12 +124,10 @@ func UpdateToolingMetadata(target, sobjectType, id string, patch map[string]any)
 		current.Metadata = map[string]any{}
 	}
 
-	// Merge on top.
 	for k, v := range patch {
 		current.Metadata[k] = v
 	}
 
-	// PATCH back the whole shape Tooling expects.
 	body, err := json.Marshal(map[string]any{
 		"FullName": current.FullName,
 		"Metadata": current.Metadata,
@@ -145,10 +141,6 @@ func UpdateToolingMetadata(target, sobjectType, id string, patch map[string]any)
 	return nil
 }
 
-// upgradeToSFError coerces REST client errors to *SFError if possible
-// so callers always get the classified Kind + Hint. Keeping this
-// close to the shared write function so every write site looks the
-// same.
 func upgradeToSFError(err error) error {
 	if typed := AsSFError(err); typed != nil {
 		return typed

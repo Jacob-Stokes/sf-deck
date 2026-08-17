@@ -22,7 +22,6 @@ func TestMovableKind(t *testing.T) {
 	notMovable := []devproject.ItemKind{
 		devproject.KindRecord, devproject.KindFlowVersion,
 		devproject.KindApexSnippet, devproject.KindSOQLQuery,
-		// Fast-follow kinds — not in v1 scope.
 		devproject.KindApexTrigger, devproject.KindAura,
 		devproject.KindPermissionSet, devproject.KindQueue,
 	}
@@ -41,7 +40,6 @@ func TestMoveNameOf(t *testing.T) {
 	}{
 		{ItemIdentity{Kind: devproject.KindSObject, Ref: "Account", Label: "Account"}, "Account", ""},
 		{ItemIdentity{Kind: devproject.KindField, Ref: "Account.Industry", Label: "Account.Industry"}, "Account.Industry", "Account"},
-		// Id-keyed: the developer name lives in Label, Ref is the org-local Id.
 		{ItemIdentity{Kind: devproject.KindFlow, Ref: "301xx0", Label: "My_Flow"}, "My_Flow", ""},
 		{ItemIdentity{Kind: devproject.KindApexClass, Ref: "01pxx0", Label: "AccountService"}, "AccountService", ""},
 		{ItemIdentity{Kind: devproject.KindLWC, Ref: "0Rbxx0", Label: "myComponent"}, "myComponent", ""},
@@ -63,25 +61,20 @@ func TestResolveMoveRef_APINameKinds(t *testing.T) {
 		t.Error("sObject before object-list load should be not-ready")
 	}
 
-	// Seed the target org's browseable object list.
 	d.SObjects.Set([]sf.SObject{{Name: "Account"}, {Name: "Contact"}})
 
-	// sObject present → matched, ready.
 	ref, found, ready := resolveMoveRef(d, devproject.KindSObject, "account", "")
 	if ref != "account" || !found || !ready {
 		t.Errorf("sObject present: got (%q,%v,%v), want (account,true,true)", ref, found, ready)
 	}
-	// sObject absent → NOT found, but ready (so caller flashes + stays put).
 	if ref, found, ready := resolveMoveRef(d, devproject.KindSObject, "Widget__c", ""); found || !ready || ref != "" {
 		t.Errorf("sObject absent: got (%q,%v,%v), want (\"\",false,true)", ref, found, ready)
 	}
 
-	// field: parent object present → matched.
 	ref, found, ready = resolveMoveRef(d, devproject.KindField, "Account.Industry", "Account")
 	if ref != "Account.Industry" || !found || !ready {
 		t.Errorf("field present: got (%q,%v,%v), want (Account.Industry,true,true)", ref, found, ready)
 	}
-	// field: parent object absent → NOT found.
 	if _, found, ready := resolveMoveRef(d, devproject.KindField, "Widget__c.Name", "Widget__c"); found || !ready {
 		t.Errorf("field absent parent: found=%v ready=%v, want found=false ready=true", found, ready)
 	}
@@ -152,8 +145,6 @@ func TestResolvePendingMove_NotReadyWaits(t *testing.T) {
 
 func TestResolveMoveRef_FlowMatchByName(t *testing.T) {
 	d := &orgData{}
-	// Seed a fetched Flows resource so FetchedAt() is non-zero, then
-	// mirror it into FlowList the way SyncFlowsList does.
 	d.Flows.Set([]sf.Flow{
 		{DefinitionID: "301A", DeveloperName: "Alpha_Flow"},
 		{DefinitionID: "301B", DeveloperName: "Beta_Flow"},

@@ -21,7 +21,6 @@ func TestMigrateRecordItemRefs(t *testing.T) {
 	if err := s.CreateDevProject(DevProject{ID: "p1", Name: "P"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	// Simulate a pre-fix item: bare Id ref, sObject in Type.
 	if _, err := s.AddItem(Item{
 		DevProjectID: "p1", OrgUser: "u@x", Kind: KindRecord,
 		Ref: "m00DM00000TEST1AAA", Type: "Shipment_Routing_Rule__mdt",

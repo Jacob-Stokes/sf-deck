@@ -1,18 +1,5 @@
 package ui
 
-// /reports xlsx export action.
-//
-// Pressing `e` on a report triggers ExportReport (always re-runs
-// server-side, capped at 100k rows by SF), passes the bytes through
-// the configured post-processor pipeline (URL hyperlink injection by
-// default), and writes the result to <ReportExportDir>/<name>-
-// <timestamp>.xlsx (default dir is ~). Flash banner reports the saved
-// path.
-//
-// Async via tea.Cmd — each Cmd runs on its own goroutine, so a slow
-// SF re-run doesn't block the TUI. Completion fires a
-// reportExportDoneMsg that Update folds back into a flash.
-
 import (
 	"fmt"
 	"os"
@@ -29,14 +16,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// reportExportDoneMsg lands on the main loop after an export completes.
-// Path is empty + Err non-nil on failure; Path is the absolute saved
-// path on success. JobID identifies the registry entry to update.
-//
-// Phase progression itself isn't message-based — the worker goroutine
-// mutates the (mutex-guarded) registry directly. The status bar tick
-// (exportActivityTickCmd) drives redraws so phase changes show up
-// without a per-phase message round-trip.
 type reportExportDoneMsg struct {
 	JobID     string
 	Path      string
@@ -44,18 +23,10 @@ type reportExportDoneMsg struct {
 	OpenAfter bool
 }
 
-// exportActivityTickMsg fires every 500ms while at least one export
-// is in flight. Drives the ellipsis animation + elapsed-time refresh
-// in the status bar. Self-rescheduling — see Update for the loop.
 type exportActivityTickMsg struct{}
 
 const exportActivityTickInterval = 500 * time.Millisecond
 
-// exportActivityTickCmd returns a one-shot tick. Update re-schedules
-// while exports are in flight; once the registry empties, the tick
-// stops re-arming and the loop dies naturally.
-//
-// Pointer receiver so the single-flight flag mutation persists.
 func (m *Model) exportActivityTickCmd() tea.Cmd {
 	if m.exportTickRunning {
 		return nil
@@ -69,10 +40,6 @@ func (m *Model) exportActivityTickCmd() tea.Cmd {
 	})
 }
 
-// triggerReportExport opens the export-options modal: matches the SF
-// Lightning UI's matrix of {Formatted, Details Only} × {xlsx, csv}.
-// Pick lands on a synthetic openReportExportMsg that fires the
-// download.
 func (m Model) triggerReportExport() (Model, tea.Cmd) {
 	if len(m.orgs) == 0 {
 		return m, nil
@@ -95,18 +62,9 @@ func (m Model) triggerReportExport() (Model, tea.Cmd) {
 			}
 		}
 	case TabReports:
-		// Use the same cursor + visible-items mapping the open path
-		// uses (update_open.go) so the export targets the row the
-		// user actually sees highlighted. d.ReportList.Selected()
-		// would return the wrong row whenever a folder filter or
-		// search query is active — the visible row is from the
-		// post-folder, post-search slice while ReportList only
-		// applies its own match function.
 		subs, reps := m.visibleReportsItems()
 		row := m.reportsRowCursor()
 		if row < len(subs) {
-			// Cursor is on a folder row, not a report — nothing to
-			// export.
 			return m, nil
 		}
 		idx := row - len(subs)
@@ -165,21 +123,12 @@ func (m Model) triggerReportExport() (Model, tea.Cmd) {
 	return m, m.openChoiceModal(state)
 }
 
-// openReportExportPathMsg fires after format is picked; Update opens
-// the path editor.
 type openReportExportPathMsg struct {
 	ID     string
 	Name   string
 	Format sf.ReportExportFormat
 }
 
-// openReportExportPathPicker opens the second-step modal: a single-line
-// edit field pre-populated with the resolved default save path.
-// User can hand-edit (e.g. change directory, rename) or hit Enter to
-// accept. Save closure fires the download with the chosen path.
-//
-// Pointer receiver — openEditModal stores its state on the Model and
-// a value receiver would lose those mutations on return.
 func (m *Model) openReportExportPathPicker(msg openReportExportPathMsg) tea.Cmd {
 	defaultPath := m.defaultExportPath(msg.ID, msg.Name, msg.Format)
 	applog.Info("export.path_picker.open", map[string]any{
@@ -216,11 +165,6 @@ func (m *Model) openReportExportPathPicker(msg openReportExportPathMsg) tea.Cmd 
 	return m.openExportSaveModal(state)
 }
 
-// defaultExportPath resolves the default full path the path-picker
-// modal pre-populates. Combines the user's configured export dir
-// (settings.ReportExportDir, default ~) with a filename derived from
-// the configurable pattern (settings.ReportExportFilenamePattern,
-// default "{name}-{timestamp}").
 func (m Model) defaultExportPath(reportID, reportName string, format sf.ReportExportFormat) string {
 	dir := expandTilde(m.settings.ReportExportDir())
 	pattern := m.settings.ReportExportFilenamePattern()
@@ -228,9 +172,6 @@ func (m Model) defaultExportPath(reportID, reportName string, format sf.ReportEx
 	return filepath.Join(dir, fname)
 }
 
-// openReportExportMsg arrives on the main loop after the user has
-// confirmed both format AND save path. Update routes it to
-// startReportExport.
 type openReportExportMsg struct {
 	ID        string
 	Name      string
@@ -266,12 +207,6 @@ func (m *Model) startReportExport(reportID, reportName, savePath string, format 
 	alias := targetArg(o)
 	savePath = expandTilde(savePath)
 
-	// Build the transform pipeline based on the chosen format.
-	// Order matters: detailsify reshapes the workbook (strips preamble,
-	// forward-fills group leaders), strip-summary drops embedded
-	// subtotals, strip-formatting clears cell colours / fonts /
-	// borders. URL hyperlinks come last so they only run on the final
-	// shape.
 	var transforms []postprocess.Transform
 	if format.View == "details" {
 		transforms = append(transforms,
@@ -280,9 +215,6 @@ func (m *Model) startReportExport(reportID, reportName, savePath string, format 
 			&postprocess.StripFormattingTransform{},
 		)
 	}
-	// URL hyperlink injection only meaningful when exporting to xlsx
-	// (csv loses formulas anyway). Skip it for csv to keep the pipeline
-	// faster and the output cleaner.
 	if format.File == "xlsx" {
 		transformIDs := m.settings.ReportExportTransforms(reportID)
 		if transformIDs == nil {
@@ -295,9 +227,6 @@ func (m *Model) startReportExport(reportID, reportName, savePath string, format 
 	prefixMap := buildPrefixMap(d)
 	instance := orgInstanceURL(o)
 
-	// Register the in-flight job before kicking the goroutine so the
-	// status bar shows it the next render. The worker mutates phase
-	// directly via the registry's mutex-guarded methods.
 	reg := m.exports
 	job := reg.startJob(exportKindReport, reportName, alias, savePath, format.View+"/"+format.File)
 	jobID := job.ID
@@ -321,8 +250,6 @@ func (m *Model) startReportExport(reportID, reportName, savePath string, format 
 				return reportExportDoneMsg{JobID: jobID, OpenAfter: openAfter, Err: fmt.Errorf("post-process: %w", err)}
 			}
 		}
-		// xlsx → csv conversion happens after the xlsx pipeline so
-		// detailsify already shaped the workbook.
 		if format.File == "csv" {
 			reg.setPhase(jobID, exportPhaseConverting)
 			out, err = postprocess.ToCSV(out)
@@ -353,10 +280,6 @@ func (m *Model) applyReportExportDone(msg reportExportDoneMsg) {
 		if msg.JobID != "" && m.exports != nil {
 			m.exports.markFailed(msg.JobID, msg.Err)
 		}
-		// Identity-verification challenge needs more screen-time than
-		// the default 3s flash to actually be readable; same for the
-		// generic export errors that mention dump paths the user might
-		// want to copy out before the banner clears.
 		if strings.Contains(errStr, "identity verification") {
 			m.flashFor("export blocked: "+errStr, 15*time.Second)
 		} else {
@@ -368,10 +291,6 @@ func (m *Model) applyReportExportDone(msg reportExportDoneMsg) {
 	if msg.JobID != "" && m.exports != nil {
 		m.exports.markDone(msg.JobID, msg.Path)
 	}
-	// Short flash so the user sees the export landed; the registry +
-	// modal carry the full path / open-shortcut from here on. `o` on
-	// /reports still opens the most-recent registry entry, so the
-	// "press X to open" hint isn't needed.
 	m.flash("saved → " + filepath.Base(msg.Path))
 	applog.Info("export.saved", map[string]any{
 		"path":       msg.Path,
@@ -388,17 +307,11 @@ func (m *Model) applyReportExportDone(msg reportExportDoneMsg) {
 	}
 }
 
-// orgInstanceURL returns the instance URL for o without trailing slash.
-// Falls back to "" when the URL isn't known yet (will produce a no-op
-// URL post-processor — the file is still written, just without links).
 func orgInstanceURL(o sf.Org) string {
 	u := strings.TrimRight(o.InstanceURL, "/")
 	return u
 }
 
-// buildPrefixMap walks the cached SObject list and returns the
-// KeyPrefix→Name map used by the URL post-processor. Empty when
-// SObjects haven't been fetched yet (post-processor will no-op).
 func buildPrefixMap(d *orgData) map[string]string {
 	if d == nil {
 		return nil
@@ -410,9 +323,6 @@ func buildPrefixMap(d *orgData) map[string]string {
 	out := make(map[string]string, len(objs))
 	for _, s := range objs {
 		if len(s.KeyPrefix) == 3 {
-			// First sobject for a prefix wins — durable enough for
-			// link-generation purposes; the user-facing URL is the
-			// same shape regardless of which sobject the prefix maps to.
 			if _, exists := out[s.KeyPrefix]; !exists {
 				out[s.KeyPrefix] = s.Name
 			}
@@ -423,19 +333,6 @@ func buildPrefixMap(d *orgData) map[string]string {
 
 var safeFilenameRE = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
 
-// renderFilename expands the user-configurable filename pattern.
-// Supported tokens (also documented in settings.toml):
-//
-//	{name}      — report's display name, sanitised for filesystem
-//	{id}        — Salesforce report Id
-//	{view}      — "formatted" / "details"
-//	{file}      — "xlsx" / "csv"
-//	{timestamp} — YYYYMMDD-HHMMSS local time
-//	{date}      — YYYY-MM-DD local
-//	{time}      — HHMMSS local
-//
-// Default pattern: "{name}-{timestamp}". Returned without an extension
-// — the caller appends format.Ext().
 func renderFilename(pattern, name, id string, format sf.ReportExportFormat) string {
 	if strings.TrimSpace(pattern) == "" {
 		pattern = "{name}-{timestamp}"
@@ -464,9 +361,6 @@ func renderFilename(pattern, name, id string, format sf.ReportExportFormat) stri
 	return r.Replace(pattern)
 }
 
-// expandTilde turns a leading "~" into the user's home directory. Falls
-// back to the input when HOME isn't set (rare) — better to write to a
-// literal "~/foo" than to error.
 func expandTilde(p string) string {
 	if !strings.HasPrefix(p, "~") {
 		return p

@@ -4,11 +4,6 @@ package treechip
 // One per (org, domain) pair — sharing across orgs would mean pins
 // from one org colliding with another's tree IDs, so the UI layer
 // constructs a fresh Registry per ensureOrgData and persists per-org.
-//
-// Mutators (Drill, Up, JumpTo, Reset, TogglePin) take pointer
-// receivers and update in place. Readers (Path, Pins, IsPinned,
-// StripModel, MainModel) take value receivers — safe for renderers
-// that hold the registry behind a Model copy.
 
 import (
 	"fmt"
@@ -33,7 +28,6 @@ type Registry struct {
 	path     TreePath
 	pins     []string            // node IDs, MRU order
 	pinNodes map[string]TreeNode // id → node, populated lazily so pin-jump
-	// doesn't re-fetch every render.
 }
 
 // NewRegistry constructs a registry for one (domain, source) pair.
@@ -50,10 +44,6 @@ func NewRegistry(domain string, src TreeSource, persist Persister) *Registry {
 	if persist != nil {
 		pins, last := persist.Load()
 		r.pins = append([]string(nil), pins...)
-		// Resolve last path lazily — call sites that want it will hit
-		// HydrateLastPath. Persisting raw IDs keeps the constructor
-		// fast (zero network) and lets the UI decide whether to pay
-		// for the lookup on entry.
 		_ = last
 	}
 	return r
@@ -151,13 +141,11 @@ func (r *Registry) ancestorChain(nodeID string) ([]TreeNode, error) {
 		seen[cur] = true
 		n, err := r.src.Item(cur)
 		if err != nil {
-			// Node missing — return what we have so far, leaf-first.
 			break
 		}
 		chainRev = append(chainRev, n)
 		cur = n.ParentID
 	}
-	// Reverse to root → leaf.
 	out := make([]TreeNode, len(chainRev))
 	for i, n := range chainRev {
 		out[len(chainRev)-1-i] = n
@@ -227,7 +215,6 @@ func (r *Registry) TogglePin(node TreeNode) bool {
 	r.mu.Lock()
 	for i, p := range r.pins {
 		if p == node.ID {
-			// un-pin: drop from list
 			r.pins = append(r.pins[:i], r.pins[i+1:]...)
 			delete(r.pinNodes, node.ID)
 			pathIDs := r.path.IDs()
@@ -237,7 +224,6 @@ func (r *Registry) TogglePin(node TreeNode) bool {
 			return false
 		}
 	}
-	// pin: insert at MRU front
 	r.pins = append([]string{node.ID}, r.pins...)
 	r.pinNodes[node.ID] = node
 	pathIDs := r.path.IDs()

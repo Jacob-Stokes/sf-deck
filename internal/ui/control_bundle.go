@@ -7,8 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/services/bundles"
 )
 
-// IPC verb handlers for bundles: create/link/retrieve/validate/deploy/report/list/show/delete. Split out of control_backend.go.
-
 func (s *ControlState) BundleList(args control.BundleListArgs) ([]any, error) {
 	if err := s.ensureStore(); err != nil {
 		return nil, err

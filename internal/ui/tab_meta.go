@@ -1,23 +1,6 @@
 package ui
 
 // /meta — the metadata long tail. Hybrid layout (2026-06-12):
-//
-//   Browse           — full type catalogue (describeMetadata) with an
-//                      Enter drill into any type's component list
-//                      (SOAP listMetadata, lazily fetched + cached
-//                      per type). Covers all ~600 types one level
-//                      deep — the catch-all.
-//   Custom Metadata  — EntityDefinition …__mdt types
-//   Custom Labels    — ExternalString rows with values
-//   Custom Settings  — EntityDefinition IsCustomSetting
-//   Static Resources — name / content-type / size / modified
-//   Named Credentials— endpoints + principal type (tooling)
-//   Remote Sites     — RemoteProxy endpoints + active flag
-//
-// The earlier 14 placeholder subtabs (Email Templates, Documents,
-// CSP, Connected Apps, Auth Providers, SAML, Certificates, Layouts…)
-// were cut — Browse subsumes their "list the names, o to Setup"
-// value, and the survivors above are the ones whose CONTENTS matter.
 
 import (
 	"strings"
@@ -71,8 +54,6 @@ func (m Model) renderMeta(w, innerH int) string {
 	)
 }
 
-// renderMetaList is the shared chip-less list body for /meta
-// subtabs: busy / press-r states, then the spec-derived table.
 func (m Model) renderMetaList(surf *listSurface, notFetched, busy bool, noun string, w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -92,8 +73,6 @@ func (m Model) renderMetaList(surf *listSurface, notFetched, busy bool, noun str
 	return body
 }
 
-// renderMetaBrowse is the default subtab: the full type catalogue.
-// Enter on a row drills into TabMetaTypeDetail.
 func (m Model) renderMetaBrowse(w, innerH int) string {
 	d := m.activeOrgData()
 	if d == nil {
@@ -113,7 +92,6 @@ func (m Model) renderMetaBrowse(w, innerH int) string {
 	return body
 }
 
-// renderMetaTypeDetail is the Browse drill: one type's components.
 func (m Model) renderMetaTypeDetail(w, innerH int) string {
 	d := m.activeOrgData()
 	if d == nil || d.MetaTypeCur == "" {
@@ -138,7 +116,6 @@ func (m Model) renderMetaTypeDetail(w, innerH int) string {
 	return body
 }
 
-// drillIntoMetaType is Enter on a Browse type row.
 func (m *Model) drillIntoMetaType() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -159,9 +136,6 @@ func (m *Model) drillIntoMetaType() tea.Cmd {
 	return tea.Batch(m.onTabChanged(), res.Ensure(m.cache))
 }
 
-// metaTypeItemsRes lazily wires the keyed per-type component list.
-// Half-hour TTL — component lists move when people deploy, unlike
-// the type catalogue (24h).
 func (d *orgData) metaTypeItemsRes(alias, metaType string) *Resource[[]sf.MetadataItem] {
 	if metaType == "" {
 		return nil
@@ -187,8 +161,6 @@ func (d *orgData) metaTypeItemsRes(alias, metaType string) *Resource[[]sf.Metada
 	return r
 }
 
-// ensureMetaData fetches whichever subtab's resource is active.
-// Browse's per-type lists are ensured on drill, not here.
 func (m *Model) ensureMetaData(d *orgData, _ sf.Org) tea.Cmd {
 	switch m.currentSubtab() {
 	case SubtabMetaCustomMetadata:
@@ -225,8 +197,6 @@ func (m Model) refreshMetaData(d *orgData) tea.Cmd {
 	return d.MetaTypes.Refresh(m.cache)
 }
 
-// ensureMetaTypeDetailData / refreshMetaTypeDetailData are the Browse
-// drill's registry hooks (extracted in the registry-purity pass).
 func (m *Model) ensureMetaTypeDetailData(d *orgData, o sf.Org) tea.Cmd {
 	if d.MetaTypeCur == "" {
 		return nil

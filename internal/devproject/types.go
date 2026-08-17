@@ -1,41 +1,6 @@
 package devproject
 
 // Dev Projects — the only first-class project concept.
-//
-// Hierarchy:
-//
-//   DevProject (cross-org, top-level)
-//     └── Item (sObject / Flow / Record / ApexClass / …)
-//
-// A DevProject is the unit a user thinks in: "Q2 migration." Items
-// hang directly off it. Each item carries the org it was collected
-// from in OrgUser, so a single project can hold things from multiple
-// orgs (dev sandbox + UAT + prod) without a separate per-org row.
-//
-// Earlier the schema had an OrgProject intermediate so each org got
-// its own per-project container. The split was theoretically clean
-// but made every common operation two-step (collect → which project?
-// → which org-instance?) and the rail had to surface both DevProject
-// and OrgProject panels. Items-with-origin-org collapses that to one
-// concept without losing the per-org Scope filtering — the Scope
-// hydrator just filters items by OrgUser at lookup time.
-//
-// Items are discriminated by Kind. Each kind stores a stable
-// identifier in Ref:
-//   - "sobject"        → API name (e.g. "Account")
-//   - "field"          → "<sObject>.<FieldApiName>" (e.g. "Account.Phone")
-//   - "flow"           → DefinitionId
-//   - "flow_version"   → Flow version Id (Type carries DefinitionId)
-//   - "record"         → Id (sobject API name in Type)
-//   - "apex_class"     → ApexClass.Id
-//   - "report"         → Report Id
-//   - "permset"        → PermissionSet Id
-//   - "permset_group"  → PermissionSetGroup Id
-//   - "profile"        → Profile Id (Type carries the implicit permset Id)
-//
-// More kinds (Dashboards, ApexTrigger, ValidationRule, …) drop in by
-// adding a new Kind constant + handling in the resolver/renderer. The
-// underlying schema is type-agnostic.
 
 import "time"
 
@@ -85,7 +50,6 @@ const (
 	// string). Same shape + semantics as KindSOQLQuery: org-
 	// agnostic, taggable, pinnable to DevProjects.
 	KindApexSnippet ItemKind = "apex_snippet"
-	// Future: KindDashboard, KindLayout, …
 )
 
 // Item is one entry in a DevProject's collected set.
@@ -111,13 +75,7 @@ type Item struct {
 	Name         string
 	AddedAt      time.Time
 	Notes        string // user's freeform note on why this item is in the project
-	// Namespace is the managed-package prefix when the item belongs
-	// to a managed package (e.g. "sf_devops" for DevOps Center
-	// classes). Empty for native / unmanaged components. Captured at
-	// collect time from the source query's NamespacePrefix column;
-	// stored so we can flag managed items in the UI + skip them at
-	// export without re-querying the org.
-	Namespace string
+	Namespace    string
 }
 
 // Managed reports whether this item belongs to a managed package

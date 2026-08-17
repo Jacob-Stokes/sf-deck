@@ -3,26 +3,6 @@ package ui
 // Open surface registry — second migration step on the path to a
 // declarative TabSpec. Companion to chipSurface (chip_surface.go)
 // and listSurface (list_surface.go).
-//
-// Each openSurface answers two questions for a given (Tab, Subtab):
-//
-//   1. What's under the cursor right now, as an sf.Openable?
-//      (drives o, ctrl+o, O, y, ctrl+y, the open-menu modal)
-//   2. What does Enter do — drill into a detail tab? Or no-op?
-//      (drives the activate() handler)
-//
-// Each surface lives as a named package-level var below, populated
-// in init(). The init() indirection breaks an otherwise unavoidable
-// initialization cycle: many Drill closures call m.onTabChanged(),
-// which transitively reaches lookupTabSpec → tabRegistry → these
-// same surface vars. Go's package-init walker follows function
-// bodies, so a direct `var X = openSurface{...}` form would cycle.
-// init() side-steps that because the var has no initializer
-// expression — the assignment happens at runtime, after all package
-// vars are declared.
-//
-// TabSpec entries point at these vars via Subtabs[i].Open or
-// TabSpec.Open — see tab_registry.go.
 
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
@@ -30,24 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// openSurface is the per-(Tab, Subtab) record. Both fields are
-// optional — a surface that has only `Openable` (cursor → URL via o)
-// without `Drill` (Enter → no drill) is fine; a surface with only
-// `Drill` (Enter drills, but no o target) is also fine.
 type openSurface struct {
-	// Openable returns the cursored row's Openable, or nil when
-	// there's nothing meaningful under the cursor (empty list,
-	// loading state, etc.). Nil result tells the caller to fall
-	// back to the org's default.
-	//
-	// Relationship to TabSpec.Identity: if a tab's Identity already
-	// returns an Openable, leave THIS field nil — cursorOpenable
-	// consults Identity first and an Identity-provided Openable
-	// makes this duplicate redundant. Set Openable here only when
-	// the openable shape doesn't fit the (kind, ref, label, openable)
-	// tuple Identity carries (e.g. records-list rows that synthesize
-	// an attributes block, /reports' "report row vs folder row"
-	// branch, multi-target opens with bespoke logic).
 	Openable func(m Model) sf.Openable
 
 	// Drill is the Enter handler. Returns the (target tab, cmd)
@@ -58,10 +21,6 @@ type openSurface struct {
 	// target tab — same pattern the legacy activate() switch used.
 	Drill func(m *Model) (tea.Cmd, bool)
 }
-
-// Surface vars — declared without initializer so they don't
-// participate in package-init cycle detection. Populated in init()
-// below.
 
 var (
 	objectsOpenSurface      openSurface
@@ -105,7 +64,6 @@ var (
 )
 
 func init() {
-	// /objects
 	objectsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -135,7 +93,6 @@ func init() {
 		},
 	}
 
-	// /flows
 	flowsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -164,7 +121,6 @@ func init() {
 		},
 	}
 
-	// /apex Classes
 	apexClassesOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -191,10 +147,7 @@ func init() {
 		},
 	}
 
-	// /apex Triggers (flat cross-sObject list)
 	apexTriggersOpenSurface = openSurface{
-		// Trigger rows aren't directly Openable in Lightning today —
-		// nil; o falls through to the org default.
 		Openable: func(m Model) sf.Openable { return nil },
 		Drill: func(m *Model) (tea.Cmd, bool) {
 			d := m.activeOrgData()
@@ -213,7 +166,6 @@ func init() {
 		},
 	}
 
-	// /components LWC
 	lwcOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -240,7 +192,6 @@ func init() {
 		},
 	}
 
-	// /components Aura
 	auraOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -267,7 +218,6 @@ func init() {
 		},
 	}
 
-	// /perms PermSets
 	permsetsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -300,7 +250,6 @@ func init() {
 		},
 	}
 
-	// /perms PSGs
 	psgsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -333,7 +282,6 @@ func init() {
 		},
 	}
 
-	// /perms Profiles
 	profilesOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -366,7 +314,6 @@ func init() {
 		},
 	}
 
-	// /perms Queues
 	queuesOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -381,7 +328,6 @@ func init() {
 		},
 	}
 
-	// /perms Public Groups
 	publicGroupsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -396,9 +342,6 @@ func init() {
 		},
 	}
 
-	// /perms Queue / Public Group detail — drill on a member opens
-	// the underlying user/group's Lightning record (same browser-hop
-	// shape as notifications + apex logs).
 	queueDetailOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -413,14 +356,6 @@ func init() {
 		Drill: drillToFirstOpenTarget,
 	}
 
-	// /home Recent subtab Open surface.  Rows are list-shaped with
-	// both Openable (yank / open-in-Lightning) and Drill (in-TUI
-	// navigation to the canonical detail tab for the row's kind).
-	// Drill dispatches by RecentEntry.Kind via the shared drillByKind
-	// helper; kinds with no in-TUI detail surface (dashboard, listview,
-	// package, deploy, apex_log) silently no-op — users can press `o`
-	// to open them in Lightning instead.  See
-	// docs/recent-kinds-drill-audit.md.
 	homeRecentOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -470,11 +405,6 @@ func init() {
 			}
 			return nil
 		},
-		// Drill on a notification = open its target in Lightning.
-		// Notifications don't have a useful in-TUI detail surface
-		// (the body is short and already rendered in the row); the
-		// expected gesture is "take me to the thing the notification
-		// is about." The openable's first target is exactly that.
 		Drill: drillToFirstOpenTarget,
 	}
 
@@ -500,7 +430,6 @@ func init() {
 		},
 	}
 
-	// /apex-logs (top-level tab)
 	apexLogsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -537,9 +466,6 @@ func init() {
 		Drill: drillToFirstOpenTarget,
 	}
 
-	// Jobs surfaces expose Openable (o → the Setup page) but NO Drill —
-	// Enter drills into the job's Apex class via the subtab's Activate
-	// hook (activateAsyncJob / activateScheduledJob), not into Lightning.
 	asyncJobsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -590,9 +516,6 @@ func init() {
 		Drill: drillToFirstOpenTarget,
 	}
 
-	// Communities: o opens the community (live/builder/setup); Enter
-	// drills into its pages (Drill omitted so activate hits the tab's
-	// Activate hook — same pattern as Active Users).
 	communitiesOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -616,7 +539,6 @@ func init() {
 		Drill: drillToFirstOpenTarget,
 	}
 
-	// /deploys (top-level)
 	deploysOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -626,16 +548,11 @@ func init() {
 			}
 			return nil
 		},
-		// Enter drills into the component/test breakdown — the
-		// browser stays on o/O per the global Enter policy. (This
-		// replaced an early drillToFirstOpenTarget which opened the
-		// browser from Enter.)
 		Drill: func(m *Model) (tea.Cmd, bool) {
 			return m.drillIntoDeploy(), true
 		},
 	}
 
-	// /deploy drill: o opens the drilled deploy's Setup detail page.
 	deployDetailOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -651,9 +568,6 @@ func init() {
 		},
 	}
 
-	// /users · Recent logins. Drill enters the in-TUI User detail
-	// surface (action menu lives in the sidebar). The browser-open
-	// path stays available via o / ctrl+o.
 	usersOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -681,17 +595,6 @@ func init() {
 	}
 }
 
-// drillToFirstOpenTarget is a generic Drill closure that opens the
-// cursored row's first OpenTarget in the user's default browser.
-//
-// Use for surfaces that don't have a useful in-TUI detail tab — the
-// natural drill is "take me to where this thing lives in
-// Salesforce." Notifications, limit rows, deploy rows that point at
-// a Lightning page, etc.
-//
-// Returns ok=false when there's nothing under the cursor (empty
-// list, loading state) so the dispatcher falls through to whatever
-// next handler exists.
 func drillToFirstOpenTarget(m *Model) (tea.Cmd, bool) {
 	surf := m.resolveOpenSurface()
 	if surf == nil || surf.Openable == nil {
@@ -737,8 +640,6 @@ var (
 )
 
 func init() {
-	// Home subtabs without their own open surface (Landing, Downloads,
-	// placeholders): o opens Lightning home for the org.
 	homeFallbackOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if o, ok := m.currentOrg(); ok {
@@ -748,9 +649,6 @@ func init() {
 		},
 	}
 
-	// Records subtab of the object drill. The openable is built from
-	// filtered record-list rows + a synthetic attributes.type, which
-	// doesn't fit the Identity tuple shape.
 	objectRecordsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -762,9 +660,6 @@ func init() {
 			if !ok {
 				return nil
 			}
-			// List-view rows don't carry the standard `attributes`
-			// block, so RecordRef's URL-parser would fail without a
-			// synthetic attributes.type.
 			if _, ok := rec["attributes"]; !ok {
 				if _, hasID := rec["Id"]; hasID {
 					rec = copyRecordWithAttrs(rec, d.DescribeCur)
@@ -774,10 +669,6 @@ func init() {
 		},
 	}
 
-	// /reports: cursor lives in d.Cursors keyed by current folder, not
-	// in d.ReportList (which holds the full unscoped row set). Resolve
-	// via visibleReportsItems so o opens what the user sees. Folder
-	// rows return nil — folders have no canonical Lightning URL.
 	reportsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -797,7 +688,6 @@ func init() {
 		},
 	}
 
-	// /reports Dashboards subtab: plain ListView selection.
 	dashboardsOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -809,8 +699,6 @@ func init() {
 		},
 	}
 
-	// /reports Report Types subtab: rows only carry a Setup-home
-	// URL (report types have no per-record Lightning page).
 	reportTypesOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if d := m.activeOrgData(); d != nil {
@@ -822,8 +710,6 @@ func init() {
 		},
 	}
 
-	// /meta Browse: Enter drills into the type's component list; o
-	// has no target on the catalogue itself (types aren't pages).
 	metaBrowseOpenSurface = openSurface{
 		Drill: func(m *Model) (tea.Cmd, bool) {
 			return m.drillIntoMetaType(), true
@@ -896,7 +782,6 @@ func init() {
 		},
 	}
 
-	// /report drill: same target list as the list-row form.
 	reportDetailOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -912,7 +797,6 @@ func init() {
 		},
 	}
 
-	// /flow drill: open the cursored version row.
 	flowDetailOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -932,8 +816,6 @@ func init() {
 		},
 	}
 
-	// Flow-version viewer: o still opens THIS version in Flow Builder
-	// (the in-terminal JSON is for reading; the browser is for editing).
 	flowVersionDetailOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -953,7 +835,6 @@ func init() {
 		},
 	}
 
-	// /soql: the cursored result row as a record ref.
 	soqlOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			if len(m.soqlResult.Records) == 0 {
@@ -967,9 +848,6 @@ func init() {
 		},
 	}
 
-	// /records: picker mode opens the cursored sObject (same openable
-	// as /objects); record-list mode opens the visible (filtered)
-	// record under the cursor.
 	recordsTabOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()
@@ -1018,9 +896,6 @@ func init() {
 		},
 	}
 
-	// /perm drill: on Overview (and any subtab without a row-level
-	// Openable of its own), o opens the parent permset/PSG/profile in
-	// Setup.
 	permParentOpenSurface = openSurface{
 		Openable: func(m Model) sf.Openable {
 			d := m.activeOrgData()

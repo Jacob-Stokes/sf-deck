@@ -1,28 +1,6 @@
 package ui
 
 // Automatic dev-project reconcile.
-//
-// A dev project is a local SQLite list of (kind, ref, name, org) rows.
-// Two problems accumulate:
-//
-//   1. Inconsistent refs — bundle-import stores a flow under its
-//      DeveloperName, but the collect path stores its DefinitionId. The
-//      same flow ends up as two rows, dedup can't catch it, and the
-//      blank-name import row is silently DROPPED from an export manifest.
-//   2. Stale rows — a resource deleted in Salesforce leaves a dangling
-//      item that drills/opens/deploys to nothing.
-//
-// reconcileDevProject fixes both, automatically, whenever the user
-// touches a project (navigates in, adds, removes, exports). It builds a
-// plan of ref-rewrites (normalise to canonical) + deletes (confirmed
-// missing) and applies it in one transaction.
-//
-// Safety rule that governs the whole thing: an item is only removed as
-// "missing" when we have POSITIVELY LOADED that item's org's resource
-// list and confirmed the resource is absent. If the list isn't loaded,
-// we leave the item alone — we can never tell "deleted" from
-// "not-fetched-yet", and must never delete on the latter. Cross-org
-// items are checked against their OWN org, never the active one.
 
 import (
 	"fmt"
@@ -53,13 +31,10 @@ func (m *Model) reconcileDevProject(projectID string) {
 		applog.Warn("devproject.reconcile_failed", map[string]any{"err": err.Error()})
 		return
 	}
-	// Tag bindings share the same identity model and the same two risks,
-	// so tidy them in the same pass — a project touch reconciles both.
 	m.reconcileTags()
 	if removed == 0 && merged == 0 {
 		return
 	}
-	// Refresh whatever project views are live so the change shows now.
 	m.reloadDevProjects()
 	if m.tab() == TabDevProjectDetail && m.devProjectCur == projectID {
 		m.reloadDevProjectItems()
@@ -123,9 +98,6 @@ func (m *Model) reconcileTags() {
 	if removed == 0 && merged == 0 {
 		return
 	}
-	// The gutter/tag caches key off store.Generation(), which
-	// ReconcileTagBindings bumped via touch() — so the dots refresh on
-	// the next paint without an explicit invalidation here.
 	m.flash(tagReconcileSummary(removed, merged))
 }
 
@@ -160,8 +132,6 @@ func plural(n int) string {
 	return "s"
 }
 
-// oracleData answers existence + canonicalisation questions for one
-// org + kind, built from currently-loaded data.
 type oracleData struct {
 	loaded        bool
 	refs          map[string]bool   // known-present canonical refs
@@ -171,7 +141,6 @@ type oracleData struct {
 	fieldMode     bool              // ref is "<sobject>.<field>"; check parent
 }
 
-// present reports whether a ref is known-present in the loaded data.
 func (o *oracleData) present(ref string) bool {
 	if o.fieldMode {
 		obj := ref
@@ -207,8 +176,6 @@ func (m *Model) planReconcile(projectID string, items []devproject.Item) ([]devp
 			continue // kind not reconcilable, or data not loaded — leave it
 		}
 
-		// 1. Flow ref normalisation: an item stored under a DeveloperName
-		//    gets rewritten to its DefinitionId (canonical), filling name.
 		if it.Kind == devproject.KindFlow {
 			if canonical, isDevName := o.byDevName[it.Ref]; isDevName && canonical != it.Ref {
 				rewrites = append(rewrites, devproject.ItemRewrite{
@@ -219,7 +186,6 @@ func (m *Model) planReconcile(projectID string, items []devproject.Item) ([]devp
 			}
 		}
 
-		// 2. Missing check: ref not known-present in the loaded list.
 		if !o.present(it.Ref) {
 			deletes = append(deletes, devproject.ItemDelete{
 				DevProjectID: projectID, OrgUser: it.OrgUser, Kind: it.Kind, Ref: it.Ref,
@@ -229,9 +195,6 @@ func (m *Model) planReconcile(projectID string, items []devproject.Item) ([]devp
 	return deletes, rewrites
 }
 
-// buildOracle constructs the existence oracle for one org + kind from
-// currently-loaded data. Returns loaded=false (leaving items untouched)
-// for any kind whose list isn't reconcilable or isn't fetched yet.
 func (m *Model) buildOracle(org string, kind devproject.ItemKind) *oracleData {
 	o := &oracleData{refs: map[string]bool{}, byDevName: map[string]string{}, names: map[string]string{}}
 	d := m.data[org]
@@ -314,9 +277,6 @@ func (m *Model) buildOracle(org string, kind devproject.ItemKind) *oracleData {
 		o.loaded = true
 
 	default:
-		// Kinds we don't reconcile (permsets/psgs/profiles/queues/
-		// triggers/reports/records/soql/apex-snippets/…): their lists
-		// aren't reliably loaded on a project touch, so leave them.
 		return o
 	}
 	return o

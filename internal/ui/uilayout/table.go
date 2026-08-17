@@ -1,14 +1,5 @@
 package uilayout
 
-// Small reusable table primitive for the read-only tables on /home,
-// /flows, /perms-overview, etc. — anywhere the UI shows fixed columns
-// without cursor / drill / search interaction.
-//
-// Not for the bigger interactive lists (objects, fields, records) —
-// those have their own widths-from-state machinery (fieldTableLayout
-// etc.) since they need to coordinate with cursor / FLAGS column /
-// scroll indicator.
-
 import (
 	"strings"
 
@@ -83,8 +74,6 @@ func RenderInteractiveTableRowHighlight(cols []Column, cells []string, selected,
 		if len(terms) == 0 {
 			parts[i] = s.Width(w).Render(truncated)
 		} else {
-			// Render the highlighted-in-style cell first (so highlight
-			// + base alternate cleanly), then pad to the column width.
 			body := HighlightInStyle(truncated, terms, s)
 			parts[i] = lipgloss.NewStyle().Width(w).Render(body)
 		}
@@ -100,8 +89,6 @@ func RenderInteractiveTableRowHighlight(cols []Column, cells []string, selected,
 	return ansi.Truncate(prefix+strings.Join(parts, Sep), inner, "…")
 }
 
-// resolveWidths fills any flex (negative) column with leftover space.
-// Reserves "  " gutter + (n-1) " │ " separators against inner.
 func resolveWidths(cols []Column, inner int) []int {
 	const gutter = 2
 	const sepW = 3 // " │ "

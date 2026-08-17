@@ -1,17 +1,5 @@
 package ui
 
-// Per-tab breadcrumb resolvers — the path segments rendered after
-// the tab name in the header. Wired into TabSpec.Breadcrumb /
-// SubtabSpec.Breadcrumb in tab_registry.go.
-//
-// Segments compose (parent → cursored item) so a user can read the
-// header and know exactly where they are without consulting any
-// in-pane title. Each closure returns nil when there's no useful
-// context to surface (no org, no cursor, fetch in flight).
-//
-// Surfaces whose breadcrumb is just "the cursored item label"
-// often reuse identity-based helpers below.
-
 import "fmt"
 
 // breadcrumbFromObjectDetail builds the multi-segment breadcrumb
@@ -53,7 +41,6 @@ func breadcrumbFromObjectDetail(m Model) []string {
 	return out
 }
 
-// breadcrumbFromObjectsList — the cursored sObject's API name.
 func breadcrumbFromObjectsList(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil {
@@ -65,7 +52,6 @@ func breadcrumbFromObjectsList(m Model) []string {
 	return nil
 }
 
-// breadcrumbFromFieldDetail — sObject → field name.
 func breadcrumbFromFieldDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" {
@@ -78,7 +64,6 @@ func breadcrumbFromFieldDetail(m Model) []string {
 	return out
 }
 
-// breadcrumbFromValidationDetail — sObject → rule name.
 func breadcrumbFromValidationDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" {
@@ -96,7 +81,6 @@ func breadcrumbFromValidationDetail(m Model) []string {
 	return out
 }
 
-// breadcrumbFromRecordTypeDetail — sObject → record type dev name.
 func breadcrumbFromRecordTypeDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" {
@@ -114,7 +98,6 @@ func breadcrumbFromRecordTypeDetail(m Model) []string {
 	return out
 }
 
-// breadcrumbFromTriggerDetail — sObject → trigger name.
 func breadcrumbFromTriggerDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" {
@@ -132,8 +115,6 @@ func breadcrumbFromTriggerDetail(m Model) []string {
 	return out
 }
 
-// breadcrumbFromRecords — picker mode shows just the cursored
-// sObject; record-list mode shows sObject → record name/id.
 func breadcrumbFromRecords(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil {
@@ -157,7 +138,6 @@ func breadcrumbFromRecords(m Model) []string {
 	return out
 }
 
-// breadcrumbFromFlows — cursored flow's DeveloperName.
 func breadcrumbFromFlows(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil {
@@ -169,7 +149,6 @@ func breadcrumbFromFlows(m Model) []string {
 	return nil
 }
 
-// breadcrumbFromFlowDetail — flow DeveloperName → version label.
 func breadcrumbFromFlowDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.FlowCur == "" {
@@ -192,7 +171,6 @@ func breadcrumbFromFlowDetail(m Model) []string {
 	return out
 }
 
-// breadcrumbFromReportDetail — folder → report name.
 func breadcrumbFromReportDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.ReportCur == "" {
@@ -211,8 +189,6 @@ func breadcrumbFromReportDetail(m Model) []string {
 	return nil
 }
 
-// breadcrumbFromRecordDetail — sObject → resolved record display
-// name (Name field, falling back to Id).
 func breadcrumbFromRecordDetail(m Model) []string {
 	d := m.activeOrgData()
 	if d == nil || d.RecordDetailCur == "" {

@@ -1,15 +1,6 @@
 package devproject
 
 // SQLite-backed storage for Dev Projects + Items.
-//
-// File: ~/.sf-deck/devprojects.db (separate from cache.db so cache
-// rebuilds / migrations don't risk wiping the user's hand-curated
-// project state).
-//
-// The active schema uses dev_projects + dev_project_items, with each item
-// carrying its originating org_user directly. migrateFromOrgProjects handles
-// compatible stores containing the intermediate org_projects tables and keeps
-// those source tables under *_legacy names for inspection.
 
 import (
 	"database/sql"
@@ -229,9 +220,6 @@ func (s *Store) Generation() int {
 	return int(s.generation.Load())
 }
 
-// touch bumps the mutation counter. Called from every write method
-// that affects tag_bindings or dev_project_items so cache consumers
-// invalidate correctly.
 func (s *Store) touch() {
 	if s == nil {
 		return
@@ -290,9 +278,6 @@ func OpenPath(path string) (*Store, error) {
 	return openAt(path)
 }
 
-// errRecoveredFromBackup marks the soft-error shape Open returns
-// when it recovered: the Store is USABLE (non-nil) but the caller
-// should surface the data-loss warning to the user.
 var errRecoveredFromBackup = errors.New("devproject store recovered")
 
 // RecoveredFromBackup reports whether an Open error is the soft
@@ -321,8 +306,6 @@ func openAt(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	// Enable foreign keys before applying schema so the tag_bindings
-	// FK constraint is enforced (SQLite defaults FK enforcement OFF).
 	if err := ensureForeignKeysOn(db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -490,9 +473,6 @@ func migrateFromOrgProjects(db *sql.DB) error {
 		FROM org_project_items i
 		JOIN org_projects op ON op.id = i.org_project_id`)
 	if err != nil {
-		// org_projects table missing but org_project_items present —
-		// data is already orphaned, nothing to copy. Continue with
-		// rename to clean up.
 		if !strings.Contains(err.Error(), "no such table") {
 			return err
 		}
@@ -797,7 +777,6 @@ func (s *Store) ApplyReconcile(deletes []ItemDelete, rewrites []ItemRewrite) (re
 			return 0, 0, err
 		}
 		if targetExists {
-			// Canonical row already there — drop the duplicate source.
 			res, e := delItem.Exec(rw.DevProjectID, rw.OrgUser, string(rw.Kind), rw.FromRef)
 			if e != nil {
 				err = e
@@ -808,7 +787,6 @@ func (s *Store) ApplyReconcile(deletes []ItemDelete, rewrites []ItemRewrite) (re
 			}
 			continue
 		}
-		// Re-key the source row to the canonical ref, filling name/type.
 		res, e := tx.Exec(`UPDATE dev_project_items
 			SET ref=?,
 			    name=CASE WHEN ?<>'' THEN ? ELSE name END,

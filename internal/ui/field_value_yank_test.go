@@ -39,7 +39,6 @@ func TestFieldValueYankOptionsPicklist(t *testing.T) {
 	if !strings.Contains(table, "Open\topen\tyes\tyes") {
 		t.Errorf("table missing default row: %q", table)
 	}
-	// A plain picklist has no formula/help/etc.
 	for _, unexpected := range []string{"Formula", "Help text", "Reference target(s)"} {
 		if _, ok := byLabel[unexpected]; ok {
 			t.Errorf("plain picklist should not offer %q", unexpected)
@@ -70,7 +69,6 @@ func TestFieldValueYankOptionsOtherValues(t *testing.T) {
 		t.Error("no references → should not offer reference target")
 	}
 
-	// Reference field
 	ref := sf.Field{Name: "AccountId", Type: "reference", ReferenceTo: []string{"Account"}}
 	byLabel = map[string]string{}
 	for _, o := range fieldValueYankOptions(ref) {

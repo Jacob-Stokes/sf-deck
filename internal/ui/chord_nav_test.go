@@ -77,7 +77,6 @@ func TestChordListModal(t *testing.T) {
 			t.Errorf("chord q-%s missing from the q-q cheat-sheet", c.Letter)
 		}
 	}
-	// Nav chords are always available → no "(n/a here)" marker.
 	for _, letter := range []string{"1", "2", "3", "4", "5"} {
 		if body := byKey[letter]; strings.Contains(body, "n/a") {
 			t.Errorf("nav chord q-%s should be available everywhere, got %q", letter, body)

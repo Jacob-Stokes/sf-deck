@@ -1,26 +1,11 @@
 package ui
 
 // /soql Saved + History subtabs.
-//
-// Both subtabs are backed by ListView[T] living on orgData, just
-// like every other list surface in sf-deck. That's the contract
-// the chip system + listSurface registry threads through; living
-// outside it (which we tried first by parking snapshots on Model)
-// makes V / N / M / project chips fight the dispatcher.
-//
-// Saved is the curated library: named queries the user authored,
-// taggable, pinnable to DevProjects, fully managed (rename / edit /
-// duplicate / delete). The data is org-agnostic but the snapshot
-// is reloaded fresh per-org from the same SQLite store.
-//
-// History is the read-only execution log: every SOQL run lands
-// here scoped to the org it ran against. The useful gesture is
-// "load this body back into the editor."
 
 import (
 	"fmt"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -30,8 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
-
-// ----- Saved subtab -----------------------------------------------
 
 // reloadSOQLSaved refreshes d.SOQLSavedList from the devproject
 // store. Idempotent — Match is set lazily on first call. The
@@ -76,14 +59,10 @@ func (m *Model) reloadSOQLSaved(d *orgData) {
 	d.SOQLSavedLoaded = true
 }
 
-// soqlSavedCols defines the Saved subtab's columns.
 func soqlSavedCols() []uilayout.ListColumn {
 	return schemaListColumns(soqlSavedColumnSchema())
 }
 
-// soqlSavedListSurface renders the Saved-queries grid. Standard
-// listSurface shape with State/Search/Match/Cursor all reading
-// from orgData — same contract as every other list surface.
 var soqlSavedListSurface = listSurface{
 	State:       func(d *orgData) *uilayout.ListTableState { return &d.SOQLSavedTable },
 	Cols:        soqlSavedCols,
@@ -140,8 +119,6 @@ var soqlSavedListSurface = listSurface{
 	},
 }
 
-// identityFromSOQLSaved exposes the cursored saved row for the
-// unified tag picker / collect / openable lookup machinery.
 func identityFromSOQLSaved(m Model) (ItemIdentity, bool) {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -157,8 +134,6 @@ func identityFromSOQLSaved(m Model) (ItemIdentity, bool) {
 		Label: q.Name,
 	}, true
 }
-
-// ----- History subtab ---------------------------------------------
 
 func (m *Model) reloadSOQLHistory(d *orgData) {
 	if d == nil {
@@ -259,8 +234,6 @@ var soqlHistoryListSurface = listSurface{
 	},
 }
 
-// ----- Renderers --------------------------------------------------
-
 func (m Model) renderSOQLSaved(w, innerH int) string {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -311,8 +284,6 @@ func (m Model) renderSOQLHistory(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// ----- Activate (Enter) handlers ----------------------------------
-
 func (m *Model) loadCursoredSavedEntry() {
 	d, ok := m.activeOrgState()
 	if !ok {
@@ -327,10 +298,6 @@ func (m *Model) loadCursoredSavedEntry() {
 	}
 	resolved := substituteSOQL(q.Body, m.substitutionsFor(d))
 	m.soqlInput.SetValue(resolved)
-	// Loading a different query: drop the previous query's results so
-	// the editor doesn't sit above stale rows (or a stale error) until
-	// the user re-runs. Search + column sort stay — they're sticky per
-	// session by design, same as across manual re-runs.
 	m.soqlResult = sf.QueryResult{}
 	m.soqlErr = nil
 	m.soqlRowCur = 0
@@ -361,10 +328,6 @@ func (m *Model) loadCursoredHistoryEntry() {
 	// somehow. Cheap; keeps the contract uniform.
 	resolved := substituteSOQL(e.Body, m.substitutionsFor(d))
 	m.soqlInput.SetValue(resolved)
-	// Loading a different query: drop the previous query's results so
-	// the editor doesn't sit above stale rows (or a stale error) until
-	// the user re-runs. Search + column sort stay — they're sticky per
-	// session by design, same as across manual re-runs.
 	m.soqlResult = sf.QueryResult{}
 	m.soqlErr = nil
 	m.soqlRowCur = 0
@@ -373,8 +336,6 @@ func (m *Model) loadCursoredHistoryEntry() {
 	m.soqlSubtabIdx = 0
 	m.soqlEditingSavedID = ""
 }
-
-// ----- Save / delete / rename / duplicate -------------------------
 
 func (m Model) handleSOQLSave() (Model, tea.Cmd) {
 	body := strings.TrimSpace(m.soqlInput.Value())
@@ -533,10 +494,6 @@ func (m Model) handleSOQLRename() (Model, tea.Cmd) {
 // strictly DevProjects.
 type soqlSavedChangedMsg struct{}
 
-// invalidateSOQLSaved marks every org's saved-queries snapshot as
-// stale so the next render reloads. Used after any mutation
-// (create / update / delete / duplicate) since the same query can
-// surface under multiple orgs in cached snapshots.
 func (m *Model) invalidateSOQLSaved() {
 	for _, d := range m.data {
 		if d != nil {
@@ -545,9 +502,6 @@ func (m *Model) invalidateSOQLSaved() {
 	}
 }
 
-// invalidateSOQLHistory marks every org's history snapshot as
-// stale. Called after a SOQL run so the next History view reflects
-// the new row.
 func (m *Model) invalidateSOQLHistory() {
 	for _, d := range m.data {
 		if d != nil {
@@ -555,8 +509,6 @@ func (m *Model) invalidateSOQLHistory() {
 		}
 	}
 }
-
-// ----- Persist execution log --------------------------------------
 
 func (m *Model) persistSOQLHistory(msg soqlResultMsg) {
 	if m.devProjects == nil || msg.orgUser == "" {
@@ -577,8 +529,6 @@ func (m *Model) persistSOQLHistory(msg soqlResultMsg) {
 	}
 	m.invalidateSOQLHistory()
 }
-
-// ----- Helpers ----------------------------------------------------
 
 func collapseSOQL(body string) string {
 	body = strings.TrimSpace(body)

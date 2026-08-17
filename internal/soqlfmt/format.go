@@ -2,23 +2,6 @@
 // "select id,name from account where industry='Tech' order by
 // name limit 50" into the clause-per-line shape every SOQL author
 // already writes by hand:
-//
-//	SELECT Id, Name
-//	FROM Account
-//	WHERE Industry = 'Tech'
-//	ORDER BY Name
-//	LIMIT 50
-//
-// Strategy: tokenize the query at whitespace + punctuation boundaries
-// (single-quoted string literals are atomic), upper-case clause
-// keywords, lower-case function calls and field references, then
-// re-emit with line breaks before each top-level clause keyword.
-//
-// Not a parser. We don't validate structure — we just shuffle
-// whitespace and case. Embedded subqueries stay on one line (they
-// rarely benefit from breaking, and they confuse the simple "is
-// this an outer-level clause keyword?" check). Aliases and
-// relationship paths are preserved verbatim.
 package soqlfmt
 
 import (
@@ -72,7 +55,6 @@ func tokenize(s string) []token {
 			out = append(out, token{Text: " ", Kind: kindSpace})
 			i = j
 		case ch == '\'':
-			// Quoted literal. Walk to the matching ' (handling \\').
 			j := i + 1
 			for j < len(s) {
 				if s[j] == '\\' && j+1 < len(s) {
@@ -95,7 +77,6 @@ func tokenize(s string) []token {
 			out = append(out, token{Text: s[i:j], Kind: kindWord})
 			i = j
 		default:
-			// Multi-char operators: >=, <=, !=, <>.
 			if i+1 < len(s) {
 				two := s[i : i+2]
 				if two == ">=" || two == "<=" || two == "!=" || two == "<>" {
@@ -118,9 +99,6 @@ func isWordChar(b byte) bool {
 		b == '_' || b == '.'
 }
 
-// upperKeywords are recognised SOQL words we always uppercase
-// regardless of position. Includes operators, qualifiers,
-// directionals.
 var upperKeywords = map[string]bool{
 	"SELECT": true, "FROM": true, "WHERE": true, "AND": true, "OR": true,
 	"NOT": true, "LIKE": true, "IN": true, "INCLUDES": true, "EXCLUDES": true,
@@ -133,23 +111,10 @@ var upperKeywords = map[string]bool{
 	"MAX": true, "FIELDS": true,
 }
 
-// emit re-assembles tokens into a formatted string. Logic:
-//  1. Walk tokens, building lines. Each clause keyword starts a
-//     new line at indent 0.
-//  2. AND/OR inside a WHERE/HAVING clause start a new line at
-//     indent 2 (continuation).
-//  3. Commas in SELECT projections get a space after but stay on
-//     the same line — projection lists are usually short enough
-//     to fit one line, and breaking on every comma reads worse.
-//  4. Strings + non-keyword words: uppercase the keyword set,
-//     preserve casing of everything else (field names like
-//     `Account.Name` stay as typed).
 func emit(tokens []token) string {
 	var b strings.Builder
 	indent := ""
 	atLineStart := true
-	// Track whether we're past the WHERE so AND/OR get the
-	// continuation indent rather than being treated as bare words.
 	inWhereOrHaving := false
 
 	skipSpaces := func(i int) int {
@@ -176,19 +141,16 @@ func emit(tokens []token) string {
 			b.WriteString(t.Text)
 			continue
 		case kindPunct:
-			// Comma → emit then ensure exactly one space follows.
 			if t.Text == "," {
 				if atLineStart {
 					b.WriteString(indent)
 					atLineStart = false
 				}
-				// Strip trailing space from previous chars.
 				trimTrailingSpace(&b)
 				b.WriteString(", ")
 				i = skipSpaces(i+1) - 1 // -1 because loop ++s
 				continue
 			}
-			// Comparison operators: pad with spaces.
 			if t.Text == "=" || t.Text == "<" || t.Text == ">" ||
 				t.Text == ">=" || t.Text == "<=" || t.Text == "!=" || t.Text == "<>" {
 				if atLineStart {
@@ -208,12 +170,9 @@ func emit(tokens []token) string {
 			continue
 		case kindWord:
 			upper := strings.ToUpper(t.Text)
-			// Multi-word clause keyword? Peek ahead for "ORDER BY",
-			// "GROUP BY".
 			if upper == "ORDER" || upper == "GROUP" {
 				j := skipSpaces(i + 1)
 				if j < len(tokens) && tokens[j].Kind == kindWord && strings.EqualFold(tokens[j].Text, "BY") {
-					// Emit "ORDER BY" / "GROUP BY" on a new line.
 					if b.Len() > 0 {
 						trimTrailingSpace(&b)
 						b.WriteByte('\n')
@@ -226,7 +185,6 @@ func emit(tokens []token) string {
 					continue
 				}
 			}
-			// Single-word clause keyword on a new line.
 			if isClauseStarter(upper) {
 				if b.Len() > 0 {
 					trimTrailingSpace(&b)
@@ -242,7 +200,6 @@ func emit(tokens []token) string {
 				}
 				continue
 			}
-			// Continuation keyword AND/OR inside WHERE/HAVING.
 			if inWhereOrHaving && (upper == "AND" || upper == "OR") {
 				trimTrailingSpace(&b)
 				b.WriteByte('\n')
@@ -268,9 +225,6 @@ func emit(tokens []token) string {
 	return out
 }
 
-// isClauseStarter is true for single-word top-level keywords that
-// start a new line. "ORDER" / "GROUP" are handled separately
-// (multi-word).
 func isClauseStarter(upper string) bool {
 	switch upper {
 	case "SELECT", "FROM", "WHERE", "HAVING",
@@ -280,9 +234,6 @@ func isClauseStarter(upper string) bool {
 	return false
 }
 
-// trimTrailingSpace removes trailing space characters from a
-// strings.Builder by re-allocating. Cheap for query-sized strings;
-// the builder doesn't expose Truncate so we have to round-trip.
 func trimTrailingSpace(b *strings.Builder) {
 	s := b.String()
 	trimmed := strings.TrimRightFunc(s, unicode.IsSpace)

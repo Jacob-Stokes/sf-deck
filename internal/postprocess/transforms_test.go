@@ -1,12 +1,5 @@
 package postprocess
 
-// Behaviour tests for the three real transforms — detailsify,
-// strip-summary, and URL injection. These reshape user export files;
-// the orchestration (Run/ToCSV) was tested but the transforms
-// themselves were the June review's flagged gap: detailsify is
-// self-described as heuristic, which is exactly where a weird report
-// shape produces silent mangling.
-
 import (
 	"bytes"
 	"strings"
@@ -15,7 +8,6 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// rowsFromXLSX re-reads transformed bytes for assertions.
 func rowsFromXLSX(t *testing.T, b []byte) [][]string {
 	t.Helper()
 	f, err := excelize.OpenReader(bytes.NewReader(b))
@@ -30,11 +22,6 @@ func rowsFromXLSX(t *testing.T, b []byte) [][]string {
 	return rows
 }
 
-// sfFormattedReport mimics the shape SF's "Formatted Report" xlsx
-// actually has: title + filter preamble (sparse rows, col A empty),
-// a header row carrying a sort arrow, an indent-gutter column A,
-// group-leader cells blank on continuation rows, subtotals, and a
-// grand total.
 func sfFormattedReport(t *testing.T) []byte {
 	return makeXLSX(t, [][]string{
 		{"", "My Accounts Report"},
@@ -56,8 +43,6 @@ func TestDetailsify_FullFormattedReport(t *testing.T) {
 	}
 	rows := rowsFromXLSX(t, out)
 
-	// Preamble gone: row 0 is the header, arrows stripped, gutter
-	// column A removed.
 	if len(rows) == 0 || rows[0][0] != "Owner" {
 		t.Fatalf("header row = %v", rows)
 	}
@@ -74,7 +59,6 @@ func TestDetailsify_FullFormattedReport(t *testing.T) {
 			t.Fatalf("sort arrow survived: %v", r)
 		}
 	}
-	// Forward-fill: Globex's continuation row inherits Alice.
 	var globexOwner string
 	for _, r := range rows {
 		if len(r) > 1 && r[1] == "Globex" {
@@ -84,7 +68,6 @@ func TestDetailsify_FullFormattedReport(t *testing.T) {
 	if globexOwner != "Alice" {
 		t.Fatalf("group-leader forward-fill failed: Globex owner = %q", globexOwner)
 	}
-	// Data rows intact: 3 data rows + header.
 	if len(rows) != 4 {
 		t.Fatalf("expected header + 3 data rows, got %d: %v", len(rows), rows)
 	}
@@ -120,7 +103,6 @@ func TestDetailsify_DoesNotFabricateNullDataCells(t *testing.T) {
 	if globex == nil {
 		t.Fatalf("Globex row missing: %v", rows)
 	}
-	// Owner (grouping col) SHOULD have cascaded.
 	if globex[0] != "Alice" {
 		t.Errorf("grouping column not filled: Globex owner = %q, want Alice", globex[0])
 	}
@@ -226,9 +208,6 @@ func TestIsAnySummaryRow(t *testing.T) {
 			t.Errorf("expected summary: %v", r)
 		}
 	}
-	// "Subtotals R Us" is a known false POSITIVE of the prefix
-	// heuristic — pin the actual behaviour so a future fix is a
-	// conscious change, not an accident.
 	if !isAnySummaryRow(no[1]) {
 		t.Errorf("heuristic changed: %v no longer matches subtotal prefix", no[1])
 	}

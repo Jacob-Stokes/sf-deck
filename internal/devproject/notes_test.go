@@ -22,7 +22,6 @@ func TestNotes_RoundtripUpsertDelete(t *testing.T) {
 		t.Fatalf("NoteFor(missing) = %q, %v; want \"\", nil", body, err)
 	}
 
-	// Set + read back.
 	gen := s.Generation()
 	if err := s.SetNote(KindFlow, "300x", org, "check batch size\nbefore go-live"); err != nil {
 		t.Fatal(err)

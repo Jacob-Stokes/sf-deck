@@ -1,19 +1,6 @@
 package ui
 
 // /users — top-level Users tab. Two subtabs:
-//
-//   - Recent logins: the bounded slice already pulled by /home's
-//     HomeStats batch. Read-only, ordered LastLoginDate DESC. Familiar
-//     view for "who's been in the org lately."
-//   - All users: the broader AllUsers SOQL pull (capped at
-//     sf.AllUsersDefaultLimit). Chip strip on top with built-in filters
-//     (Active / Inactive / System admins / Standard users / Logged 30d /
-//     Never logged in). User-defined chips supported via the standard
-//     qchip wiring; favourites + overflow modal come for free.
-//
-// Drilling deeper into a single User opens the Lightning detail page
-// via UserRow.Targets() — the open + yank flows reuse the registry
-// machinery in identityFromUsersList* / Open closures.
 
 import (
 	"fmt"
@@ -27,14 +14,10 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// usersListCols is the column spec shared by both subtabs.
 func usersListCols() []uilayout.ListColumn {
 	return schemaListColumns(userColumnSchema())
 }
 
-// recentUsersListSurface renders /users · Recent logins. Reuses the
-// HomeUserList that home pulls so toggling between /home and /users
-// doesn't reload.
 var recentUsersListSurface = listSurface{
 	State:       func(d *orgData) *uilayout.ListTableState { return &d.HomeUserTableState },
 	Cols:        usersListCols,
@@ -75,11 +58,6 @@ var recentUsersListSurface = listSurface{
 	},
 }
 
-// allUsersListSurface renders /users · All users. Each chip has its
-// own SOQL-driven Resource (d.ChipUsers) and per-chip ListView
-// (d.ChipUsersList) so cursor + search are remembered across chip
-// cycling. SyncChipUsers fans the active resource into the matching
-// ListView each render.
 var allUsersListSurface = listSurface{
 	State: func(d *orgData) *uilayout.ListTableState {
 		return d.UsersTableStatePtr(activeUsersChipID(d))
@@ -99,9 +77,6 @@ var allUsersListSurface = listSurface{
 			return listRenderModel{}, false
 		}
 		chipID := activeUsersChipID(d)
-		// SyncChipUsers re-fans the resource value into the per-chip
-		// ListView each render — cheap (≤500 rows) and keeps the
-		// ListView fresh when the resource lands.
 		d.SyncChipUsers(chipID)
 		lv := d.UsersListPtr(chipID)
 		state := d.UsersTableStatePtr(chipID)
@@ -143,20 +118,6 @@ var allUsersListSurface = listSurface{
 	},
 }
 
-// activeUsersChipID returns the chip-id currently selected on /users
-// · All users, falling back to the first built-in ("all") when the
-// strip is empty / unfetched.
-//
-// Reads d.ActiveUsersChipID, a string stashed by setAllUsersChipIdx
-// every time the chip cursor moves. That setter resolves the cursor
-// index through the live chip registry (favourites + imports +
-// transient), so the stashed string reflects the actual chip the
-// user sees highlighted — NOT qchip.UserBuiltins[idx], which would
-// be wrong whenever favourites are re-ordered or Salesforce list-
-// view chips are imported. Reading the resolved ID directly from
-// orgData means listSurface closures (which only have d) can stay
-// closed over their existing contract without growing a Model
-// parameter.
 func activeUsersChipID(d *orgData) string {
 	if d == nil || d.ActiveUsersChipID == "" {
 		if len(qchip.UserBuiltins) == 0 {
@@ -167,9 +128,6 @@ func activeUsersChipID(d *orgData) string {
 	return d.ActiveUsersChipID
 }
 
-// usersChipLabel resolves the active chip's user-visible label by
-// walking the registry — falls back to the chip-id when the chip
-// isn't in the registry yet.
 func usersChipLabel(m Model, chipID string) string {
 	if m.chipRegistry(domainUsers) == nil {
 		return chipID
@@ -201,9 +159,6 @@ func activeUsersChip(m Model, d *orgData) (qchip.Chip, bool) {
 	return qchip.Chip{}, false
 }
 
-// ensureActiveUsersChip kicks the chip-keyed Resource for the
-// currently-selected chip — used by the subtab's EnsureData hook so
-// first-time entry pulls a slice without the user pressing r.
 func ensureActiveUsersChip(m *Model, d *orgData) tea.Cmd {
 	if m == nil || d == nil || len(m.orgs) == 0 {
 		return nil
@@ -217,8 +172,6 @@ func ensureActiveUsersChip(m *Model, d *orgData) tea.Cmd {
 	return r.Ensure(m.cache)
 }
 
-// refreshActiveUsersChip force-refreshes the active chip's resource
-// — fires from the standard r dispatch.
 func refreshActiveUsersChip(m Model, d *orgData) tea.Cmd {
 	if d == nil || len(m.orgs) == 0 {
 		return nil
@@ -271,8 +224,6 @@ func init() {
 	}
 }
 
-// renderUsers is the top-level /users renderer — routes into the
-// active subtab's body via dispatchSubtab.
 func (m Model) renderUsers(w, innerH int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -331,9 +282,6 @@ func (m Model) renderUsersAll(w, innerH int) string {
 
 	chipID := activeUsersChipID(d)
 	r := d.ChipUsers[chipID]
-	// First visit on this chip — Resource isn't loaded yet. Show
-	// "press r" while inviting the user; refresh fires through the
-	// standard r dispatch via TabSpec.RefreshData below.
 	if r == nil || r.FetchedAt().IsZero() {
 		if r != nil && r.Busy() {
 			lines = append(lines, dimLine("  loading users…", inner))
@@ -348,9 +296,6 @@ func (m Model) renderUsersAll(w, innerH int) string {
 		lines = append(lines, dimLine("  loading…", inner))
 		return strings.Join(lines, "\n")
 	}
-	// usedLines counts embedded newlines — dash is a multi-line block
-	// stored as one slice element, so len(lines) would undercount and
-	// push the trailing hint past clipLines.
 	budget := innerH - usedLines(lines)
 	lines = append(lines, renderListModel(m, model, m.focus, inner, budget)...)
 	return strings.Join(lines, "\n")

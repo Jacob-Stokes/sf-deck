@@ -13,7 +13,6 @@ func TestHeaderFreshnessCoverage(t *testing.T) {
 		TabDevProjects: true, TabDevProjectDetail: true, TabBundleDetail: true,
 		TabTags: true, TabTagDetail: true, TabProjects: true,
 	}
-	// Subtabs that render session-local state rather than org fetches.
 	exemptSub := map[Subtab]bool{
 		SubtabSystemAPI: true,
 	}

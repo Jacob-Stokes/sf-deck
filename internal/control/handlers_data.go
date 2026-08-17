@@ -1,14 +1,5 @@
 package control
 
-// handlers_data.go — IPC verb handlers for the data-plane nouns:
-// SOQL, Apex, records. All delegate to Backend, which the UI layer
-// fulfils against the internal/sf package.
-//
-// Reads (soql.run, apex.get, apex.log, record.get) run on the
-// listener goroutine. Writes (apex.run, record.create/update/delete)
-// go through withWriteLock for single-writer semantics — apex
-// anonymous in particular can mutate arbitrary state.
-
 import (
 	"encoding/json"
 )

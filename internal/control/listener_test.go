@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-// fakeBackend captures invocations so the tests can assert what
-// the listener forwarded.
 type fakeBackend struct {
 	mu sync.Mutex
 
@@ -138,9 +136,6 @@ func (b *fakeBackend) ReportRun(args ReportRunArgs) (any, error)               {
 func (b *fakeBackend) OrgSafetyGet(args OrgSafetyGetArgs) (any, error)         { return nil, nil }
 func (b *fakeBackend) OrgSafetySet(args OrgSafetySetArgs) (any, error)         { return nil, nil }
 
-// shortHome returns a home dir whose .sf-deck/control-1.sock path
-// stays under macOS's 104-byte sun_path limit. t.TempDir() lives
-// under /var/folders/... which already blows the budget.
 func shortHome(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", "sfd")
@@ -179,7 +174,6 @@ func sendReq(t *testing.T, conn net.Conn, req Request) Response {
 	if err := enc.Encode(req); err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	// Read one response line.
 	dec := json.NewDecoder(conn)
 	var resp Response
 	if err := dec.Decode(&resp); err != nil {
@@ -255,7 +249,6 @@ func TestUnknownCommand_ReturnsMethodNotImplemented(t *testing.T) {
 
 func TestMalformedJSON_ReturnsInvalidArgument(t *testing.T) {
 	_, _, conn, _ := setupServer(t)
-	// Send a bare invalid line.
 	_, _ = conn.Write([]byte("not-a-json\n"))
 	dec := json.NewDecoder(conn)
 	var resp Response
@@ -277,7 +270,6 @@ func TestIDIsEchoed(t *testing.T) {
 
 func TestStateSubscribe_StreamsInitialSnapshotThenUpdates(t *testing.T) {
 	_, be, conn, _ := setupServer(t)
-	// Issue subscribe — should get an initial snapshot promptly.
 	enc := json.NewEncoder(conn)
 	if err := enc.Encode(Request{Command: "state.subscribe"}); err != nil {
 		t.Fatal(err)
@@ -294,12 +286,10 @@ func TestStateSubscribe_StreamsInitialSnapshotThenUpdates(t *testing.T) {
 	if data["tab"] != "home" {
 		t.Errorf("initial tab = %v", data["tab"])
 	}
-	// Push an update via the fake backend.
 	be.mu.Lock()
 	be.state = map[string]any{"tab": "records"}
 	be.subCh <- be.state
 	be.mu.Unlock()
-	// Read the streamed update.
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if err := dec.Decode(&resp); err != nil {
 		t.Fatal(err)
@@ -326,7 +316,6 @@ func TestListen_ClaimsInstanceAndRemovesSocketOnClose(t *testing.T) {
 	}
 	cancel()
 	srv.Close()
-	// Socket file should be gone.
 	if _, err := net.Dial("unix", entry.Socket); err == nil {
 		t.Error("expected dial to fail after Close()")
 	}

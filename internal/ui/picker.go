@@ -1,33 +1,5 @@
 package ui
 
-// Picker — a small anchored dropdown overlay for "type-to-filter, pick
-// one item" workflows. Generic over the item type so the same widget
-// serves field pickers (in the chip wizard), sObject pickers, picklist
-// value pickers, user pickers, etc.
-//
-// Shape:
-//   - Anchored at a caller-supplied (x, y) screen position so the
-//     dropdown opens under the trigger row rather than centering
-//     globally. Caller computes the anchor from whatever cursor /
-//     row state it owns.
-//   - Search input at the top, populated as the user types.
-//   - Filtered list below with viewport scrolling — defaults to
-//     12 rows visible.
-//   - Enter picks the highlighted item; Esc cancels.
-//   - j/k or arrow keys move the highlight; tab/shift+tab too.
-//
-// Generics: pickerSpec[T] carries the items + match + render
-// closures. Different call sites have different item types and
-// different "what to display per row" rules; the closures keep this
-// flexible without forcing every caller to adapt to an Item interface.
-//
-// The runtime state lives in pickerState which is *not* generic — it
-// holds the closures already bound to the concrete type. This keeps
-// Model from needing a generic field (Go doesn't allow generic
-// methods on concrete types either). The trade-off: the spec gets
-// "compiled" through pickerStateFromSpec at open time, type-erasing
-// to func(string) bool / func(int) string for the runtime.
-
 import (
 	"fmt"
 	"strings"
@@ -39,26 +11,15 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// pickerSpec[T] declares one invocation of the picker.
 type pickerSpec[T any] struct {
-	// Title is the bold headline above the search input.
 	Title string
 
-	// Items are the picker's full source list. Filtered live by Match
-	// against the user's typed query.
 	Items []T
 
-	// Match reports whether an item passes the filter. Called per-item
-	// per-keystroke, so cheap is fine. Empty query is the "match all"
-	// case which the implementation handles before calling Match.
 	Match func(item T, query string) bool
 
-	// RenderRow draws a single item. Receives a focused flag so the
-	// caller can apply highlight styling for the cursored row.
 	RenderRow func(item T, focused bool) string
 
-	// OnPick fires when the user hits enter on a row. Returns a
-	// tea.Cmd the runtime fires after the picker dismisses.
 	OnPick func(item T) tea.Cmd
 
 	// AnchorX, AnchorY are the screen cell where the dropdown's top-
@@ -66,23 +27,15 @@ type pickerSpec[T any] struct {
 	// state they own. The picker clamps to fit on screen.
 	AnchorX, AnchorY int
 
-	// Width is the dropdown width in cells. Default 40 if zero.
 	Width int
 
-	// MaxRows caps the visible portion of the list. Default 12.
 	MaxRows int
 
-	// Placeholder is shown in the search input when empty.
 	Placeholder string
 
-	// EmptyHint shows when the filtered list has zero rows. Default
-	// "no matches".
 	EmptyHint string
 }
 
-// pickerState is the runtime state, type-erased so Model can hold a
-// single non-generic field. See the package docstring for the
-// rationale.
 type pickerState struct {
 	title     string
 	width     int
@@ -91,33 +44,23 @@ type pickerState struct {
 	anchorY   int
 	emptyHint string
 
-	// Compiled / closed-over slices and closures, type-erased to
-	// indices into the underlying source list. The picker only ever
-	// indexes into items; the dispatch closures handle the original
-	// typed values internally.
 	itemCount int
 	matches   func(idx int, query string) bool
 	render    func(idx int, focused bool) string
 	pick      func(idx int) tea.Cmd
 
-	// Live state.
 	search  textinput.Model
 	visible []int // indices passing the current filter, in source order
 	cursor  int   // position into visible (NOT into items)
 	viewTop int   // first visible-row index drawn (for viewport clamp)
 }
 
-// openPicker[T] is the canonical entry point — the type parameter
-// keeps the spec strongly-typed at the call site even though the
-// runtime is type-erased.
 func openPicker[T any](m *Model, spec pickerSpec[T]) tea.Cmd {
 	state := pickerStateFromSpec(spec)
 	m.picker = state
 	return nil
 }
 
-// pickerStateFromSpec compiles the typed spec into the type-erased
-// runtime state.
 func pickerStateFromSpec[T any](spec pickerSpec[T]) *pickerState {
 	if spec.Width == 0 {
 		spec.Width = 40
@@ -170,9 +113,6 @@ func pickerStateFromSpec[T any](spec pickerSpec[T]) *pickerState {
 	return st
 }
 
-// recomputeVisible rebuilds the indices passing the current query.
-// Resets cursor + scroll when the previously-cursored item filters
-// out so the picker doesn't show a phantom selection.
 func (s *pickerState) recomputeVisible() {
 	q := strings.TrimSpace(s.search.Value())
 	prev := -1
@@ -217,8 +157,6 @@ func (s *pickerState) clampViewport() {
 	}
 }
 
-// stylePickerInput themes the search input. Same convention as the
-// theme picker / chip wizard so the look stays consistent.
 func stylePickerInput(ti *textinput.Model) {
 	s := ti.Styles()
 	s.Focused.Text = lipgloss.NewStyle().Foreground(theme.Fg)
@@ -227,8 +165,6 @@ func stylePickerInput(ti *textinput.Model) {
 	ti.SetStyles(s)
 }
 
-// renderPicker draws the picker overlay, or "" when not open.
-// Returned positioned by the main frame compositor using anchorX/anchorY.
 func (m Model) renderPicker() string {
 	if m.picker == nil {
 		return ""
@@ -276,7 +212,6 @@ func (m Model) renderPicker() string {
 		Render(body)
 }
 
-// handlePickerKey is the reducer while the picker is open.
 func (m Model) handlePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.picker == nil {
 		return m, nil
@@ -310,8 +245,6 @@ func (m Model) handlePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Forward to the textinput widget — every printable key + backspace
-	// + ctrl+u etc. flows through it.
 	before := s.search.Value()
 	newInput, cmd := s.search.Update(msg)
 	s.search = newInput

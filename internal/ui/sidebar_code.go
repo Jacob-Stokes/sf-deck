@@ -9,14 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// Per-surface sidebars for the code tabs: /apex (classes + triggers),
-// /flows (definitions + versions), and /soql (editor + schema).
-// Split out of sidebar.go.
-
-// sidebarApex routes the right-pane render for /apex by active
-// subtab. Classes + Triggers each get their own renderer; VF Pages
-// + Components fall through to an empty placeholder until they
-// have detail data.
 func (m Model) sidebarApex(inner int) string {
 	switch m.currentSubtab() {
 	case SubtabApexClasses:
@@ -27,10 +19,6 @@ func (m Model) sidebarApex(inner int) string {
 	return sideEmpty("—")
 }
 
-// sidebarApexClass renders the cursored Apex class's metadata in
-// the right pane. Pills above the kv rows show managed-package
-// status + IsValid so they're scannable without parsing column
-// values.
 func (m Model) sidebarApexClass(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -70,9 +58,6 @@ func (m Model) sidebarApexClass(inner int) string {
 		devproject.KindApexClass, a.ID, o.Username, rows, extra...)
 }
 
-// sidebarApexTrigger is sidebarApexClass's twin for the Triggers
-// subtab. Same shape; trigger-specific fields swap in (parent
-// sObject, events).
 func (m Model) sidebarApexTrigger(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -199,7 +184,6 @@ func (m Model) sidebarFlowVersion(inner int) string {
 	idx := d.Cursors.Get(cursorKindFlowVersion, len(versions), d.FlowCur)
 	v := versions[idx]
 
-	// Active marker.
 	var header sf.Flow
 	for _, ff := range d.Flows.Value() {
 		if ff.DefinitionID == d.FlowCur {
@@ -276,15 +260,6 @@ func (m Model) sidebarSOQL(inner int) string {
 	return renderKVPanel(inner, "SOQL", rows, extra...)
 }
 
-// sidebarSOQLSchema renders the describe of the FROM sObject (when
-// resolvable) as a scannable field reference. Returns "" when the
-// query has no FROM yet OR the describe isn't loaded yet — caller
-// falls through to the result-row sidebar in that case.
-//
-// Layout: header with sObject name + label, then per-field rows
-// showing `apiName  type  badges`. Reference fields show their
-// target sObject; picklist fields show value count; required
-// fields get a `*` marker.
 func (m Model) sidebarSOQLSchema(inner int) string {
 	query := m.soqlInput.Value()
 	sobject := extractFromSObject(query)

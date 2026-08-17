@@ -56,7 +56,6 @@ func UnregisterDemoTargets(targets ...string) {
 	}
 }
 
-// isDemoTarget reports whether the alias/username identifies a demo org.
 func isDemoTarget(target string) bool {
 	demoTargetsMu.RLock()
 	defer demoTargetsMu.RUnlock()

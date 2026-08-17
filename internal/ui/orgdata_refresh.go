@@ -33,20 +33,15 @@ func (d *orgData) loadedResources() []resource.Refreshable {
 		}
 	}
 
-	// Registered list resources (see list_resource_registrations.go) are
-	// enumerated from the registry — no manual line per resource.
 	for _, key := range listResourceOrder {
 		add(listResourceHandlers[key].loadedResource(d))
 	}
-	// Resources NOT on the list-resource registry (bespoke apply, non-[]T
-	// shape, or not a list surface) stay explicit here.
 	add(
 		&d.SObjects, &d.PermSets, &d.PSGs, &d.Profiles,
 		&d.PermissionSets, &d.Deploys, &d.Notifications,
 		&d.RecentlyViewed, &d.Home, &d.OrgInfo,
 	)
 
-	// Keyed per-(sobject / id) collections — refresh every loaded entry.
 	for _, r := range d.Describes {
 		add(r)
 	}
@@ -119,10 +114,6 @@ func (d *orgData) loadedResources() []resource.Refreshable {
 	return out
 }
 
-// refreshAllLoaded re-fetches every loaded resource for the active org
-// (bypassing TTL), drops the per-frame projection/gutter caches so the
-// display rebuilds cleanly, and flashes the count. Cold resources and
-// other orgs are left untouched.
 func (m *Model) refreshAllLoaded() (Model, tea.Cmd) {
 	if len(m.orgs) == 0 {
 		return *m, m.orgsRes.Refresh(m.cache)
@@ -143,9 +134,6 @@ func (m *Model) refreshAllLoaded() (Model, tea.Cmd) {
 			cmds = append(cmds, c)
 		}
 	}
-	// Clean repaint: drop the per-render gutter/projection cache so the
-	// refreshed data isn't masked by a stale render-side cache. It
-	// re-allocates lazily on the next render (ensureGutterCache).
 	d.gutterCache = nil
 	m.flash(refreshCountMsg(len(cmds)))
 	return *m, tea.Batch(cmds...)

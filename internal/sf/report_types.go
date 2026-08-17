@@ -1,10 +1,5 @@
 package sf
 
-// Report Types — the catalogue a new report starts from, fetched via
-// the analytics REST endpoint (GET /analytics/reportTypes). Returns
-// categories each holding a list of types; flattened here to one row
-// per type for the list surface.
-
 import "encoding/json"
 
 // ReportTypeRow is one report type in the flattened catalogue.

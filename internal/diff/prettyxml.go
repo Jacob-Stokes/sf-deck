@@ -22,7 +22,6 @@ func PrettyXML(s string) string {
 	if s == "" {
 		return ""
 	}
-	// Already multi-line and indented? Leave it (source-format files).
 	if strings.Count(s, "\n") > 2 {
 		return s
 	}
@@ -39,8 +38,6 @@ func PrettyXML(s string) string {
 	firstLine := true
 	for i < n {
 		if s[i] != '<' {
-			// Stray text outside a tag (rare: the XML decl prologue or
-			// inter-tag text we didn't consume as element content).
 			j := strings.IndexByte(s[i:], '<')
 			if j < 0 {
 				b.WriteString(s[i:])
@@ -50,7 +47,6 @@ func PrettyXML(s string) string {
 			i += j
 			continue
 		}
-		// Find the end of this tag.
 		gt := strings.IndexByte(s[i:], '>')
 		if gt < 0 {
 			b.WriteString(s[i:])
@@ -61,21 +57,18 @@ func PrettyXML(s string) string {
 
 		switch {
 		case strings.HasPrefix(tag, "<?"), strings.HasPrefix(tag, "<!"):
-			// XML decl / comment / doctype — own line, no depth change.
 			if !firstLine {
 				b.WriteByte('\n')
 			}
 			indent()
 			b.WriteString(tag)
 		case strings.HasSuffix(tag, "/>"):
-			// Self-closing element — own line, no depth change.
 			if !firstLine {
 				b.WriteByte('\n')
 			}
 			indent()
 			b.WriteString(tag)
 		case strings.HasPrefix(tag, "</"):
-			// Closing tag — dedent, own line.
 			depth--
 			if depth < 0 {
 				depth = 0
@@ -86,15 +79,11 @@ func PrettyXML(s string) string {
 			indent()
 			b.WriteString(tag)
 		default:
-			// Opening tag. Peek: if the immediate content is text
-			// followed by THIS tag's matching close (a leaf like
-			// <type>Text</type>), keep it all on one line.
 			name := tagName(tag)
 			closeTag := "</" + name + ">"
 			rest := s[i:]
 			ct := strings.Index(rest, "<")
 			if ct >= 0 && strings.HasPrefix(rest[ct:], closeTag) {
-				// Leaf: <tag>text</tag> on one line.
 				if !firstLine {
 					b.WriteByte('\n')
 				}
@@ -104,7 +93,6 @@ func PrettyXML(s string) string {
 				b.WriteString(closeTag)
 				i += ct + len(closeTag)
 			} else {
-				// Container open tag — own line, then indent children.
 				if !firstLine {
 					b.WriteByte('\n')
 				}
@@ -118,7 +106,6 @@ func PrettyXML(s string) string {
 	return b.String()
 }
 
-// tagName extracts the element name from an opening tag "<name …>".
 func tagName(tag string) string {
 	inner := strings.TrimPrefix(tag, "<")
 	inner = strings.TrimSuffix(inner, ">")

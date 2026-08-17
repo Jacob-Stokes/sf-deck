@@ -2,7 +2,6 @@ package devproject
 
 import "testing"
 
-// seed a tag + bind it to an item.
 func seedTagBinding(t *testing.T, s *Store, tagName string, kind ItemKind, ref, org string) int64 {
 	t.Helper()
 	tag, ok, err := s.FindTagByName(tagName)
@@ -77,9 +76,7 @@ func TestReconcileTagBindings_DeleteStale(t *testing.T) {
 // binding to the DefinitionId, merging tag sets (INSERT OR IGNORE).
 func TestReconcileTagBindings_RewriteMerges(t *testing.T) {
 	s := openTestStore(t)
-	// item tagged under DeveloperName with tag "x"
 	seedTagBinding(t, s, "x", KindFlow, "Carrier_Onboarding", "alice")
-	// same logical flow already tagged under DefinitionId with tags "x" (dup) and "y"
 	seedTagBinding(t, s, "x", KindFlow, "300CANON", "alice")
 	seedTagBinding(t, s, "y", KindFlow, "300CANON", "alice")
 
@@ -92,8 +89,6 @@ func TestReconcileTagBindings_RewriteMerges(t *testing.T) {
 	if merged != 1 {
 		t.Fatalf("merged=%d, want 1 (the source DeveloperName row)", merged)
 	}
-	// DeveloperName ref gone; canonical keeps its two distinct tags (x, y)
-	// — the duplicate "x" from the source was ignored on insert.
 	refs := boundRefs(t, s)
 	if refs["flow|Carrier_Onboarding|alice"] {
 		t.Error("DeveloperName-ref binding should be gone")

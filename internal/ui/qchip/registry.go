@@ -46,9 +46,6 @@ func NewRegistry(domain string, builtins []Chip) *Registry {
 	}
 }
 
-// effectiveFavourite returns the chip's actual favourite state after
-// applying user overrides. User chips don't go through here — they
-// store their own state directly in the slice.
 func (r *Registry) effectiveFavourite(c Chip) bool {
 	if r.builtinFavOverrides != nil {
 		if v, ok := r.builtinFavOverrides[c.ID]; ok {
@@ -58,10 +55,6 @@ func (r *Registry) effectiveFavourite(c Chip) bool {
 	return c.Favourite
 }
 
-// withEffectiveFavourite returns a copy of c with Favourite set to
-// the user's override (if any), or its baseline default. Callers
-// render against this so the chip strip reflects what the user
-// actually toggled.
 func (r *Registry) withEffectiveFavourite(c Chip) Chip {
 	c.Favourite = r.effectiveFavourite(c)
 	return c
@@ -90,11 +83,6 @@ func (r *Registry) SetGroupMembers(fn func(groupID, username string) bool) {
 // org filter is active.
 func (r *Registry) ActiveOrg() string { return r.activeOrg }
 
-// chipBelongsToActiveOrg reports whether a user-stored chip should be
-// returned given the registry's current activeOrg + groupMembers. The
-// decision is delegated to the chip's EffectiveShare so the rules live
-// in one place (settings.ChipShare.Allows); the registry just supplies
-// the active org and the group resolver.
 func (r *Registry) chipBelongsToActiveOrg(c Chip) bool {
 	share := c.Share
 	if share.IsZero() {
@@ -280,7 +268,6 @@ func (r *Registry) PersistUser(s *settings.Settings) {
 	if s == nil {
 		return
 	}
-	// Replace only this domain's slice; leave other domains alone.
 	keep := []settings.ChipConfig{}
 	for _, c := range s.Chips() {
 		if c.Domain != r.domain {
@@ -294,8 +281,6 @@ func (r *Registry) PersistUser(s *settings.Settings) {
 	s.SetChipFavouriteOverridesFor(r.domain, r.BuiltinFavOverrides())
 }
 
-// scopeApplies reports whether a chip with chipScope applies to a given
-// query scope. Empty / "*" chip scope = universal.
 func scopeApplies(chipScope, queryScope string) bool {
 	if chipScope == "" || chipScope == "*" {
 		return true

@@ -2,15 +2,6 @@ package qchip
 
 import "github.com/Jacob-Stokes/sf-deck/internal/query"
 
-// Built-in chip catalogues. Each surface declares its built-ins as
-// query.Query literals. Adding a new built-in is one entry; adding a
-// new operator or row field reaches the catalogue automatically (via
-// the AST + Eval).
-//
-// Names + IDs are stable on disk — callers reference chips by ID
-// (settings.toml keeps a pointer to the active chip per surface) so
-// renaming a built-in id is a breaking change for users' configs.
-
 // SObjectBuiltins ships /objects' built-in chips. Replaces the
 // hardcoded match closures in internal/ui/filter/sobject.go.
 //
@@ -81,12 +72,7 @@ var SObjectBuiltins = []Chip{
 	{
 		ID: "unmanaged", Label: "Unmanaged", Scope: "*", Origin: OriginBuiltIn,
 		Favourite: true,
-		// Name-based check: synthetic companions (ChangeEvent / History /
-		// Share / OwnerSharingRule) of managed parents have a null
-		// NamespacePrefix on EntityDefinition but still carry the parent's
-		// namespace in the API name. NamespacePrefix-only would leak them
-		// into Unmanaged.
-		Query: query.Query{Where: query.Cmp("IsManaged", query.OpEq, false)},
+		Query:     query.Query{Where: query.Cmp("IsManaged", query.OpEq, false)},
 	},
 	{
 		ID: "managed", Label: "Managed", Scope: "*", Origin: OriginBuiltIn,
@@ -95,9 +81,6 @@ var SObjectBuiltins = []Chip{
 	},
 	// --- Overflow (Favourite: false) -----------------------------
 	{
-		// All = no filter. Renamed from "All" so the strip default
-		// (Browseable) doesn't seem misleading by comparison — the
-		// system suffix makes it obvious this is the firehose.
 		ID: "all", Label: "All (incl. system)", Scope: "*", Origin: OriginBuiltIn,
 		Query: query.Query{},
 	},
@@ -437,13 +420,6 @@ var FlowBuiltins = []Chip{
 		Query:     query.Query{Where: query.Cmp("Status", query.OpEq, "Active")},
 	},
 	{
-		// Inactive: anything that isn't running, regardless of how
-		// it got there. Status = "Obsolete" is the explicit Salesforce
-		// state for deprecated flows; "Inactive" is the synthetic
-		// state sf-deck stamps when there's no active version at all
-		// (see ListFlows). One chip covers both — users typically
-		// don't care which flavour of inactive a flow is, just that
-		// it isn't running.
 		ID: "inactive", Label: "Inactive", Scope: "*", Origin: OriginBuiltIn,
 		Favourite: true,
 		Query: query.Query{Where: query.Or(
@@ -527,10 +503,6 @@ var RecordBuiltins = []Chip{
 		},
 	},
 	{
-		// The created-axis counterpart to "Changed": records ordered by
-		// CreatedDate descending, i.e. "what's newest in this object."
-		// One query on the current object — inherits the Records
-		// surface's sort / search / scroll / columns for free.
 		ID: "recently-created", Label: "Recently created", Scope: "*", Origin: OriginBuiltIn,
 		Favourite: true,
 		Query: query.Query{
@@ -538,12 +510,6 @@ var RecordBuiltins = []Chip{
 		},
 	},
 	{
-		// Filters + orders by LastModifiedDate, not CreatedDate.
-		// Users intuitively read "Today" on a record list as "what
-		// happened today" — and "happened" almost always means
-		// edits, not just new creations. The default "Changed"
-		// chip already orders by LastModifiedDate; keeping the
-		// date axis consistent across the strip is the right UX.
 		ID: "today", Label: "Today", Scope: "*", Origin: OriginBuiltIn,
 		Query: query.Query{
 			Where:   query.Cmp("LastModifiedDate", query.OpDateLiteral, "TODAY"),
@@ -682,11 +648,6 @@ var RecentBuiltins = []Chip{
 		},
 	},
 	{
-		// ListViews appear in Salesforce's RecentlyViewed when users
-		// open a list view in Lightning.  The default "All" chip
-		// hides them (see above); this chip is the opt-in.  Pinned
-		// to the strip so the round-trip is one keystroke for the
-		// rare "what list views was I just using" workflow.
 		ID: "listviews", Label: "List Views", Scope: "*", Origin: OriginBuiltIn,
 		Favourite: true,
 		Query:     query.Query{Where: query.Cmp("Kind", query.OpEq, "listview")},
@@ -922,16 +883,12 @@ var ActiveUsersBuiltins = []Chip{
 	{
 		ID: "nomfa", Label: "No MFA", Scope: "*", Origin: OriginBuiltIn,
 		Favourite: true,
-		// AnyLowMFA is true when any of the user's sessions is below
-		// HIGH_ASSURANCE — i.e. didn't clear step-up/MFA this session.
-		Query: query.Query{Where: query.Cmp("AnyLowMFA", query.OpEq, true)},
+		Query:     query.Query{Where: query.Cmp("AnyLowMFA", query.OpEq, true)},
 	},
 	{
 		ID: "recent", Label: "Recently active", Scope: "*", Origin: OriginBuiltIn,
 		Favourite: true,
-		// RecentMinutes is stamped at fetch time (minutes since last
-		// activity); ≤15 ≈ "here right now".
-		Query: query.Query{Where: query.Cmp("RecentMinutes", query.OpLTE, 15)},
+		Query:     query.Query{Where: query.Cmp("RecentMinutes", query.OpLTE, 15)},
 	},
 	{
 		ID: "api", Label: "API / integration", Scope: "*", Origin: OriginBuiltIn,

@@ -1,10 +1,5 @@
 package ui
 
-// Fields view on TabPermParentDetail — reached by pressing Enter on
-// a row in the Objects subtab. Reuses the FLS grid but scoped to this
-// parent's permset (PermParentPermSetID) rather than the FLS
-// scope-picker. Esc returns to the Objects grid.
-
 import (
 	"fmt"
 	"strings"
@@ -13,28 +8,20 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderPermParentFields is the main-pane renderer for the Fields subtab.
 func (m Model) renderPermParentFields(w, inner, innerH int, o sf.Org) string {
 	d := m.ensureOrgDataRef(o.Username)
 
-	// PSGs have no direct permset.
 	if d.PermParentPermSetID == "" {
 		return psgNoDirectPermsNote(inner, "Field")
 	}
 
-	// Shouldn't reach here without a drilled sobject, but be defensive.
 	if d.PermFieldsSObject == "" {
 		return theme.Subtle.Render("  press enter on an object in the Objects subtab first")
 	}
 
-	// Show the FLS grid scoped to this parent, without the scope picker strip.
 	return m.renderFLSGrid(w, inner, innerH, o, d.PermFieldsSObject, d.PermParentPermSetID, false)
 }
 
-// renderFLSGrid renders the FLS grid for a specific (sobject, parentID).
-// When showScopePicker is true, the FLS scope chip strip is included
-// (as in TabObjectDetail). When false, it is suppressed (Fields subtab
-// on TabPermParentDetail, where the scope is fixed).
 func (m Model) renderFLSGrid(w, inner, innerH int, o sf.Org, sobj, parentID string, showScopePicker bool) string {
 	d := m.ensureOrgDataRef(o.Username)
 
@@ -67,7 +54,6 @@ func (m Model) renderFLSGrid(w, inner, innerH int, o sf.Org, sobj, parentID stri
 		return strings.Join(lines, "\n")
 	}
 
-	// Index FieldPermissions by field name for O(1) lookup.
 	byField := map[string]sf.FieldPermissionRow{}
 	for _, fp := range flsRes.Value() {
 		name := fp.Field
@@ -112,9 +98,6 @@ func (m Model) renderFLSGrid(w, inner, innerH int, o sf.Org, sobj, parentID stri
 		labelW = 12
 	}
 
-	// Both /objects/FLS and /perms/Fields use the same cursor namespace,
-	// keyed by (sobject, parentID), so a user toggling between them
-	// stays on the same field.
 	sel := d.Cursors.Get(cursorKindFLS, len(fields), sobj, parentID)
 	lines = append(lines, renderRows(
 		len(fields), sel, innerH, len(lines), 0, inner,

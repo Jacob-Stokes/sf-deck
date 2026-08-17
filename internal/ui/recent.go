@@ -1,16 +1,6 @@
 package ui
 
 // Client-side "recently visited" tracking — UI shell.
-//
-// The data types + pure-logic transforms (merge, sort, filter, kind
-// mapping, formatters, settings round-trip) live in internal/recent.
-// This file keeps the UI-coupled pieces: per-tab visit closures
-// wired into TabSpec.RecordRecentVisit, plus the orgData mutators
-// that touch d.Recent and trigger persistence.
-//
-// Type/const aliases below preserve the legacy ui-package names so
-// 11 sibling files don't need rewriting. New code should reference
-// the recent.* names directly.
 
 import (
 	"strings"
@@ -54,10 +44,6 @@ const (
 	RecentKindApexLog      = recent.KindApexLog
 )
 
-// Thin shims for the recent-package pure helpers. Kept as functions
-// (not aliases) so they retain their ui-package visibility shape and
-// callers don't need to thread the recent. qualifier.
-
 func recentNameForRow(r RecentEntry) string   { return recent.NameForRow(r) }
 func recentDetailForRow(r RecentEntry) string { return recent.DetailForRow(r) }
 func entryKindLabel(kind string) string       { return recent.KindLabel(kind) }
@@ -65,11 +51,6 @@ func upsertRecent(list []RecentEntry, entry RecentEntry, cap int) []RecentEntry 
 	return recent.Upsert(list, entry, cap)
 }
 
-// --- UI-coupled helpers (mutate orgData, talk to settings) ---------------
-
-// rememberRecentRecord records a visit to a Salesforce record.
-// Convenience wrapper that delegates to rememberRecent with
-// Kind=record so existing call sites don't need to change.
 func (m *Model) rememberRecentRecord(orgUser, sobject, id, name string) {
 	m.rememberRecent(orgUser, RecentKindRecord, id, name, sobject)
 }
@@ -100,12 +81,6 @@ func (m *Model) recordDrillInForCurrentTab() {
 	spec.RecordRecentVisit(m, d, o.Username)
 }
 
-// --- Recent-visit closures used by TabSpec.RecordRecentVisit -----------
-
-// recentVisitRecordDetail captures a record drill on TabRecordDetail.
-// d.RecordDetailCur is "<sobject>:<id>". Resolves the display name
-// from the cached detail map when possible; falls back to the id
-// alone when the detail isn't loaded yet.
 func recentVisitRecordDetail(m *Model, d *orgData, orgUser string) {
 	key := d.RecordDetailCur
 	if key == "" {
@@ -128,9 +103,6 @@ func recentVisitRecordDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindRecord, id, name, sobject)
 }
 
-// recentVisitObjectDetail captures an sObject drill on TabObjectDetail.
-// Identity uses the API name as id (mirrors what recordRecentVisit
-// does for sf.SObject).
 func recentVisitObjectDetail(m *Model, d *orgData, orgUser string) {
 	if d.DescribeCur == "" {
 		return
@@ -138,7 +110,6 @@ func recentVisitObjectDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindSObject, d.DescribeCur, d.DescribeCur, "")
 }
 
-// recentVisitFieldDetail captures a field drill on TabFieldDetail.
 func recentVisitFieldDetail(m *Model, d *orgData, orgUser string) {
 	if d.DescribeCur == "" || d.FieldCur == "" {
 		return
@@ -147,8 +118,6 @@ func recentVisitFieldDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindField, id, d.FieldCur, d.DescribeCur)
 }
 
-// recentVisitFlowDetail captures a flow drill on TabFlowDetail.
-// Resolves the human label from the cached flow list when available.
 func recentVisitFlowDetail(m *Model, d *orgData, orgUser string) {
 	if d.FlowCur == "" {
 		return
@@ -169,10 +138,6 @@ func recentVisitFlowDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindFlow, d.FlowCur, name, "")
 }
 
-// recentVisitReportDetail captures a report drill on TabReportDetail.
-// Name resolution is deferred — the renderer falls back to id when
-// Name is blank, and the treechip registry doesn't expose a by-id
-// lookup yet.
 func recentVisitReportDetail(m *Model, d *orgData, orgUser string) {
 	if d.ReportCur == "" {
 		return
@@ -180,8 +145,6 @@ func recentVisitReportDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindReport, d.ReportCur, "", "")
 }
 
-// recentVisitBundleDetail captures an LWC / Aura bundle drill on
-// TabBundleDetail. Bundle id doubles as the display name.
 func recentVisitBundleDetail(m *Model, d *orgData, orgUser string) {
 	if m.bundleCur == "" {
 		return
@@ -189,12 +152,6 @@ func recentVisitBundleDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindLWC, m.bundleCur, m.bundleCur, "")
 }
 
-// recentVisitPermParentDetail captures a permset / PSG / profile drill
-// on TabPermParentDetail. Maps the kind to the right RecentKind*
-// constant. Name resolution is deferred (same reasoning as reports).
-// recentVisitUserDetail captures a user drill on TabUserDetail.
-// Closes the ratchet exemption from 2026-06-13 — drills now feed
-// the recents stream the same way o (browser open) always did.
 func recentVisitUserDetail(m *Model, d *orgData, orgUser string) {
 	id := d.UserCur
 	if id == "" {
@@ -207,8 +164,6 @@ func recentVisitUserDetail(m *Model, d *orgData, orgUser string) {
 	m.rememberRecent(orgUser, RecentKindUser, row.ID, row.Name, row.Username)
 }
 
-// recentVisitLWCDetail captures component drills for both bundle kinds so
-// Enter and browser-open paths feed the same Recently Viewed stream.
 func recentVisitLWCDetail(m *Model, d *orgData, orgUser string) {
 	id := d.LWCCur
 	if id == "" {
@@ -292,10 +247,6 @@ func (m *Model) rememberRecent(orgUser, kind, id, name, secondary string) {
 	}
 	d.Recent = upsertRecent(d.Recent, entry, m.settings.RecentMaxEntries())
 	d.recentGen++
-	// Keep the renderer-facing wrapper in sync with the underlying
-	// slice. Without this, the /recent tab shows a stale list until
-	// some other event triggers SyncListViews — manifested as "press
-	// tab a few times, then it appears."
 	d.RecentList.Set(d.Recent)
 	persistRecent(m, orgUser, d.Recent)
 }
@@ -311,9 +262,6 @@ func persistRecent(m *Model, orgUser string, list []RecentEntry) {
 	m.saveSettings("")
 }
 
-// loadRecent restores the per-org recent list from settings on first
-// access. Called lazily from ensureOrgData so newly-attached orgs
-// pick up their persisted history without a refactor of the boot path.
 func loadRecent(m *Model, d *orgData, orgUser string) {
 	if m.settings == nil {
 		return

@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// instance.list reads ~/.sf-deck/instances.json. With HOME pointed at
-// a temp dir + no file, it should return an empty list (not an
-// error) — agents poll this and "no instances running yet" is the
-// normal cold-start state.
-
 func TestInstanceList_EmptyRegistryReturnsEmpty(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	a := newTestApp()
@@ -37,7 +32,6 @@ func TestInstanceList_EmptyRegistryReturnsEmpty(t *testing.T) {
 func TestInstanceList_ReadsRegistryEntries(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	// Pre-populate the registry file.
 	dir := filepath.Join(home, ".sf-deck")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -56,9 +50,6 @@ func TestInstanceList_ReadsRegistryEntries(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	data := out["data"].(map[string]any)
-	// The registry prunes dead PIDs on read, so what's surfaced
-	// depends on whether 99999/99998 happen to be live (almost
-	// always not). Either way the response shape should be valid.
 	instances := data["instances"].([]any)
 	count := int(data["count"].(float64))
 	if len(instances) != count {

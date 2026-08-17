@@ -4,26 +4,6 @@ package resource
 // entity kind that lives as a per-sobject child list on orgData:
 // validation rules, record types, triggers, and (eventually) layouts,
 // compact layouts, approval processes, etc.
-//
-// Every such entity has the same five pieces of state:
-//
-//	Lists[sobject]     — Resource of the child-list for one parent sobject.
-//	Cursors[sobject]   — index into that list, per parent, preserved across
-//	                      refreshes so cursor position survives.
-//	Details[childID]   — Resource of the drilled child's full payload.
-//	DrillID            — childID the user has currently drilled into.
-//	fetchList / fetchDetail — typed closures used by Ensure helpers.
-//
-// Generic over Row (the list-row shape) and Detail (the drilled
-// payload shape) so each entity kind gets its own concretely-typed
-// value without re-implementing the scaffolding. Before this, orgData
-// had four flat fields times three entity kinds = 12 fields; now it's
-// one SObjectChildren field per kind.
-//
-// Field, which is carried inside sf.SObjectDescribe.Fields rather
-// than as its own Resource, deliberately doesn't use this type —
-// its lifecycle is owned by the describe. Every OTHER sobject-
-// child entity in the roadmap should.
 
 import (
 	"time"
@@ -38,38 +18,16 @@ import (
 // details Resource per drilled child, and which child is currently
 // drilled in.
 type SObjectChildren[Row any, Detail any] struct {
-	// Lists maps parent sobject api-name → child-list Resource.
-	Lists map[string]*Resource[[]Row]
-	// Cursors is the j/k cursor index into Lists[sobject].Value(),
-	// keyed by parent sobject api-name. Preserved across refreshes.
+	Lists   map[string]*Resource[[]Row]
 	Cursors map[string]int
-	// Details maps child Id → full-payload Resource, used when the
-	// user drills into a single child for its detail view.
 	Details map[string]*Resource[Detail]
-	// DrillID is the child Id currently drilled into (TabXxxDetail).
-	// Empty when not on a detail tab.
 	DrillID string
 
-	// ResourceKeyPrefix is the cache-key prefix used for list
-	// Resources (e.g. "validationrules:" or "triggers:"). The full
-	// key is prefix+sobject. Routes incoming UpdatedMsg
-	// back to the right Resource via applyResourceMsg.
 	ResourceKeyPrefix string
-	// DetailKeyPrefix is the cache-key prefix used for detail
-	// Resources (e.g. "validationruledetail:" or "triggerdetail:").
-	// The full key is prefix+childID.
-	DetailKeyPrefix string
+	DetailKeyPrefix   string
 
-	// fetchList is the typed sf-package call that returns the full
-	// child list for a parent sobject. Bound once at construction
-	// so EnsureList doesn't need the caller to repeat it.
-	fetchList func(alias, sobject string) ([]Row, error)
-	// fetchDetail is the typed sf-package call that returns the
-	// full payload for one child Id.
-	fetchDetail func(alias, id string) (Detail, error)
-	// listTTL / detailTTL tune the per-Resource TTL. Zero = default
-	// of 1 minute (the current value across all the concrete
-	// per-entity Ensure helpers).
+	fetchList    func(alias, sobject string) ([]Row, error)
+	fetchDetail  func(alias, id string) (Detail, error)
 	listTTL      time.Duration
 	detailTTL    time.Duration
 	listNoDisk   bool

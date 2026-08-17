@@ -19,9 +19,6 @@ func TestProvidersForMethod(t *testing.T) {
 	}
 
 	auto := providersForMethod(compareMethodAuto)
-	// Auto = every mdapi type, but Tooling-capable ones served by the
-	// fast provider. Count should equal the union (mdapi set, since
-	// Apex/Trigger are in both lists → deduped).
 	labels := map[string]int{}
 	for _, p := range auto {
 		labels[p.TypeLabel()]++
@@ -37,21 +34,15 @@ func TestProvidersForMethod(t *testing.T) {
 }
 
 func TestEstimateCompareCalls(t *testing.T) {
-	// Tooling: 2 types × 1 list call per org. Bodies are lazy on drill-in.
 	if got := estimateCompareCalls(compareMethodTooling, []string{"ApexClass", "ApexTrigger"}); got != 2 {
 		t.Errorf("tooling estimate = %d, want 2", got)
 	}
-	// SOAP path scales with scope (NOT flat). 3 plain types:
-	// listing 3 + retrieve 3 = 6 (the runner lists each type today).
 	if got := estimateCompareCalls(compareMethodMetadataAPI, []string{"Flow", "Layout", "Profile"}); got != 6 {
 		t.Errorf("mdapi 3-type estimate = %d, want 6", got)
 	}
-	// 1 plain type: listing 1 + retrieve 1 = 2.
 	if got := estimateCompareCalls(compareMethodMetadataAPI, []string{"Flow"}); got != 2 {
 		t.Errorf("mdapi 1-type estimate = %d, want 2", got)
 	}
-	// Auto with Apex + an object-child (CustomField rides CustomObject):
-	// Apex bulk query 1; object lane list 1 + ~5 object batches = 7.
 	if got := estimateCompareCalls(compareMethodAuto, []string{"ApexClass", "CustomField"}); got != 7 {
 		t.Errorf("auto apex+objchild estimate = %d, want 7", got)
 	}
@@ -110,7 +101,6 @@ func TestEstimateCompareCallsScalesWithScope(t *testing.T) {
 	if bigEst < 280 {
 		t.Errorf("280 SOAP types should estimate >= ~280 (>=1 retrieve each), got %d", bigEst)
 	}
-	// Apex types cost a bulk query, not a per-name retrieve, but still count.
 	apexOnly := estimateCompareCalls(compareMethodAuto, []string{"ApexClass", "ApexTrigger"})
 	if apexOnly < 1 {
 		t.Errorf("apex-only estimate should be >=1, got %d", apexOnly)

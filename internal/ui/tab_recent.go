@@ -1,13 +1,5 @@
 package ui
 
-// /recent — client-side history of recently-visited records.
-//
-// Phase 1 surface: read-only browse of the per-org RecentEntry list
-// (records only). Enter on a row re-fires the same Lightning open the
-// original visit triggered; o (the standard openable hook) does the
-// same. Future tabs can render Recent reports / flows / dashboards
-// from the same list (filter by Kind).
-
 import (
 	"fmt"
 	"strings"
@@ -66,8 +58,6 @@ func recentCols() []uilayout.ListColumn {
 	return schemaListColumns(recentColumnSchema())
 }
 
-// humanTimeAgo formats a Time as "5m ago", "2h ago", "yesterday",
-// or the date for older entries. Keeps the WHEN column compact.
 func humanTimeAgo(t time.Time) string {
 	if t.IsZero() {
 		return "—"

@@ -1,37 +1,12 @@
 package ui
 
 // SOQL token substitution.
-//
-// Saved queries can reference org-portable tokens that resolve to
-// the active org's identity at load time:
-//
-//   $ME           → current user 18-char Id
-//   $ME_USERNAME  → current user Username
-//   $ORG          → org alias
-//   $TODAY        → YYYY-MM-DD
-//   $NOW          → ISO 8601 timestamp (current second, UTC)
-//
-// Future: $ORG_ID once we surface the organisation Id on Home or
-// OrgInfo. Today neither resource carries it.
-//
-// Substitution happens when the user loads a saved query into the
-// editor — the editor body shows the resolved values, so what the
-// user runs is exactly what they see. The on-disk saved query
-// keeps the original tokens, so the same row works across orgs.
-//
-// Tokens that can't be resolved (e.g. $ME before OrgInfo loads) are
-// left in place so a later re-load can complete the substitution.
-// We never silently substitute an empty string.
 
 import (
 	"strings"
 	"time"
 )
 
-// soqlSubstitutions is the resolved-values bundle. Empty fields
-// signal "couldn't resolve" — substituteSOQL leaves the matching
-// tokens in the body untouched rather than producing a query
-// fragment with empty quotes.
 type soqlSubstitutions struct {
 	UserID   string
 	Username string
@@ -81,9 +56,6 @@ func (m Model) substitutionsFor(d *orgData) soqlSubstitutions {
 		s.Username = o.Username
 	}
 	if d != nil {
-		// Home resource carries UserID once fetched. OrgID isn't
-		// surfaced on any resource yet; add when Home or OrgInfo
-		// grows the field.
 		s.UserID = d.Home.Value().UserID
 	}
 	return s

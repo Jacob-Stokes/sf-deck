@@ -1,24 +1,5 @@
 package ui
 
-// Chip surface definitions. Each chipSurface bundles the project-chip
-// registry, cursor accessors, and list reset hook for one uniform
-// chipped surface.
-//
-// Most surfaces are built from ListChipSurfaceSpec[T] (see
-// chip_surface_spec.go) — the spec declares only the per-surface
-// variation; newListChipSurface() wires the common closures.
-//
-// Bespoke surfaces that don't fit the spec (objects uses Name-keyed
-// visit lookup, recent has multi-kind scope membership, users runs
-// chips server-side with a no-op client filter) keep hand-rolled
-// chipSurface literals.
-//
-// TabSpec/SubtabSpec entries in tab_registry.go point directly at
-// the named vars below. The resolver order is active subtab → parent
-// tab → nil; the only remaining runtime bridge is /records before
-// it has drilled into a specific sObject, where it reuses
-// objectsChipSurface.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
@@ -26,26 +7,14 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/qchip"
 )
 
-// chipSurface bundles every per-surface hook the chip system needs:
-// where to find the chip cursor (ChipIdx / SetChipIdx), where to
-// reset the underlying list when the chip changes (ResetList),
-// which qchip.Registry to consult, and the two predicate-applying
-// closures for chip + project-chip selection.
 type chipSurface struct {
 	Domain chipDomain
 
-	// ChipIdx + SetChipIdx are the per-org chip-cursor accessors.
 	ChipIdx    func(Model) int
 	SetChipIdx func(*Model, int)
 
-	// ResetList clears the underlying list cursor; called when the
-	// chip selection changes so the user lands on row 0 of the new
-	// filtered set instead of the old cursor index that may now
-	// point at nothing.
 	ResetList func(*orgData)
 
-	// Registry returns the qchip.Registry pointer holding this
-	// surface's chips (built-ins + user-defined).
 	Registry func(*Model) *qchip.Registry
 
 	// ApplyChip writes the chosen chip's predicate onto the
@@ -53,58 +22,21 @@ type chipSurface struct {
 	// each List has a different element type.
 	ApplyChip func(d *orgData, c qchip.Chip)
 
-	// ApplyProjectChip is the project-chip variant — writes the
-	// scope-membership predicate onto the same filter slot. Nil for
-	// surfaces where the project chip doesn't apply.
 	ApplyProjectChip func(d *orgData, scope *orgproject.Scope)
 
-	// ApplyVisitedChip is the Visited-chip variant — writes a
-	// closure that consults the merged-recent stream onto the
-	// surface's filter slot. Receives the active Model so it can
-	// reach m.recentVisitedRecordIDs / m.recentVisitedSObjects.
-	// Nil for surfaces that don't participate in the Visited chip.
-	//
-	// Implementations should ALSO install a most-recent-first
-	// recency order via applyVisitedListOrder so the chip's
-	// "Recently viewed" label actually means "most recent at top"
-	// (not alphabetical) when no column sort is active.
 	ApplyVisitedChip func(m Model, d *orgData)
 
-	// ClearVisitedOrder removes the recency-default-order installed
-	// by ApplyVisitedChip. Called by the dispatcher when the user
-	// switches away from the Visited chip to a regular chip or the
-	// project chip, so the list returns to its natural order. Nil
-	// for surfaces that don't install a recency order.
 	ClearVisitedOrder func(d *orgData)
 
-	// ScopeCount returns how many items of this surface's kind the
-	// scope contains. The chip strip auto-prepends the project chip
-	// when this returns > 0.
 	ScopeCount func(*orgproject.Scope) int
 
-	// ManagerTitle returns the title shown atop the V (chip
-	// manager) modal — e.g. "Views · sObjects". Receives Model so
-	// surfaces with per-row context (Records: "Views · Account")
-	// can compose the right label.
 	ManagerTitle func(Model) string
 
-	// ManagerScope returns the scope key the manager modal opens
-	// under. Most surfaces are universal scope ("*"); Records is
-	// per-sObject ("Account"). Empty string is treated as "*"; when
-	// the closure is nil the dispatcher falls back to "*".
 	ManagerScope func(Model) string
 
-	// ImportFromSF flags whether the V modal offers "Import from
-	// Salesforce…" — the Lightning list-view import flow. Only
-	// meaningful for surfaces backed by ListView entities (Records,
-	// Flows). Defaults to false.
 	ImportFromSF bool
 }
 
-// surfaceManagerTitle resolves the V (chip manager) modal title for
-// a surface. Falls back to a generic "Views" when the surface
-// hasn't declared a ManagerTitle — better than crashing or showing
-// an empty string.
 func surfaceManagerTitle(s chipSurface, m Model) string {
 	if s.ManagerTitle != nil {
 		return s.ManagerTitle(m)
@@ -112,9 +44,6 @@ func surfaceManagerTitle(s chipSurface, m Model) string {
 	return "Views"
 }
 
-// surfaceManagerScope resolves the scope key the manager modal
-// opens under. Most surfaces use "*" (universal); per-row scopes
-// declare ManagerScope explicitly. Empty / nil → "*".
 func surfaceManagerScope(s chipSurface, m Model) string {
 	if s.ManagerScope == nil {
 		return "*"
@@ -124,8 +53,6 @@ func surfaceManagerScope(s chipSurface, m Model) string {
 	}
 	return "*"
 }
-
-// --- Per-surface chipSurface values ----------------------------------
 
 // /objects — bespoke because sObject visits are keyed by Name (the
 // API name) instead of an Id, and use the dedicated
@@ -161,7 +88,6 @@ var objectsChipSurface = chipSurface{
 	ManagerTitle:      func(Model) string { return "Views · sObjects" },
 }
 
-// /flows
 var flowsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.Flow]{
 	Domain:        domainFlows,
 	ChipIdx:       func(m Model) int { return m.flowsChipIdx() },
@@ -183,7 +109,6 @@ var flowsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.Flow]{
 	// one via N (chip wizard) instead.
 })
 
-// /apex Classes
 var apexClassesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.ApexClassRow]{
 	Domain:        domainApex,
 	ChipIdx:       func(m Model) int { return m.apexChipIdx() },
@@ -198,8 +123,6 @@ var apexClassesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.ApexClass
 	ManagerTitle:  "Views · Apex Classes",
 })
 
-// /apex Triggers (flat cross-sObject list).
-// Triggers ride on the apex_trigger kind in the scope — see Scope.HasTrigger.
 var apexTriggersChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.TriggerRow]{
 	Domain:        domainTriggers,
 	ChipIdx:       func(m Model) int { return m.apexTriggersChipIdx() },
@@ -214,7 +137,6 @@ var apexTriggersChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.TriggerR
 	ManagerTitle:  "Views · Apex Triggers",
 })
 
-// /components LWC
 var lwcChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.LWCBundle]{
 	Domain:        domainLWC,
 	ChipIdx:       func(m Model) int { return m.lwcChipIdx() },
@@ -229,7 +151,6 @@ var lwcChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.LWCBundle]{
 	ManagerTitle:  "Views · LWC",
 })
 
-// /components Aura
 var auraChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.AuraBundle]{
 	Domain:        domainAura,
 	ChipIdx:       func(m Model) int { return m.auraChipIdx() },
@@ -244,7 +165,6 @@ var auraChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.AuraBundle]{
 	ManagerTitle:  "Views · Aura",
 })
 
-// /perms PermSets
 var permsetsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.PermissionSet]{
 	Domain:        domainPermSets,
 	ChipIdx:       func(m Model) int { return m.permsetsChipIdx() },
@@ -259,7 +179,6 @@ var permsetsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.PermissionSe
 	ManagerTitle:  "Views · Permission Sets",
 })
 
-// /perms PSGs
 var psgsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.PermissionSetGroup]{
 	Domain:        domainPSGs,
 	ChipIdx:       func(m Model) int { return m.psgsChipIdx() },
@@ -274,7 +193,6 @@ var psgsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.PermissionSetGro
 	ManagerTitle:  "Views · Permission Set Groups",
 })
 
-// /perms Profiles
 var profilesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.Profile]{
 	Domain:        domainProfiles,
 	ChipIdx:       func(m Model) int { return m.profilesChipIdx() },
@@ -289,7 +207,6 @@ var profilesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.Profile]{
 	ManagerTitle:  "Views · Profiles",
 })
 
-// /perms Queues
 var queuesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.QueueRow]{
 	Domain:        domainQueues,
 	ChipIdx:       func(m Model) int { return m.queuesChipIdx() },
@@ -304,7 +221,6 @@ var queuesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.QueueRow]{
 	ManagerTitle:  "Views · Queues",
 })
 
-// /perms Public Groups
 var publicGroupsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.PublicGroupRow]{
 	Domain:        domainPublicGroup,
 	ChipIdx:       func(m Model) int { return m.publicGroupsChipIdx() },
@@ -319,7 +235,6 @@ var publicGroupsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.PublicGr
 	ManagerTitle:  "Views · Public Groups",
 })
 
-// /deploys
 var deploysChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.DeployRow]{
 	Domain:       domainDeploys,
 	ChipIdx:      func(m Model) int { return m.deploysChipIdx() },
@@ -342,7 +257,6 @@ var activeUsersChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.ActiveUse
 	ManagerTitle: "Views · Active users",
 })
 
-// /reports Dashboards
 var dashboardsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.DashboardRow]{
 	Domain:       domainDashboards,
 	ChipIdx:      func(m Model) int { return m.dashboardsChipIdx() },
@@ -353,7 +267,6 @@ var dashboardsChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.DashboardR
 	ManagerTitle: "Views · Dashboards",
 })
 
-// /reports Report Types
 var reportTypesChipSurface = newListChipSurface(ListChipSurfaceSpec[sf.ReportTypeRow]{
 	Domain:       domainReportTypes,
 	ChipIdx:      func(m Model) int { return m.reportTypesChipIdx() },
@@ -378,7 +291,6 @@ var savedQueriesChipSurface = chipSurface{
 	ManagerTitle: func(Model) string { return "Views · Saved Queries" },
 }
 
-// /soql History — bespoke for the same reasons.
 var soqlHistoryChipSurface = chipSurface{
 	Domain:     domainSOQLHistory,
 	ChipIdx:    func(m Model) int { return m.soqlHistoryChipIdx() },
@@ -391,10 +303,6 @@ var soqlHistoryChipSurface = chipSurface{
 	ManagerTitle: func(Model) string { return "Views · SOQL History" },
 }
 
-// /recent + /home Recent — bespoke. The chip filters
-// d.RecentList.Extra by RecentEntry.Kind; the project chip's
-// match function is a per-kind switch over the scope's per-kind
-// sets, which doesn't fit the simple ScopeContains(id) shape.
 var recentChipSurface = chipSurface{
 	Domain:     domainRecent,
 	ChipIdx:    func(m Model) int { return m.recentChipIdx() },
@@ -402,9 +310,6 @@ var recentChipSurface = chipSurface{
 	ResetList:  func(d *orgData) { d.RecentList.ResetCursor() },
 	Registry:   func(m *Model) *qchip.Registry { return m.chipRegistry(domainRecent) },
 	ApplyChip: func(d *orgData, c qchip.Chip) {
-		// Filter the ACTIVE list (sf-deck or Salesforce) — chip
-		// predicates run against RecentEntry.Field which exposes
-		// Kind for the kind chips.
 		if lv := activeRecentListPtr(d); lv != nil {
 			lv.SetExtra(chipMatcherFor[RecentEntry](c, chipSubs(d)))
 		}
@@ -427,9 +332,6 @@ var recentChipSurface = chipSurface{
 			case RecentKindSObject:
 				return scope.HasObject(r.ID)
 			case RecentKindField:
-				// Fields aren't tracked individually — the project
-				// scopes whole sObjects. Match when the parent
-				// sObject (carried on r.Type) is in scope.
 				return scope.HasObject(r.Type)
 			case RecentKindFlow:
 				return scope.HasFlow(r.ID)
@@ -455,10 +357,6 @@ var recentChipSurface = chipSurface{
 			return false
 		})
 	},
-	// ScopeCount is conservative — return a positive number whenever
-	// the loaded project has ANYTHING in it, so the project chip
-	// always shows for users with a project loaded. Filtering happens
-	// inside ApplyProjectChip.
 	ScopeCount: func(s *orgproject.Scope) int {
 		return len(s.Objects) + len(s.FlowIDs) + len(s.ApexIDs) +
 			len(s.TriggerIDs) + len(s.LWCIDs) + len(s.AuraIDs) +
@@ -489,8 +387,6 @@ var usersChipSurface = chipSurface{
 	ChipIdx:    func(m Model) int { return m.allUsersChipIdx() },
 	SetChipIdx: func(m *Model, i int) { m.setAllUsersChipIdx(i) },
 	ResetList: func(d *orgData) {
-		// Reset every per-chip ListView's cursor — switching chip
-		// shouldn't carry over a deep cursor on the previous chip.
 		for _, lv := range d.ChipUsersList {
 			lv.ResetCursor()
 		}
@@ -501,21 +397,6 @@ var usersChipSurface = chipSurface{
 	ImportFromSF: true,
 }
 
-// allChipSurfaces walks the TabSpec registry and yields every
-// declared chipSurface — both TabSpec.Chips and SubtabSpec.Chips.
-// Replaces the older chipSurfaces() map (which duplicated what the
-// registry already encoded). Used by:
-//
-//   - domainFromRegistry (chip_helpers.go) — reverse-lookup from a
-//     qchip.Registry pointer to its domain.
-//   - chipSurfaceForDomain — reverse-lookup from a domain enum to
-//     the surface that owns it.
-//   - compensateChipCursorsForPrepend (orgproject_load.go) — fan
-//     out across every project-chip-aware surface when scope
-//     changes.
-//
-// Returns by value so callers don't accidentally mutate the
-// registry's spec entries through the returned slice.
 func allChipSurfaces() []chipSurface {
 	out := make([]chipSurface, 0, 16)
 	seen := map[chipDomain]bool{}
@@ -535,9 +416,6 @@ func allChipSurfaces() []chipSurface {
 	return out
 }
 
-// chipSurfaceForDomain reverses the lookup: given a domain, return
-// its surface entry. Used by the chip-manager modal which thinks in
-// terms of domains, not tabs.
 func chipSurfaceForDomain(domain chipDomain) *chipSurface {
 	for _, s := range allChipSurfaces() {
 		if s.Domain == domain {

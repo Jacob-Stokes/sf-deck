@@ -40,9 +40,6 @@ func Parse(soql string) (Query, string, error) {
 	if parts.where != "" {
 		w, perr := parseWhere(parts.where)
 		if perr != nil {
-			// Partial result: keep SELECT / FROM / ORDER BY / LIMIT,
-			// drop the WHERE we couldn't parse. Caller decides whether
-			// to surface the warning.
 			return q, parts.from, perr
 		}
 		q.Where = w
@@ -57,9 +54,6 @@ func Parse(soql string) (Query, string, error) {
 	return q, parts.from, nil
 }
 
-// soqlSplit is the structural break-up done before tokenisation —
-// finds clause boundaries respecting parens + string literals so that
-// e.g. an apostrophe inside a string literal doesn't hide a later WHERE.
 type soqlSplit struct {
 	selectCols []string
 	from       string
@@ -73,12 +67,6 @@ func splitSOQL(s string) (soqlSplit, error) {
 	upper := strings.ToUpper(s)
 	out := soqlSplit{}
 
-	// Walk the string char-by-char to find the keyword boundaries that
-	// aren't inside a string literal or paren group. This is the crucial
-	// difference vs a plain strings.Index — `Name = 'WHERE'` shouldn't
-	// terminate the SELECT.
-	// marker.pos is the index of the *first* char of the keyword
-	// (e.g. the W of WHERE), so start = pos + len(kw) skips it cleanly.
 	type marker struct {
 		kw  string
 		pos int
@@ -101,7 +89,6 @@ func splitSOQL(s string) (soqlSplit, error) {
 			if upper[at:end] != kw {
 				continue
 			}
-			// Followed by whitespace or EOF.
 			if end < len(upper) && upper[end] != ' ' && upper[end] != '\t' && upper[end] != '\n' {
 				continue
 			}
@@ -140,7 +127,6 @@ func splitSOQL(s string) (soqlSplit, error) {
 		return out, fmt.Errorf("query: no SELECT keyword found")
 	}
 
-	// Reject unsupported clauses early.
 	for _, m := range markers {
 		switch m.kw {
 		case "GROUP BY", "HAVING", "OFFSET":
@@ -148,7 +134,6 @@ func splitSOQL(s string) (soqlSplit, error) {
 		}
 	}
 
-	// Build the section map.
 	get := func(kw string) (start, end int, ok bool) {
 		for i, m := range markers {
 			if m.kw != kw {
@@ -185,7 +170,6 @@ func splitSOQL(s string) (soqlSplit, error) {
 	}
 	if start, end, ok := get("LIMIT"); ok {
 		body := strings.TrimSpace(s[start:end])
-		// Find the first non-digit so we ignore trailing tokens.
 		i := 0
 		for i < len(body) && body[i] >= '0' && body[i] <= '9' {
 			i++
@@ -198,23 +182,6 @@ func splitSOQL(s string) (soqlSplit, error) {
 	return out, nil
 }
 
-// ---- WHERE parser ------------------------------------------------------
-
-// parseWhere is a recursive-descent parser over the WHERE body.
-//
-// Grammar (informal):
-//
-//	expr     := term ( OR term )*
-//	term     := factor ( AND factor )*
-//	factor   := NOT factor | "(" expr ")" | compare
-//	compare  := IDENT op_or_pred
-//	op_or_pred := EQ literal | NE literal | GT literal | ...
-//	             | LIKE string
-//	             | IN "(" literal ("," literal)* ")"
-//	             | IS [NOT] NULL
-//
-// The tokeniser handles whitespace, identifiers, numeric / string
-// literals, parens, and the comparison operators.
 func parseWhere(s string) (Node, error) {
 	p := &parser{src: s, tokens: tokenise(s)}
 	expr, err := p.parseOr()
@@ -278,7 +245,6 @@ func tokenise(s string) []token {
 				j++
 			}
 			body := s[i+1 : j]
-			// Unescape \' → '
 			body = strings.ReplaceAll(body, "\\'", "'")
 			// Clamp the closing index: an UNTERMINATED literal (no closing
 			// quote) leaves j == len(s), so s[i : j+1] would slice one past
@@ -334,10 +300,6 @@ func tokenise(s string) []token {
 			out = append(out, token{kind: tkNumber, text: s[i:j], raw: s[i:j]})
 			i = j
 		default:
-			// Identifier or keyword. Salesforce ids are alnum + underscore + dot
-			// (relationship traversals like Account.Owner.Name). Date/datetime
-			// literals like 2025-01-01T00:00:00Z aren't quoted in SOQL — we
-			// treat them as identifiers and the value-coercion step decides.
 			j := i
 			for j < len(s) {
 				ch := s[j]
@@ -374,8 +336,6 @@ func tokenise(s string) []token {
 	return out
 }
 
-// allDigits reports whether every byte of s is a decimal digit. Used by
-// the tokeniser to detect the YYYY-MM-DD prefix of a date literal.
 func allDigits(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] < '0' || s[i] > '9' {
@@ -620,13 +580,9 @@ func likeToCompare(field, pattern string) Node {
 	case endsAny:
 		return Cmp(field, OpStartsWith, body)
 	}
-	// No wildcard at all — treat as equality (this is what SOQL does
-	// in practice, give or take collation).
 	return Cmp(field, OpEq, body)
 }
 
-// isNullLit reports whether the literal value should be treated as
-// NULL — used to fold `field = null` into OpIsNull.
 func isNullLit(v any) bool {
 	if v == nil {
 		return true
@@ -637,10 +593,6 @@ func isNullLit(v any) bool {
 	return false
 }
 
-// isDateLiteral reports whether a string is one of Salesforce's
-// date-literal tokens. Used by the parser to fold `field = TODAY`
-// into OpDateLiteral so Eval can resolve the window at apply time
-// (rather than treating the literal as a plain string).
 func isDateLiteral(v any) bool {
 	s, ok := v.(string)
 	if !ok {
@@ -663,11 +615,6 @@ func isDateLiteral(v any) bool {
 		strings.HasPrefix(upper, "NEXT_N_MONTHS:")
 }
 
-// ---- ORDER BY parser ---------------------------------------------------
-
-// parseOrderBy splits an ORDER BY body into typed entries. SOQL grammar:
-//
-//	field [ASC|DESC] [NULLS FIRST|LAST] (, field [ASC|DESC] ...)*
 func parseOrderBy(s string) ([]OrderBy, error) {
 	var out []OrderBy
 	for _, part := range strings.Split(s, ",") {

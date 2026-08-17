@@ -6,38 +6,17 @@ import (
 )
 
 // Tunable client config.
-//
-// The sf package is a lower layer than internal/settings (settings reads
-// user TOML; sf does the actual API work), so sf must NOT import
-// settings — that would invert the dependency and risk a cycle. Instead
-// the UI reads the user's preferences from settings at startup and pushes
-// them down here via ApplyConfig. Everything has a sane default so sf
-// works standalone (tests, headless callers) without any ApplyConfig
-// call.
-//
-// Reads go through the accessor funcs (cfgHTTPTimeout, etc.) which take
-// the lock, so a startup ApplyConfig racing the first API call is safe.
 
 var (
 	cfgMu sync.RWMutex
 	cfg   = clientConfig{
-		HTTPTimeout: 30 * time.Second,
-		CLITimeout:  30 * time.Second,
-		// RetrieveTimeout caps `sf project retrieve start` /
-		// `sf project deploy start` / `sf project deploy validate`
-		// shell-outs. Salesforce-side validates with Apex test
-		// runs routinely take 5-15 min on busy orgs (queue time +
-		// test execution); the previous 5min cap killed sf-deck's
-		// client before SF returned for any non-trivial manifest.
-		// 20min covers ~99% of real-world validates while still
-		// catching truly hung processes.
+		HTTPTimeout:     30 * time.Second,
+		CLITimeout:      30 * time.Second,
 		RetrieveTimeout: 20 * time.Minute,
 		DeployDeadline:  60 * time.Second,
-		// Steady-state deploy poll (after the 500ms fast-start in
-		// pollDeploy). Mirrors settings.APIDeployPollMsFallback.
-		DeployPoll: 5 * time.Second,
-		BulkPoll:   5 * time.Second,
-		APIVersion: "", // "" = use the org-reported version
+		DeployPoll:      5 * time.Second,
+		BulkPoll:        5 * time.Second,
+		APIVersion:      "", // "" = use the org-reported version
 	}
 )
 
@@ -114,14 +93,8 @@ func cfgDeployDeadline() time.Duration {
 func cfgDeployPoll() time.Duration { cfgMu.RLock(); defer cfgMu.RUnlock(); return cfg.DeployPoll }
 func cfgBulkPoll() time.Duration   { cfgMu.RLock(); defer cfgMu.RUnlock(); return cfg.BulkPoll }
 
-// cfgAPIVersion returns the user-forced API version, or "" when unset
-// (caller should fall back to the org-reported / defaultAPIVersion).
 func cfgAPIVersion() string { cfgMu.RLock(); defer cfgMu.RUnlock(); return cfg.APIVersion }
 
-// cfgFlowOpenActive reports whether the user prefers the flows-list `o`
-// to open the ACTIVE flow version instead of the latest. Default (unset
-// or any other value) is latest-first — the most recent version
-// regardless of status, matching Setup's own flow list.
 func cfgFlowOpenActive() bool {
 	cfgMu.RLock()
 	defer cfgMu.RUnlock()

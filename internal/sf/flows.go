@@ -4,23 +4,18 @@ package sf
 // FlowDefinition — we aggregate the active-version metadata in so the
 // list has useful info without a second round-trip per row.
 type Flow struct {
-	DefinitionID     string `json:"defId"`
-	DeveloperName    string `json:"devName"`
-	MasterLabel      string `json:"label"`
-	Description      string `json:"desc"`
-	Namespace        string `json:"ns,omitempty"`
-	ActiveVersionID  string `json:"activeId,omitempty"`
-	LatestVersionID  string `json:"latestId,omitempty"`
-	ActiveVersionNum int    `json:"activeN,omitempty"`
-	LatestVersionNum int    `json:"latestN,omitempty"`
-	ProcessType      string `json:"ptype,omitempty"`
-	APIVersion       int    `json:"api,omitempty"`
-	Status           string `json:"status,omitempty"` // Active / Draft / Obsolete / InvalidDraft
-	// LatestVersionStatus is the status of the LATEST version, which
-	// differs from Status (the active version's) when a newer version
-	// exists — e.g. active v3 with a v4 Draft. Drives the status-
-	// accurate "(v4) = newer Draft" footer hint. Empty when the latest
-	// version wasn't fetched or equals the active one.
+	DefinitionID        string `json:"defId"`
+	DeveloperName       string `json:"devName"`
+	MasterLabel         string `json:"label"`
+	Description         string `json:"desc"`
+	Namespace           string `json:"ns,omitempty"`
+	ActiveVersionID     string `json:"activeId,omitempty"`
+	LatestVersionID     string `json:"latestId,omitempty"`
+	ActiveVersionNum    int    `json:"activeN,omitempty"`
+	LatestVersionNum    int    `json:"latestN,omitempty"`
+	ProcessType         string `json:"ptype,omitempty"`
+	APIVersion          int    `json:"api,omitempty"`
+	Status              string `json:"status,omitempty"` // Active / Draft / Obsolete / InvalidDraft
 	LatestVersionStatus string `json:"latestStatus,omitempty"`
 	LastModifiedDate    string `json:"mod,omitempty"`
 	LastModifiedBy      string `json:"modBy,omitempty"`
@@ -91,9 +86,6 @@ type FlowVersion struct {
 // active-version's process type / API version / status via a second
 // query against the Flow object. All read-only Tooling-API SOQL.
 func ListFlows(orgAlias string) ([]Flow, error) {
-	// Page FlowDefinition by Id so we don't trip the 2000-row queryMore
-	// limit on Tooling-API views. In practice orgs rarely have more than
-	// a couple thousand flows, but the code handles it cleanly regardless.
 	defs, err := listFlowDefinitions(orgAlias)
 	if err != nil {
 		return nil, err
@@ -102,9 +94,6 @@ func ListFlows(orgAlias string) ([]Flow, error) {
 		return nil, nil
 	}
 
-	// Fetch the "active or latest" version for each definition so we can
-	// show ProcessType, APIVersion, Status, VersionNumber, LastModified
-	// without a round-trip per row.
 	byID := map[string]*Flow{}
 	versionIDs := make([]string, 0, len(defs)*2)
 	for i := range defs {
@@ -117,12 +106,6 @@ func ListFlows(orgAlias string) ([]Flow, error) {
 			versionIDs = append(versionIDs, f.LatestVersionID)
 		}
 	}
-	// fetchFlowVersions returns whatever it managed to collect even on
-	// error — earlier versions of this code dropped partial results
-	// when ANY chunk failed, leaving the entire flow list with no
-	// version metadata. Apply what we got and just log the error away
-	// (best-effort: the user sees most rows populated rather than
-	// none).
 	versions, _ := fetchFlowVersions(orgAlias, versionIDs)
 	vByID := map[string]FlowVersion{}
 	for _, v := range versions {
@@ -130,7 +113,6 @@ func ListFlows(orgAlias string) ([]Flow, error) {
 	}
 	for i := range defs {
 		f := &defs[i]
-		// Prefer the active version's metadata; fall back to the latest.
 		v, ok := vByID[f.ActiveVersionID]
 		if !ok {
 			v = vByID[f.LatestVersionID]
@@ -198,15 +180,13 @@ func listFlowDefinitions(orgAlias string) ([]Flow, error) {
 	out := make([]Flow, 0, len(q.Records))
 	for _, r := range q.Records {
 		f := Flow{
-			DefinitionID:    asString(r["Id"]),
-			DeveloperName:   asString(r["DeveloperName"]),
-			MasterLabel:     asString(r["MasterLabel"]),
-			Description:     asString(r["Description"]),
-			Namespace:       asString(r["NamespacePrefix"]),
-			ActiveVersionID: asString(r["ActiveVersionId"]),
-			LatestVersionID: asString(r["LatestVersionId"]),
-			// Seed modified* from the definition; ListFlows overwrites
-			// with the newest of {definition, active, latest version}.
+			DefinitionID:     asString(r["Id"]),
+			DeveloperName:    asString(r["DeveloperName"]),
+			MasterLabel:      asString(r["MasterLabel"]),
+			Description:      asString(r["Description"]),
+			Namespace:        asString(r["NamespacePrefix"]),
+			ActiveVersionID:  asString(r["ActiveVersionId"]),
+			LatestVersionID:  asString(r["LatestVersionId"]),
 			LastModifiedDate: asString(r["LastModifiedDate"]),
 			// Created* come from the definition and are authoritative —
 			// ListFlows must not overwrite them from a version row.
@@ -223,12 +203,6 @@ func listFlowDefinitions(orgAlias string) ([]Flow, error) {
 	return out, nil
 }
 
-// adoptNewerModified sets f's LastModifiedDate/By to v's when v is
-// strictly newer than what f already holds. All three timestamp
-// sources (FlowDefinition, active Flow version, latest Flow version)
-// come back from the Tooling API in the same ISO-8601 UTC format
-// (2026-07-07T11:36:08.000+0000), so a lexicographic compare orders
-// them chronologically — no parse needed. Empty candidate is ignored.
 func adoptNewerModified(f *Flow, v FlowVersion) {
 	if v.ID == "" || v.LastModifiedDate == "" {
 		return

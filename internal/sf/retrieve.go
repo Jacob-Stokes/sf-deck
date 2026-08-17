@@ -2,22 +2,6 @@ package sf
 
 // `sf project retrieve` / `sf project deploy` shell-outs for the
 // in-TUI bundle workflow.
-//
-// All commands here run synchronously and require being executed from
-// inside a directory that looks like a Salesforce DX project
-// (sfdx-project.json present). Callers pass the bundle dir as
-// bundleDir; the commands cd into that directory before exec'ing sf.
-//
-// The retrieve / deploy commands take 30-120s for medium projects;
-// callers run them from a goroutine via tea.Cmd. Preview commands
-// are fast (typically < 5s) but still off the UI thread for
-// consistency.
-//
-// Source tracking caveat: the *preview* commands (RetrievePreview,
-// DeployPreview) require source tracking to be enabled on the target
-// org. Production orgs and most non-default sandboxes return
-// NonSourceTrackedOrgError. Callers should fall back to a plain
-// "show what's in the manifest" listing in that case.
 
 import (
 	"context"
@@ -205,15 +189,9 @@ func DeployReport(bundleDir, orgAlias, jobID string) ([]byte, error) {
 // the bundle dir; "" when the item exists only in the org / only
 // in the manifest.
 type ManifestPreviewItem struct {
-	FullName string `json:"fullName"`
-	Type     string `json:"type"`
-	Path     string `json:"path,omitempty"`
-	// Namespace is the managed-package prefix when the item belongs
-	// to a managed package. Set by the fallback diff (which queries
-	// NamespacePrefix from Tooling); always "" for `sf project
-	// retrieve preview` results since those are about your project,
-	// not the org's package inventory. Renderer uses this to badge
-	// managed items + bucket them separately.
+	FullName  string `json:"fullName"`
+	Type      string `json:"type"`
+	Path      string `json:"path,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -290,9 +268,6 @@ func parsePreviewOutput(out []byte, err error) (ManifestPreview, error) {
 	return env.Result, nil
 }
 
-// isNonSourceTracked reports whether err is the typed SFError that
-// preview commands return when the target org doesn't have source
-// tracking enabled.
 func isNonSourceTracked(err error) bool {
 	var se *SFError
 	if !errors.As(err, &se) {
@@ -301,9 +276,6 @@ func isNonSourceTracked(err error) bool {
 	return se.Code == "NonSourceTrackedOrgError"
 }
 
-// runSFInDir is runSF with cmd.Dir set. Used by every project-level
-// sf invocation since they all need to be run inside an sfdx project
-// directory.
 func runSFInDir(bundleDir, orgAlias string, args ...string) ([]byte, error) {
 	return runSFInDirWithTimeout(bundleDir, orgAlias, cfgRetrieveTimeout(), args...)
 }

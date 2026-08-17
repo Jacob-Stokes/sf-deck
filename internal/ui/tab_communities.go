@@ -1,17 +1,5 @@
 package ui
 
-// /communities — Experience sites (Networks) list + a drill into one
-// community's pages and config.
-//
-// Layer 1 (solid): the community list with config + member count, and
-// o → open menu (live site / Experience Builder / Administration /
-// Setup). Layer 2 (best-effort): Enter drills into a community-detail
-// view that lists the org's community-type FlexiPages. FlexiPages don't
-// carry a foreign key to their Network, so the pages are grouped by
-// name prefix as a best-effort approximation — the detail view says so.
-// Full page content remains in Experience Builder rather than being
-// loaded through this best-effort list.
-
 import (
 	"strings"
 	"time"
@@ -37,7 +25,6 @@ func (m Model) renderCommunities(w, innerH int) string {
 	return renderListSurface(m, &communitiesListSurface, w, innerH, d)
 }
 
-// activateCommunities is Enter on a community row: drill into its pages.
 func (m *Model) activateCommunities() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {

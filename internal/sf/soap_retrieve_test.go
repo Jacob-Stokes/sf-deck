@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// objectXMLWithAllChildren is a CustomObject readMetadata record with one
-// of each child type, to verify extractObjectChildren covers them all.
 const objectXMLWithAllChildren = `<fullName>Acct__c</fullName>` +
 	`<fields><fullName>F1__c</fullName><type>Text</type></fields>` +
 	`<validationRules><fullName>VR1</fullName><active>true</active></validationRules>` +

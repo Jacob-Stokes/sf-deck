@@ -19,7 +19,6 @@ func TestGroupSessionsByUser(t *testing.T) {
 			"LoginType":            "Application",
 		}
 	}
-	// Newest-first, as the SOQL ORDER BY delivers.
 	records := []map[string]any{
 		rec("005A", "Ada", "UI", "HIGH_ASSURANCE", "2026-07-08T14:58:00.000+0000"),     // Ada newest (2m ago)
 		rec("005A", "Ada", "Aura", "LOW", "2026-07-08T14:40:00.000+0000"),              // Ada 2nd session, LOW
@@ -31,7 +30,6 @@ func TestGroupSessionsByUser(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 users, got %d", len(rows))
 	}
-	// Newest activity first → Ada then Bob.
 	ada, bob := rows[0], rows[1]
 	if ada.UserName != "Ada" || bob.UserName != "Bob" {
 		t.Fatalf("order/name wrong: %q, %q", ada.UserName, bob.UserName)
@@ -53,7 +51,6 @@ func TestGroupSessionsByUser(t *testing.T) {
 	if ada.IsAPI {
 		t.Error("Ada IsAPI should be false (UI session)")
 	}
-	// Bob: single API session, not low, ~120 min stale.
 	if !bob.IsAPI {
 		t.Error("Bob IsAPI should be true (Oauth2)")
 	}
@@ -81,9 +78,7 @@ func TestGroupPrefersBrowserSessionOverAPI(t *testing.T) {
 		}
 	}
 	records := []map[string]any{
-		// Newest = API, LOW, Salesforce-internal IP.
 		full("005DM", "Demo User", "API", "LOW", "Salesforce.com IP", "2026-07-08T15:36:00.000+0000"),
-		// Older = real browser session, HIGH, real IP.
 		full("005DM", "Demo User", "UI", "HIGH_ASSURANCE", "198.51.100.42", "2026-07-08T15:30:00.000+0000"),
 	}
 	rows := groupSessionsByUser(records, now)
@@ -106,7 +101,6 @@ func TestGroupPrefersBrowserSessionOverAPI(t *testing.T) {
 	if p.IsAPI {
 		t.Error("IsAPI should be false — the representative is a browser session")
 	}
-	// LastActive still tracks the newest activity (the API session).
 	if got := p.LastActive.Format("15:04"); got != "15:36" {
 		t.Errorf("LastActive = %s, want 15:36 (newest across all sessions)", got)
 	}

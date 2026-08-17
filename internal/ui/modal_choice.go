@@ -1,14 +1,5 @@
 package ui
 
-// Choice modal — a "pick one of these options" overlay used when
-// editing a field's boolean/enum Metadata property. Sibling to the
-// text editModal; shares the same modalBox primitive, Save/OnSuccess
-// callback shape, and saving/loading lifecycle.
-//
-// Use when: the set of valid values is small + discrete (required vs
-// nullable, cascade vs restricted-delete, picklist-kind vs text,
-// etc.). For free-form prose → editModal.
-
 import (
 	"fmt"
 	"strings"
@@ -19,9 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// choiceModalVisibleIndices returns the indices into cm.Options that
-// should be visible given the current search state. When no search is
-// active or the modal isn't searchable, returns every index in order.
 func choiceModalVisibleIndices(cm *choiceModalState) []int {
 	out := make([]int, 0, len(cm.Options))
 	q := strings.ToLower(cm.SearchQuery)
@@ -40,8 +28,6 @@ func choiceModalVisibleIndices(cm *choiceModalState) []int {
 	return out
 }
 
-// choiceModalSyncCursor maps cm.visibleCursor → cm.Cursor (the index
-// into cm.Options) so submit handlers find the correct row.
 func choiceModalSyncCursor(cm *choiceModalState) {
 	visible := choiceModalVisibleIndices(cm)
 	if len(visible) == 0 {
@@ -56,10 +42,6 @@ func choiceModalSyncCursor(cm *choiceModalState) {
 	cm.Cursor = visible[cm.visibleCursor]
 }
 
-// choiceModalSkipHeading nudges the cursor off Heading rows in the
-// given direction (+1 down, -1 up), bouncing at the list edges. Call
-// after any cursor move/reset; no-op when the row is selectable. If
-// every visible row is a heading (degenerate), the cursor stays put.
 func choiceModalSkipHeading(cm *choiceModalState, dir int) {
 	visible := choiceModalVisibleIndices(cm)
 	if len(visible) == 0 || dir == 0 {
@@ -111,16 +93,9 @@ func choiceModalWindow(cursor, n, visible int) (int, int) {
 	return start, end
 }
 
-// choiceOption is one selectable value in the choice modal.
 type choiceOption struct {
-	// Label is the human-readable name shown in the list.
 	Label string
-	// Hint is an optional one-line explainer shown under the label
-	// when this option is selected.
-	Hint string
-	// Value is the raw value committed via Save(value). Kept
-	// separate from Label so we can show "Nullable" but commit
-	// `true`, etc.
+	Hint  string
 	Value any
 	// Cancel marks this option as a dismiss-without-saving shortcut.
 	// Useful for destructive-confirmation modals where Cancel is
@@ -133,21 +108,13 @@ type choiceOption struct {
 	Heading bool
 }
 
-// choiceModalState is the live state of a choice modal.
 type choiceModalState struct {
-	// Title / Hint / Loading / Saving / Err mirror editModalState
-	// so the render + key handlers feel familiar.
 	Title string
 	Hint  string
 
-	// Options is the full list; Cursor is the current highlight. The
-	// modal doesn't enforce a "default option" — callers pre-position
-	// the cursor to reflect the current value.
 	Options []choiceOption
 	Cursor  int
 
-	// SuccessMsg is the flash-banner string shown after a successful
-	// commit. Optional.
 	SuccessMsg string
 
 	// LoadCurrent, Save, OnSuccess — same roles as on editModalState.
@@ -164,23 +131,10 @@ type choiceModalState struct {
 	OnSuccess      func() tea.Cmd
 	OnSuccessTyped func(val any) tea.Cmd
 
-	// OnCancel fires when the user dismisses the modal with esc. When
-	// set, it runs INSTEAD of a bare close — used by drill-down menus
-	// (Settings → submenu → leaf) so esc pops one level up (reopening
-	// the parent menu) rather than closing the whole stack. Nil = plain
-	// close, the default.
 	OnCancel func() tea.Cmd
 
-	// Searchable enables `/` to start a substring filter over Label
-	// + Hint. Used by long pickers (list-view import, theme picker
-	// could swap to this). Off by default to keep small confirm-style
-	// modals (cancel/delete) free of unexpected typing behaviour.
 	Searchable bool
 
-	// AltKeys lists extra single-rune keys (e.g. "e") that act on the
-	// selected option as a secondary channel beside Enter. Pressing
-	// one closes the modal and fires OnAltTyped(key, value). Ignored
-	// while the search input is active, and on Heading/Cancel rows.
 	AltKeys    string
 	OnAltTyped func(key string, val any) tea.Cmd
 
@@ -190,7 +144,6 @@ type choiceModalState struct {
 	// the compact 48..70 confirm size.
 	Wide bool
 
-	// Internal live state.
 	Loading       bool
 	Saving        bool
 	Err           string
@@ -199,7 +152,6 @@ type choiceModalState struct {
 	visibleCursor int    // cursor position in the filtered slice
 }
 
-// renderChoiceModal renders the choice modal, or "".
 func (m Model) renderChoiceModal() string {
 	if m.choiceModal == nil {
 		return ""
@@ -224,7 +176,6 @@ func (m Model) renderChoiceModal() string {
 		)
 	}
 
-	// Search bar — only shown when the modal opted in.
 	if cm.Searchable {
 		switch {
 		case cm.SearchActive:
@@ -246,7 +197,6 @@ func (m Model) renderChoiceModal() string {
 			lipgloss.NewStyle().Foreground(theme.FgDim).Italic(true).
 				Render("loading current value…"))
 	} else {
-		// Filter the option list when a search is active.
 		visible := choiceModalVisibleIndices(cm)
 		if len(visible) == 0 {
 			lines = append(lines,
@@ -307,7 +257,6 @@ func (m Model) renderChoiceModal() string {
 	return modalBox(strings.Join(lines, "\n"), w)
 }
 
-// handleChoiceModalKey — reducer while the choice modal is open.
 func (m Model) handleChoiceModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.choiceModal == nil {
 		return m, nil
@@ -321,8 +270,6 @@ func (m Model) handleChoiceModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 	key := msg.String()
 
-	// Active search input — keystrokes go into the buffer until the
-	// user commits with enter or escapes.
 	if cm.Searchable && cm.SearchActive {
 		switch key {
 		case "esc":
@@ -368,7 +315,6 @@ func (m Model) handleChoiceModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			choiceModalSkipHeading(cm, -1)
 			return m, nil
 		}
-		// Append printable single-rune keys to the search buffer.
 		if len(key) == 1 && key[0] >= 0x20 && key[0] < 0x7f {
 			cm.SearchQuery += key
 			cm.visibleCursor = 0
@@ -393,8 +339,6 @@ func (m Model) handleChoiceModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "esc", "ctrl+c":
 		onCancel := cm.OnCancel
 		m.choiceModal = nil
-		// ctrl+c always closes outright; esc pops one level up when a
-		// parent-reopener is wired (drill-down menus), else closes.
 		if key == "esc" && onCancel != nil {
 			return m, onCancel()
 		}
@@ -470,32 +414,20 @@ func (m Model) submitChoiceModal() (Model, tea.Cmd) {
 	}
 }
 
-// choiceModalResultMsg carries the outcome of a choice-modal save.
-// Value is the picked choiceOption.Value, surfaced to the OnSuccess
-// hook so multi-step modal flows can hand the selection forward
-// without per-flow package-globals (the old pendingX struct pattern).
 type choiceModalResultMsg struct {
 	Value any
 	Err   error
 }
 
-// choiceModalLoadedMsg carries the outcome of LoadCurrent. The Value
-// is cross-checked against Options; if a match is found the cursor
-// jumps to it. On mismatch (shouldn't happen) the cursor stays put.
 type choiceModalLoadedMsg struct {
 	Value any
 	Err   error
 }
 
-// openChoiceModal is the canonical way to show a choice modal. Sets
-// state, kicks the optional LoadCurrent, returns the tea.Cmd to fire.
 func (m *Model) openChoiceModal(state choiceModalState) tea.Cmd {
 	if state.LoadCurrent != nil {
 		state.Loading = true
 	}
-	// Seed the visible-cursor from the caller's Cursor so initial
-	// rendering highlights the same row regardless of whether the
-	// modal is searchable.
 	state.visibleCursor = state.Cursor
 	s := state
 	m.choiceModal = &s

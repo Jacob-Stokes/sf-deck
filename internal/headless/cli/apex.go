@@ -99,9 +99,6 @@ func apexExecute(a *app.App, rest []string, stdout io.Writer, mode headless.Writ
 	bodyHash := sha256Hex(src)
 	bodyChars := len(src)
 
-	// Compile failure → invalid_argument. Body is malformed; the
-	// caller fixes it and retries. Body kept so line/column means
-	// something.
 	if !res.Compiled {
 		r := headless.Fail("apex.execute", orgUser,
 			headless.ErrInvalidArgument,
@@ -120,10 +117,6 @@ func apexExecute(a *app.App, rest []string, stdout io.Writer, mode headless.Writ
 		return headless.ExitCodeFor(r)
 	}
 
-	// Compiled but runtime exception → invalid_argument too. SF
-	// catches its own exceptions before they crash the request, so
-	// from the caller's perspective the script was bad input. Body
-	// kept for the same reason as compile failure.
 	if !res.Success {
 		r := headless.Fail("apex.execute", orgUser,
 			headless.ErrInvalidArgument,
@@ -143,7 +136,6 @@ func apexExecute(a *app.App, rest []string, stdout io.Writer, mode headless.Writ
 		return headless.ExitCodeFor(r)
 	}
 
-	// Success — drop body, keep correlation fields.
 	r := headless.Success("apex.execute", orgUser, serviceResult.Target.CLIArg, true,
 		map[string]any{
 			"compiled":    true,
@@ -202,7 +194,6 @@ func resolveApexBody(a *app.App, inline, path, snippetID string) (body, source s
 	case 0:
 		return "", "", nil // caller-side decides whether that's an error
 	case 1:
-		// fallthrough to handler below
 	default:
 		return "", "",
 			errors.New("--body, --body-file, --snippet-id are mutually exclusive")
@@ -211,9 +202,6 @@ func resolveApexBody(a *app.App, inline, path, snippetID string) (body, source s
 		return inline, "inline", nil
 	}
 	if path != "" {
-		// Re-use resolveSOQL — it does file + stdin reading; the
-		// content interpretation is the caller's job, so the helper
-		// is generic enough.
 		b, err := resolveSOQL("", path)
 		if err != nil {
 			return "", "", err
@@ -237,8 +225,6 @@ func resolveApexBody(a *app.App, inline, path, snippetID string) (body, source s
 	return snip.Body, "snippet:" + snippetID, nil
 }
 
-// apexSnippet routes `sf-deck apex snippet <subverb>`. Local-only —
-// snippets live in devprojects.db; no org calls.
 func apexSnippet(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	subverb := ""
 	if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
@@ -281,11 +267,6 @@ func apexSnippetList(a *app.App, rest []string, stdout io.Writer, mode headless.
 	if err != nil {
 		return writeArgErr("apex.snippet.list", err, stdout, mode)
 	}
-	// List uses the SUMMARY projection — no body. A library of 200
-	// snippets can run hundreds of KB of Apex source; an agent
-	// listing snippets shouldn't accidentally exfiltrate everything
-	// into a logs / context-window dump. Callers fetch the body via
-	// `apex snippet show --id ...`.
 	out := make([]map[string]any, 0, len(all))
 	for _, s := range all {
 		out = append(out, snippetSummary(s))
@@ -424,9 +405,6 @@ func apexSnippetDelete(a *app.App, rest []string, stdout io.Writer, mode headles
 	return headless.ExitCodeFor(r)
 }
 
-// snippetView is the DETAIL projection — full body included. Used by
-// show, create, update, delete responses where the caller is
-// inspecting one specific snippet.
 func snippetView(s devproject.SavedApex) map[string]any {
 	return map[string]any{
 		"id":          s.ID,
@@ -440,10 +418,6 @@ func snippetView(s devproject.SavedApex) map[string]any {
 	}
 }
 
-// snippetSummary is the LIST projection — no body, replaced by size
-// + hash so callers can dedupe / detect changes without paying the
-// byte cost of every snippet's source. body_sha256 also lets a
-// downstream tool ask "did this snippet change?" cheaply.
 func snippetSummary(s devproject.SavedApex) map[string]any {
 	return map[string]any{
 		"id":          s.ID,
@@ -456,17 +430,11 @@ func snippetSummary(s devproject.SavedApex) map[string]any {
 	}
 }
 
-// sha256Hex returns the hex SHA-256 of s. Used by list/summary
-// projections so a caller can detect "is this snippet still the
-// same?" without re-fetching the body. Empty string in → empty hash
-// kept for symmetry; a 32-byte hash of empty bytes is fine.
 func sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
-// writeSnippetErr maps devproject.ErrSavedApexNotFound → not_found,
-// ErrSavedApexEmpty → invalid_argument, anything else → internal.
 func writeSnippetErr(command, ref string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	if errors.Is(err, devproject.ErrSavedApexNotFound) {
 		r := headless.Fail(command, "", headless.ErrNotFound, err.Error(),

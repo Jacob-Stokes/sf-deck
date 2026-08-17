@@ -1,12 +1,5 @@
 package ui
 
-// Field-value yank sub-modal — the "Field values…" entry in a field's
-// ctrl+y menu opens a second picker of everything worth copying OUT of
-// a field's definition: picklist values (four formats), the formula,
-// the default, help text, and reference targets. Kept as a sub-modal so
-// the top-level yank menu stays short (API name / Object.Field / Label)
-// rather than sprouting a dozen field-specific rows.
-
 import (
 	"fmt"
 	"strings"
@@ -16,21 +9,13 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// fieldValuesYankTargetID marks the synthetic "Field values…" yank
-// target that opens the sub-modal (no YankValue — fireMenuTarget
-// intercepts it). UI-side since the sub-modal is a UI concern.
 const fieldValuesYankTargetID = "__field_values_submenu__"
 
-// fieldValueYankOption is one copyable value with its menu label.
 type fieldValueYankOption struct {
 	Label string
 	Value string
 }
 
-// fieldValueYankOptions builds the sub-modal contents for a field —
-// only the entries that actually apply (a non-picklist field skips the
-// picklist formats, a field with no formula skips FORMULA, etc.). Empty
-// slice → the "Field values…" entry isn't offered.
 func fieldValueYankOptions(f sf.Field) []fieldValueYankOption {
 	var out []fieldValueYankOption
 
@@ -70,8 +55,6 @@ func fieldValueYankOptions(f sf.Field) []fieldValueYankOption {
 	return out
 }
 
-// fieldDefaultValueString renders a field's default (a formula default
-// takes precedence over a literal). Empty when the field has none.
 func fieldDefaultValueString(f sf.Field) string {
 	if f.DefaultValueFormula != "" {
 		return f.DefaultValueFormula
@@ -84,8 +67,6 @@ func fieldDefaultValueString(f sf.Field) string {
 	return ""
 }
 
-// openFieldValuesYankModal opens the sub-modal listing every copyable
-// value for a field; selecting one copies it to the clipboard.
 func (m *Model) openFieldValuesYankModal(f sf.Field) tea.Cmd {
 	opts := fieldValueYankOptions(f)
 	if len(opts) == 0 {

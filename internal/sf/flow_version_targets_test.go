@@ -25,13 +25,10 @@ func TestFlowVersionTargetsIncludeViewDefinition(t *testing.T) {
 	if view == nil {
 		t.Fatalf("Targets() missing %q; got %+v", FlowVersionViewDefinitionTargetID, targets)
 	}
-	// It's an in-app action: no URL to open. fireMenuTarget relies on
-	// the empty Path/AbsoluteURL to route it to the drill.
 	if view.Path != "" || view.AbsoluteURL != "" {
 		t.Errorf("view-definition target must have no URL (in-app drill); Path=%q AbsoluteURL=%q", view.Path, view.AbsoluteURL)
 	}
 
-	// Browser targets still present.
 	if !hasTargetID(targets, "builder") {
 		t.Error("Flow Builder target missing")
 	}
@@ -75,7 +72,6 @@ func TestFlowTargetsLatestFirstActiveSecondary(t *testing.T) {
 		t.Errorf("secondary must be the ACTIVE version: %+v", ts[1])
 	}
 
-	// Same version active+latest: one builder target, no duplicate.
 	same := Flow{DefinitionID: "300x", ActiveVersionID: "301A", LatestVersionID: "301A", ActiveVersionNum: 3, LatestVersionNum: 3}
 	for _, tgt := range same.Targets() {
 		if tgt.ID == "builder-active" {
@@ -124,7 +120,6 @@ func TestFlowTargetsActivePreference(t *testing.T) {
 		t.Errorf("active mode: draft-only flow must open its latest version: %+v", ts[0])
 	}
 
-	// Same version active+latest: one builder target, no duplicate.
 	same := Flow{DefinitionID: "300x", ActiveVersionID: "301A", LatestVersionID: "301A", ActiveVersionNum: 3, LatestVersionNum: 3}
 	for _, tgt := range same.Targets() {
 		if tgt.ID == "builder-latest" {

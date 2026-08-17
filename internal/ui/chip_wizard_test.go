@@ -6,8 +6,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/query"
 )
 
-// ---- splitForWizard ---------------------------------------------------
-
 func TestSplitForWizardFlatPredicates(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -77,8 +75,6 @@ func TestSplitForWizardRichShapesNeedAdvanced(t *testing.T) {
 	}
 }
 
-// ---- hasMeaningfulWhere ----------------------------------------------
-
 func TestHasMeaningfulWhere(t *testing.T) {
 	cases := []struct {
 		name string
@@ -101,13 +97,7 @@ func TestHasMeaningfulWhere(t *testing.T) {
 	}
 }
 
-// ---- populateFromCompareNodes ---------------------------------------
-
 func TestPopulateFromCompareNodesByFieldAndOp(t *testing.T) {
-	// Catalogue rows: a string Name field on Contains, and a tristate
-	// IsCustom on Eq. Same Field name on different Ops should match
-	// independently, so we add two Name rows with different Ops to
-	// stress the (Field, Op) keying.
 	fields := []cwField{
 		{Field: "Name", Op: query.OpContains, Kind: cwText, input: newWizardInput("")},
 		{Field: "Name", Op: query.OpStartsWith, Kind: cwText, input: newWizardInput("")},
@@ -142,15 +132,12 @@ func TestPopulateFromCompareNodesIgnoresUnknown(t *testing.T) {
 	}
 }
 
-// ---- buildSimpleQuery + round-trip ----------------------------------
-
 func TestBuildSimpleQueryFromFilledRows(t *testing.T) {
 	tri := true
 	fields := []cwField{
 		{Field: "Name", Op: query.OpContains, Kind: cwText, input: newWizardInput("acc")},
 		{Field: "ApiVersion", Op: query.OpGTE, Kind: cwInt, input: newWizardInput("60")},
 		{Field: "IsCustom", Op: query.OpEq, Kind: cwTri, triValue: &tri},
-		// Empty rows should drop out.
 		{Field: "Status", Op: query.OpEq, Kind: cwText, input: newWizardInput("")},
 	}
 	q := buildSimpleQuery(fields)
@@ -164,8 +151,6 @@ func TestBuildSimpleQueryFromFilledRows(t *testing.T) {
 }
 
 func TestSimpleRoundTripPreservesPredicate(t *testing.T) {
-	// Build → split → repopulate → rebuild. The two builds should
-	// produce equivalent ASTs.
 	tri := true
 	original := []cwField{
 		{Field: "Name", Op: query.OpContains, Kind: cwText, input: newWizardInput("lead")},
@@ -188,8 +173,6 @@ func TestSimpleRoundTripPreservesPredicate(t *testing.T) {
 
 	q2 := buildSimpleQuery(repopulated)
 
-	// Compare emitted SOQL — easier than DeepEqual on the AST since
-	// AndNode children may reorder during conversion.
 	got := query.ToSOQLWhere(q2.Where)
 	want := query.ToSOQLWhere(q1.Where)
 	if got != want {

@@ -18,9 +18,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// openSettingsModal opens the top-level settings menu. Each entry
-// drills into a specialised picker / editor for one category. New
-// categories slot in here as additional choiceOption rows.
 func (m *Model) openSettingsModal() tea.Cmd {
 	currentTheme := "tokyo-night"
 	if m.settings != nil {
@@ -38,9 +35,6 @@ func (m *Model) openSettingsModal() tea.Cmd {
 	if m.settings != nil {
 		startTab = m.settings.StartupStartTab()
 	}
-	// One entry per behaviour group; each drills into a submenu of the
-	// individual knobs. Every setting in the app lives under exactly
-	// one of these — no more "Misc" junk drawer.
 	opts := []choiceOption{
 		{Label: "Appearance", Hint: "theme: " + currentTheme + " · banner animation", Value: "appearance"},
 		{Label: "Startup & defaults", Hint: "what the app opens with · start tab: " + startTab, Value: "startup"},
@@ -64,10 +58,6 @@ func (m *Model) openSettingsModal() tea.Cmd {
 		Options: opts,
 		Cursor:  0,
 		OnSuccessTyped: func(val any) tea.Cmd {
-			// Pick threads through the typed-value channel —
-			// no per-flow package globals. Update handles the
-			// synthetic openSettingsSubmenuMsg by opening the
-			// chosen submenu on the live Model.
 			pick, _ := val.(string)
 			return func() tea.Msg { return openSettingsSubmenuMsg{pick: pick} }
 		},
@@ -92,9 +82,6 @@ func (m *Model) openBrowserModal() tea.Cmd {
 	if m.settings != nil {
 		current = m.settings.Browser()
 	}
-	// Auto-discovered from the machine (installed browsers only), with
-	// "(system default)" first. A user can still type/paste any name
-	// Launch Services knows about even if it's not in the list.
 	opts, cursor := browserChoiceOptions(current)
 	state := choiceModalState{
 		Title:      "Browser (for extension URLs)",
@@ -114,10 +101,6 @@ func (m *Model) openBrowserModal() tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// openInspectorURLModal opens a single-line edit modal for the
-// Salesforce Inspector Reloaded base URL. Empty-string submission
-// clears the setting (Inspector targets disappear). Value is
-// persisted to settings.toml on Enter.
 func (m *Model) openInspectorURLModal() tea.Cmd {
 	initial := ""
 	if m.settings != nil {
@@ -141,8 +124,6 @@ func (m *Model) openInspectorURLModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// openInputModal opens the Navigation & input submenu — jump-step
-// size plus the three wheel-scroll tunables.
 func (m *Model) openInputModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -159,7 +140,6 @@ func (m *Model) openInputModal() tea.Cmd {
 	return m.settingsSubmenu("Navigation & input", "input", opts)
 }
 
-// sortScopeLabel names the per-view-sort mode for the settings hint.
 func sortScopeLabel(perView bool) string {
 	if perView {
 		return "per view (each view keeps its own sort)"
@@ -167,8 +147,6 @@ func sortScopeLabel(perView bool) string {
 	return "shared across views"
 }
 
-// flowVersionEnterLabel names the flow-version Enter behaviour for the
-// settings hint.
 func flowVersionEnterLabel(opens bool) string {
 	if opens {
 		return "open Flow Builder"
@@ -176,12 +154,6 @@ func flowVersionEnterLabel(opens bool) string {
 	return "view definition (in-terminal)"
 }
 
-// openChipDefaultLimitModal — single-line edit modal for the
-// shared chip-fetch row cap. Empty / 0 / non-integer → reset to
-// settings.DefaultChipLimitFallback.
-//
-// Per-chip Limit on the chip's own Query AST overrides this — the
-// default only applies when a chip declares no Limit of its own.
 func (m *Model) openChipDefaultLimitModal() tea.Cmd {
 	initial := ""
 	if m.settings != nil {
@@ -205,8 +177,6 @@ func (m *Model) openChipDefaultLimitModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// openRecentLimitModal — single-line edit modal for the /recent
-// display cap. Empty / 0 / non-integer → reset to default (50).
 func (m *Model) openRecentLimitModal() tea.Cmd {
 	initial := ""
 	if m.settings != nil {
@@ -230,11 +200,6 @@ func (m *Model) openRecentLimitModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// openRecentExcludedSFTypesModal — free-text editor for the
-// RecentlyViewed sObject-type exclusion list (the WHERE Type NOT IN
-// content). One type per line; users add/remove raw API type names to
-// hide builder internals / admin artifacts they don't want surfaced.
-// Blank submission resets to the built-in defaults.
 func (m *Model) openRecentExcludedSFTypesModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -253,7 +218,6 @@ func (m *Model) openRecentExcludedSFTypesModal() tea.Cmd {
 			}
 			types := parseLinesList(val)
 			if len(types) == 0 {
-				// Blank → back to built-in defaults (clear the override).
 				m.settings.SetRecentExcludedSFTypes(nil)
 				m.settings.UI.Recent.UserSetExcludedSFTypes = false
 			} else {
@@ -261,8 +225,6 @@ func (m *Model) openRecentExcludedSFTypesModal() tea.Cmd {
 			}
 			return m.settings.Save()
 		},
-		// Re-fetch the active org's RecentlyViewed so the new exclusion
-		// list (which changes the SOQL) takes effect immediately.
 		OnSuccess: func() tea.Cmd {
 			if d := m.activeOrgData(); d != nil {
 				return d.RecentlyViewed.Refresh(m.cache)
@@ -273,8 +235,6 @@ func (m *Model) openRecentExcludedSFTypesModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// parseLinesList splits a textarea value into a trimmed, de-duped,
-// comment/blank-stripped list — used by the SF-types editor.
 func parseLinesList(s string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -289,16 +249,10 @@ func parseLinesList(s string) []string {
 	return out
 }
 
-// openRecentExcludedKindsModal — toggleable per-kind exclude list.
-// Each row shows a kind with [excluded] / [included] state; picking
-// it flips the membership and re-opens the modal so the user can
-// toggle several without reopening from the top each time.
 func (m *Model) openRecentExcludedKindsModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
 	}
-	// Every kind we track in /recent. Order = most-likely-to-toggle
-	// first (the noise defaults), then the rest.
 	allKinds := []struct {
 		kind, label string
 	}{
@@ -367,8 +321,6 @@ func (m *Model) openRecentExcludedKindsModal() tea.Cmd {
 			m.settings.SetRecentExcludedKinds(next)
 			return m.settings.Save()
 		},
-		// Re-open the modal after each toggle so the user can flip
-		// several without reopening from the top each time.
 		OnSuccessTyped: func(val any) tea.Cmd {
 			return func() tea.Msg {
 				return openSettingsSubmenuMsg{pick: "misc.recent_excluded_kinds"}
@@ -404,13 +356,6 @@ func (m *Model) openJumpRowsModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// numericEditModal is the shared "edit one number" pattern used by
-// most experimental knobs. Caller supplies the title, hint, current
-// value (for the input prefill), and a save closure that takes the
-// parsed int.
-//
-// Empty / non-integer input passes 0 to save — accessors interpret
-// that as "reset to default" by convention.
 func (m *Model) numericEditModal(title, hint, successMsg string, current int, save func(int)) tea.Cmd {
 	state := editModalState{
 		Title:       title,
@@ -430,9 +375,6 @@ func (m *Model) numericEditModal(title, hint, successMsg string, current int, sa
 	return m.openEditModal(state)
 }
 
-// floatEditModal mirrors numericEditModal for float-valued knobs
-// (today: search project-membership boost). Empty / non-numeric
-// passes 0 — accessor convention re-applies the default.
 func (m *Model) floatEditModal(title, hint, successMsg string, current float64, save func(float64)) tea.Cmd {
 	state := editModalState{
 		Title:       title,
@@ -452,8 +394,6 @@ func (m *Model) floatEditModal(title, hint, successMsg string, current float64, 
 	return m.openEditModal(state)
 }
 
-// openWheelQuietGapModal — idle window before the wheel throttle
-// resets. Bigger = more grouping; smaller = faster re-engagement.
 func (m *Model) openWheelQuietGapModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -467,8 +407,6 @@ func (m *Model) openWheelQuietGapModal() tea.Cmd {
 	)
 }
 
-// openWheelMinIntervalModal — minimum spacing between accepted ticks
-// in a single gesture.
 func (m *Model) openWheelMinIntervalModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -482,12 +420,6 @@ func (m *Model) openWheelMinIntervalModal() tea.Cmd {
 	)
 }
 
-// openWheelMaxStepModal — per-accepted-tick cursor delta cap for
-// continuous mode. The accumulator drains up to this many rows on
-// each accept, so a fast trackpad flick translates faithfully into
-// "advance N rows" rather than being capped at the throttle's
-// accept rate. Paginated mode is unaffected — that path is one row
-// per accept regardless.
 func (m *Model) openWheelMaxStepModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -501,7 +433,6 @@ func (m *Model) openWheelMaxStepModal() tea.Cmd {
 	)
 }
 
-// openRecentMaxEntriesModal — local visit log size.
 func (m *Model) openRecentMaxEntriesModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -515,7 +446,6 @@ func (m *Model) openRecentMaxEntriesModal() tea.Cmd {
 	)
 }
 
-// openExportHistoryMaxModal — kept-history cap for the export tracker.
 func (m *Model) openExportHistoryMaxModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -529,8 +459,6 @@ func (m *Model) openExportHistoryMaxModal() tea.Cmd {
 	)
 }
 
-// openSearchProjectBoostModal — global-search rank bump for items in
-// the loaded project.
 func (m *Model) openSearchProjectBoostModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -544,7 +472,6 @@ func (m *Model) openSearchProjectBoostModal() tea.Cmd {
 	)
 }
 
-// openSearchRecentDecayModal — half-life for the recent-visit boost.
 func (m *Model) openSearchRecentDecayModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -558,7 +485,6 @@ func (m *Model) openSearchRecentDecayModal() tea.Cmd {
 	)
 }
 
-// openHomeBannerIntervalModal — animation tick speed.
 func (m *Model) openHomeBannerIntervalModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -572,8 +498,6 @@ func (m *Model) openHomeBannerIntervalModal() tea.Cmd {
 	)
 }
 
-// openHomeBannerDisableModal — flip the disable flag. Implemented as
-// a yes/no choice modal rather than an edit field since it's binary.
 func (m *Model) openHomeBannerDisableModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -598,7 +522,6 @@ func (m *Model) openHomeBannerDisableModal() tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// openDebugModal lists the developer/testing toggles.
 func (m *Model) openDebugModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -610,9 +533,6 @@ func (m *Model) openDebugModal() tea.Cmd {
 	})
 }
 
-// openDebugForceWelcomeModal flips the force-welcome toggle. When on, the
-// welcome modal appears on every launch (welcome_seen is ignored) so it
-// can be tested repeatedly.
 func (m *Model) openDebugForceWelcomeModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -640,9 +560,6 @@ func (m *Model) openDebugForceWelcomeModal() tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// openHomeBannerHideModal — flip the hide-entirely flag. Distinct from
-// disable (which only freezes the animation): hide removes the banner
-// block from /home altogether.
 func (m *Model) openHomeBannerHideModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -667,8 +584,6 @@ func (m *Model) openHomeBannerHideModal() tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// openListViewPreviewLimitModal — row cap for SF list-view chips on
-// /records.
 func (m *Model) openListViewPreviewLimitModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -682,18 +597,6 @@ func (m *Model) openListViewPreviewLimitModal() tea.Cmd {
 	)
 }
 
-// ============================================================================
-// Behaviour-group submenus + their leaf modals.
-//
-// The top-level settings menu drills into one of these per group; each
-// lists the individual knobs as rows that re-emit openSettingsSubmenuMsg
-// with a "<group>.<id>" pick. Leaf modals reuse numericEditModal /
-// editModalState / the boolSettingModal + enumSettingModal helpers below.
-// ============================================================================
-
-// boolSettingModal renders a two-option on/off picker. trueFirst puts
-// the "on" option at the top (cursor default). save persists; the
-// caller's accessor + Set* twin handle the tri-state bookkeeping.
 func (m *Model) boolSettingModal(title, onLabel, onHint, offLabel, offHint string, current bool, save func(bool)) tea.Cmd {
 	cursor := 1
 	if current {
@@ -721,9 +624,6 @@ func (m *Model) boolSettingModal(title, onLabel, onHint, offLabel, offHint strin
 	return m.openChoiceModal(state)
 }
 
-// enumSettingModal renders a picker over a fixed set of string values.
-// opts pairs the stored value with its display label/hint; current is
-// the value highlighted on open.
 func (m *Model) enumSettingModal(title string, opts []choiceOption, current string, save func(string)) tea.Cmd {
 	cursor := 0
 	for i, o := range opts {
@@ -751,8 +651,6 @@ func (m *Model) enumSettingModal(title string, opts []choiceOption, current stri
 	return m.openChoiceModal(state)
 }
 
-// --- Appearance ---------------------------------------------------------
-
 func (m *Model) openAppearanceModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -769,8 +667,6 @@ func (m *Model) openAppearanceModal() tea.Cmd {
 	}
 	return m.settingsSubmenu("Appearance", "appearance", opts)
 }
-
-// --- Startup & defaults -------------------------------------------------
 
 func (m *Model) openStartupModal() tea.Cmd {
 	if m.settings == nil {
@@ -805,23 +701,17 @@ func startupSortLabel(desc bool) string {
 	return "ascending"
 }
 
-// sidebarPositionLabel names the sidebar-position value for hints.
 func sidebarPositionLabel(pos string) string {
 	switch pos {
 	case settings.SidebarPositionBottom:
 		return "bottom (stacked below main)"
 	case settings.SidebarPositionAuto:
-		// Preserve old settings files without exposing the retired
-		// placeholder choice. Auto has always rendered beside main.
 		return "right (beside main)"
 	default:
 		return "right (beside main)"
 	}
 }
 
-// openSidebarPositionModal is the RHS / Bottom picker. Applies
-// the choice live (the sidebar moves immediately) via a msg so the
-// mutation lands on the live Model, then persists.
 func (m *Model) openSidebarPositionModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -853,10 +743,6 @@ func (m *Model) openSidebarPositionModal() tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// sidebarPositionChangedMsg carries the picked sidebar position so
-// Update can persist it AND apply it to the live Model (moving the
-// sidebar immediately), sidestepping the captured-pointer staleness of
-// the modal's OnSuccess closure.
 type sidebarPositionChangedMsg struct{ pos string }
 
 func startupGSLabel(records bool) string {
@@ -866,16 +752,12 @@ func startupGSLabel(records bool) string {
 	return "metadata (local index)"
 }
 
-// ansiTrunc is a tiny helper for hint text — trims long values for the
-// one-line hint without pulling in the ansi pkg here.
 func ansiTrunc(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
 	return ansi.Truncate(s, n, "…")
 }
-
-// --- Lists & limits -----------------------------------------------------
 
 func (m *Model) openLimitsModal() tea.Cmd {
 	if m.settings == nil {
@@ -906,15 +788,12 @@ func (m *Model) openLimitsModal() tea.Cmd {
 	return m.settingsSubmenu("Lists & limits", "limits", opts)
 }
 
-// recentSFTypesHint summarises the SF-type exclusion list for the menu.
 func recentSFTypesHint(types []string) string {
 	if len(types) == 0 {
 		return "(none)"
 	}
 	return fmt.Sprintf("%d types · %s", len(types), ansiTrunc(strings.Join(types, ", "), 44))
 }
-
-// --- Search -------------------------------------------------------------
 
 func (m *Model) openSearchSettingsModal() tea.Cmd {
 	if m.settings == nil {
@@ -927,8 +806,6 @@ func (m *Model) openSearchSettingsModal() tea.Cmd {
 	}
 	return m.settingsSubmenu("Search", "search", opts)
 }
-
-// --- Layout & sizing ----------------------------------------------------
 
 func (m *Model) openLayoutModal() tea.Cmd {
 	if m.settings == nil {
@@ -945,8 +822,6 @@ func (m *Model) openLayoutModal() tea.Cmd {
 	}
 	return m.settingsSubmenu("Layout & sizing", "layout", opts)
 }
-
-// --- API & network ------------------------------------------------------
 
 func (m *Model) openAPISettingsModal() tea.Cmd {
 	if m.settings == nil {
@@ -970,8 +845,6 @@ func (m *Model) openAPISettingsModal() tea.Cmd {
 	return m.settingsSubmenu("API & network", "api", opts)
 }
 
-// --- Export -------------------------------------------------------------
-
 func (m *Model) openExportSettingsModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -987,8 +860,6 @@ func (m *Model) openExportSettingsModal() tea.Cmd {
 	}
 	return m.settingsSubmenu("Export", "export", opts)
 }
-
-// --- Integrations -------------------------------------------------------
 
 func (m *Model) openIntegrationsModal() tea.Cmd {
 	if m.settings == nil {
@@ -1012,8 +883,6 @@ func (m *Model) openIntegrationsModal() tea.Cmd {
 	return m.settingsSubmenu("Integrations", "integrations", opts)
 }
 
-// settingsSubmenu is the shared builder for a group submenu: a choice
-// modal whose picks re-emit openSettingsSubmenuMsg as "<group>.<id>".
 func (m *Model) settingsSubmenu(title, group string, opts []choiceOption) tea.Cmd {
 	state := choiceModalState{
 		Title:   title,
@@ -1024,15 +893,12 @@ func (m *Model) settingsSubmenu(title, group string, opts []choiceOption) tea.Cm
 			id, _ := val.(string)
 			return func() tea.Msg { return openSettingsSubmenuMsg{pick: group + "." + id} }
 		},
-		// Esc from a submenu pops back to the top-level settings menu.
 		OnCancel: func() tea.Cmd {
 			return func() tea.Msg { return openSettingsSubmenuMsg{pick: "__root__"} }
 		},
 	}
 	return m.openChoiceModal(state)
 }
-
-// --- Startup leaf modals ------------------------------------------------
 
 func (m *Model) openStartupStartTabModal() tea.Cmd {
 	if m.settings == nil {
@@ -1135,9 +1001,6 @@ func (m *Model) openStartupSOQLSeedModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// dispatchSettingsPick routes a settings menu pick ("<group>" or
-// "<group>.<id>") to the matching submenu / leaf modal. Keeps the big
-// switch out of update.go.
 func (m *Model) dispatchSettingsPick(pick string) tea.Cmd {
 	cmd := m.dispatchSettingsPickInner(pick)
 	// Leaf picks are "group.leaf" (e.g. "startup.auto_layout"). Wire
@@ -1173,7 +1036,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "__root__":
 		return m.openSettingsModal()
 
-	// Top-level groups.
 	case "appearance":
 		return m.openAppearanceModal()
 	case "startup":
@@ -1205,7 +1067,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "about":
 		return m.openAboutModal()
 
-	// Update leaves.
 	case "updates.automatic":
 		return m.boolSettingModal("Automatic update checks",
 			"On", "check GitHub Releases at most once every 24 hours",
@@ -1214,11 +1075,9 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "updates.check_now":
 		return m.updateCheckCmd(true)
 
-	// Debug leaves.
 	case "debug.force_welcome":
 		return m.openDebugForceWelcomeModal()
 
-	// Appearance leaves.
 	case "appearance.theme":
 		return m.openThemePicker()
 	case "appearance.home_banner_interval":
@@ -1228,7 +1087,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "appearance.home_banner_hide":
 		return m.openHomeBannerHideModal()
 
-	// Startup leaves.
 	case "startup.sidebar_open":
 		return m.boolSettingModal("Sidebar open on launch",
 			"Open", "right sidebar visible on launch",
@@ -1262,7 +1120,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "startup.soql_seed":
 		return m.openStartupSOQLSeedModal()
 
-	// Input leaves.
 	case "input.jump_rows":
 		return m.openJumpRowsModal()
 	case "input.wheel_quiet_gap":
@@ -1279,7 +1136,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 			"View definition", "Enter drills into the in-terminal definition viewer (JSON)",
 			m.settings.FlowVersionEnterOpens(), m.settings.SetFlowVersionEnterOpens)
 
-	// Limits leaves.
 	case "limits.recent_records":
 		return m.limitEditModal("Recent records fetch", m.settings.LimitRecentRecords(), m.settings.SetLimitRecentRecords)
 	case "limits.notifications":
@@ -1307,13 +1163,11 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "limits.recent_excluded_sf_types":
 		return m.openRecentExcludedSFTypesModal()
 
-	// Search leaves.
 	case "search.search_project_boost":
 		return m.openSearchProjectBoostModal()
 	case "search.search_recent_decay":
 		return m.openSearchRecentDecayModal()
 
-	// Layout leaves.
 	case "layout.object_pinned_subtabs":
 		return m.limitEditModal("Object drill: pinned subtabs", m.settings.LayoutObjectPinnedSubtabs(), m.settings.SetLayoutObjectPinnedSubtabs)
 	case "layout.autocomplete_rows":
@@ -1327,7 +1181,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "layout.global_search_rows":
 		return m.limitEditModal("Global search result rows", m.settings.LayoutGlobalSearchRows(), m.settings.SetLayoutGlobalSearchRows)
 
-	// API leaves. Saving any of these re-applies the live sf config.
 	case "api.http_timeout":
 		return m.apiEditModal("HTTP request timeout (seconds)", m.settings.APIHTTPTimeoutSec(), m.settings.SetAPIHTTPTimeoutSec)
 	case "api.cli_timeout":
@@ -1339,21 +1192,17 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	case "api.deploy_poll":
 		return m.apiEditModal("Deploy poll interval (ms)", m.settings.APIDeployPollMs(), m.settings.SetAPIDeployPollMs)
 	case "api.deploy_watch":
-		// Read live at each tick arm — no sf-config re-apply needed, but
-		// apiEditModal's harmless re-apply keeps the leaves uniform.
 		return m.apiEditModal("Deploys watch interval (seconds)", m.settings.APIDeployWatchSec(), m.settings.SetAPIDeployWatchSec)
 	case "api.bulk_poll":
 		return m.apiEditModal("Bulk job poll interval (ms)", m.settings.APIBulkPollMs(), m.settings.SetAPIBulkPollMs)
 	case "api.api_version":
 		return m.openAPIVersionModal()
 
-	// Export leaves.
 	case "export.report_export":
 		return m.openReportExportSettingsModal()
 	case "export.export_history_max":
 		return m.openExportHistoryMaxModal()
 
-	// Integrations leaves.
 	case "integrations.inspector":
 		return m.openInspectorURLModal()
 	case "integrations.open_auth":
@@ -1393,8 +1242,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 				}
 				m.settings.SetFlowOpenVersion(mode)
 				m.saveSettings("flow open version → " + mode)
-				// Flow.Targets() reads the sf package config, so push the
-				// change down immediately — no restart needed.
 				applySFConfig(m.settings)
 				return nil
 			},
@@ -1405,8 +1252,6 @@ func (m *Model) dispatchSettingsPickInner(pick string) tea.Cmd {
 	return nil
 }
 
-// limitEditModal is numericEditModal with the standard "blank or 0 =
-// default" hint, for the row-count / sizing knobs.
 func (m *Model) limitEditModal(title string, current int, save func(int)) tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -1414,9 +1259,6 @@ func (m *Model) limitEditModal(title string, current int, save func(int)) tea.Cm
 	return m.numericEditModal(title, "blank or 0 = built-in default", "setting saved", current, save)
 }
 
-// apiEditModal is limitEditModal that ALSO re-applies the live sf
-// config after saving, so API timeout / poll changes take effect
-// immediately without a restart.
 func (m *Model) apiEditModal(title string, current int, save func(int)) tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -1440,8 +1282,6 @@ func (m *Model) apiEditModal(title string, current int, save func(int)) tea.Cmd 
 	return m.openEditModal(state)
 }
 
-// openAPIVersionModal edits the forced API version. Blank = use the
-// org-reported version. Re-applies the live sf config on save.
 func (m *Model) openAPIVersionModal() tea.Cmd {
 	if m.settings == nil {
 		return nil
@@ -1464,13 +1304,6 @@ func (m *Model) openAPIVersionModal() tea.Cmd {
 	return m.openEditModal(state)
 }
 
-// applyAPIConfigLive pushes the saved [ui.api] settings into the sf
-// package AND drops every cached REST client. Existing clients bake
-// the HTTP timeout + apiVersion into themselves at bootstrap, so
-// without the invalidation a saved change would only affect orgs
-// connected for the first time after the change — open orgs would keep
-// the old values, contradicting the "applied" flash. Next API call per
-// org re-bootstraps with the new config (one extra `sf org display`).
 func applyAPIConfigLive(st *settings.Settings) {
 	applySFConfig(st)
 	sf.InvalidateRESTClients()

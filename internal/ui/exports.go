@@ -1,25 +1,5 @@
 package ui
 
-// Export tracker — in-flight + persisted history.
-//
-// Two distinct lifetimes:
-//
-//   - inflight: live exports as they progress through phases
-//     (downloading → post-processing → writing → done). Lives only on
-//     the in-memory registry. Once a job finishes (success or failure)
-//     it's removed from inflight and pushed onto history.
-//
-//   - history: the durable list of files we've saved during this and
-//     prior sessions. Persisted to ~/.sf-deck/exports.json so the
-//     downloads modal + /home Downloads subtab can show "you exported
-//     this last Tuesday — open it again". Trimmed to the most recent
-//     200 entries (newest first) so the file doesn't grow unbounded.
-//
-// Single registry instance per process; stored on the Model so every
-// surface (status bar, modal, /home subtab) reads the same source of
-// truth without copies. Mutations always go through registry methods
-// so we can keep the persisted view consistent.
-
 import (
 	"encoding/json"
 	"errors"
@@ -33,10 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/securefile"
 )
 
-// exportPhase is a single named stage in the export pipeline. Used by
-// the status-bar indicator so the user sees "downloading…" then
-// "post-processing…" then "writing…" rather than a single opaque
-// "exporting…" for the full minute.
 type exportPhase string
 
 const (
@@ -50,9 +26,6 @@ const (
 	exportPhaseFailed      exportPhase = "failed"
 )
 
-// exportKind classifies an export so the modal + history can group +
-// label rows. Keep it small — extend only when a new export actually
-// ships, not speculatively.
 type exportKind string
 
 const (
@@ -61,9 +34,6 @@ const (
 	exportKindManifest exportKind = "manifest"
 )
 
-// exportJob is one in-flight or recently-finished export. The same
-// struct serves the status bar, modal, and history persistence
-// (everything except runtime channels round-trips through JSON).
 type exportJob struct {
 	ID         string      `json:"id"`
 	Kind       exportKind  `json:"kind"`
@@ -78,8 +48,6 @@ type exportJob struct {
 	ErrMsg     string      `json:"err,omitempty"`
 }
 
-// exportRegistry holds in-flight + history. All mutations go through
-// methods so persistence stays in step with state changes.
 type exportRegistry struct {
 	mu         sync.Mutex
 	inflight   []*exportJob
@@ -106,7 +74,6 @@ func newExportRegistry(historyCap int) *exportRegistry {
 	return r
 }
 
-// load reads exports.json into history. Quiet on missing/invalid file.
 func (r *exportRegistry) load() {
 	if r.path == "" {
 		return
@@ -148,9 +115,6 @@ func (r *exportRegistry) save() {
 	}
 }
 
-// startJob registers a fresh in-flight job and returns it. Caller is
-// expected to call setPhase as the pipeline advances and one of
-// markDone / markFailed when the pipeline ends.
 func (r *exportRegistry) startJob(kind exportKind, name, orgAlias, path, format string) *exportJob {
 	j := &exportJob{
 		ID:        time.Now().UTC().Format("20060102-150405.000") + "-" + name,
@@ -181,9 +145,6 @@ func (r *exportRegistry) setPhase(id string, phase exportPhase) {
 	r.mu.Unlock()
 }
 
-// markDone moves a job from inflight → history, sets the final path
-// + size, and persists. If the file no longer exists by the time we
-// stat it (rare but possible on tmpfs), Size stays 0.
 func (r *exportRegistry) markDone(id, finalPath string) {
 	r.mu.Lock()
 	idx := -1
@@ -204,7 +165,6 @@ func (r *exportRegistry) markDone(id, finalPath string) {
 	if info, err := os.Stat(finalPath); err == nil {
 		j.SizeBytes = info.Size()
 	}
-	// Pop from inflight, prepend to history.
 	r.inflight = append(r.inflight[:idx], r.inflight[idx+1:]...)
 	r.history = append([]*exportJob{j}, r.history...)
 	if r.historyCap > 0 && len(r.history) > r.historyCap {
@@ -245,9 +205,6 @@ func (r *exportRegistry) markFailed(id string, err error) {
 	r.save()
 }
 
-// removeFromHistory deletes one history entry by ID and persists.
-// Used by the modal's `d` key. Inflight jobs aren't removable —
-// users have to wait for them to finish or fail.
 func (r *exportRegistry) removeFromHistory(id string) {
 	r.mu.Lock()
 	idx := -1
@@ -283,27 +240,18 @@ func (r *exportRegistry) snapshot() (inflight, history []*exportJob) {
 		history[i] = &cp
 	}
 	r.mu.Unlock()
-	// Sort inflight oldest-first (so the user sees "started 30s ago"
-	// before "started 5s ago" in the status bar's collapsed view).
 	sort.SliceStable(inflight, func(i, j int) bool {
 		return inflight[i].StartedAt.Before(inflight[j].StartedAt)
 	})
 	return inflight, history
 }
 
-// hasInflight is the cheap "anything running?" probe the status bar
-// + tick scheduler use to decide whether to bother rendering the
-// activity indicator.
 func (r *exportRegistry) hasInflight() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.inflight) > 0
 }
 
-// mostRecentDone returns the most recently saved (kind=k, phase=done)
-// job in history, or nil if none exists. Used by `o` on /reports to
-// reopen the last report export. History is stored newest-first so
-// this is a linear scan stopping at the first match.
 func (r *exportRegistry) mostRecentDone(k exportKind) *exportJob {
 	r.mu.Lock()
 	defer r.mu.Unlock()

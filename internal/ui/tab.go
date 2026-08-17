@@ -2,9 +2,6 @@ package ui
 
 import "sync"
 
-// tabsForNumbersCache holds the resolved slot-1-through-8 list
-// after settings load. Read by TabsForNumbers() on every call;
-// rebuilt via RebuildTabsForNumbers when the user changes pins.
 var (
 	tabsForNumbersMu    sync.RWMutex
 	tabsForNumbersCache []Tab
@@ -159,10 +156,6 @@ func (v Tab) String() string {
 // built-in tab list used when unset. Unknown ids (typo'd settings,
 // removed tabs) are silently dropped.
 func TabsForNumbers() []Tab {
-	// Read from the most recent settings snapshot the model has
-	// seen. The function is package-level so it doesn't take a
-	// Model arg; instead we stash the resolved list when settings
-	// load (see RebuildTabsForNumbers).
 	tabsForNumbersMu.RLock()
 	defer tabsForNumbersMu.RUnlock()
 	if len(tabsForNumbersCache) > 0 {
@@ -171,8 +164,6 @@ func TabsForNumbers() []Tab {
 	return defaultPinnedTabs()
 }
 
-// defaultPinnedTabs is the built-in slot-1-through-8 list. Used
-// when settings.UI.TabBar.Pinned is unset.
 func defaultPinnedTabs() []Tab {
 	// System takes slot 8 so the operational surfaces (apex logs,
 	// deploys, setup audit trail, flow interviews) are one keystroke
@@ -194,8 +185,6 @@ func RebuildTabsForNumbers(ids []string) {
 	tabsForNumbersCache = resolvePinnedIDs(ids)
 }
 
-// resolvePinnedIDs maps string IDs to Tab values, dropping unknown
-// entries. Caps at 8 slots.
 func resolvePinnedIDs(ids []string) []Tab {
 	if len(ids) == 0 {
 		return defaultPinnedTabs()
@@ -228,9 +217,6 @@ func tabByID(id string) (Tab, bool) {
 	return 0, false
 }
 
-// allPinnableTabs lists every top-level tab that's eligible for a
-// number-bar slot. Drill-only tabs (record-detail, field-detail,
-// etc.) are excluded; the user reaches those via Enter on a row.
 func allPinnableTabs() []Tab {
 	return []Tab{
 		TabHome, TabSOQL, TabObjects, TabFlows, TabApex, TabLWC,

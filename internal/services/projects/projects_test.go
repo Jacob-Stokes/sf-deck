@@ -177,7 +177,6 @@ func TestDelete_NonEmptyRequiresForce(t *testing.T) {
 		OrgUser:   "dev@x",
 	})
 
-	// Without force — ErrNotEmpty.
 	_, err := Delete(s, created.Project.ID, false)
 	var ne ErrNotEmpty
 	if !errors.As(err, &ne) {
@@ -187,7 +186,6 @@ func TestDelete_NonEmptyRequiresForce(t *testing.T) {
 		t.Errorf("ne.Items = %d", ne.Items)
 	}
 
-	// With force — deletes.
 	res, err := Delete(s, created.Project.ID, true)
 	if err != nil {
 		t.Fatalf("force Delete: %v", err)
@@ -229,7 +227,6 @@ func TestAddItem_HappyPath(t *testing.T) {
 }
 
 func TestAddItem_PopulatesAddedAt(t *testing.T) {
-	// The service stamps AddedAt before passing the value into the store.
 	s := newTestStore(t)
 	created, _ := Create(s, CreateInput{Name: "X"})
 	res, err := AddItem(s, AddItemInput{
@@ -339,7 +336,6 @@ func TestRemoveItem_ChangedReflectsPresence(t *testing.T) {
 	s := newTestStore(t)
 	created, _ := Create(s, CreateInput{Name: "X"})
 
-	// Remove from empty — Changed=false (no row).
 	res, err := RemoveItem(s, created.Project.ID, "d@x", "record", "001A")
 	if err != nil {
 		t.Fatalf("Remove empty: %v", err)
@@ -348,7 +344,6 @@ func TestRemoveItem_ChangedReflectsPresence(t *testing.T) {
 		t.Error("remove-absent Changed=true")
 	}
 
-	// Add then remove — Changed=true.
 	_, _ = AddItem(s, AddItemInput{
 		ProjectID: created.Project.ID, Kind: "record", Ref: "001A", OrgUser: "d@x",
 	})

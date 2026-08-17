@@ -33,9 +33,6 @@ func TestSummariesAreSingleLine(t *testing.T) {
 }
 
 func TestIPCCommandMatchesQualifiedName(t *testing.T) {
-	// Conventional rule: the IPC Command should match the Spec's
-	// Qualified() name. Catches typos like "soql.hist.list" vs
-	// the registry's "soql.history.list".
 	for _, s := range registry {
 		if s.IPC == nil {
 			continue
@@ -69,7 +66,6 @@ func TestSpecsForSurfaceFilters(t *testing.T) {
 }
 
 func TestByQualifiedLookup(t *testing.T) {
-	// Sanity: a well-known verb should be findable.
 	if _, ok := ByQualified("bundle.deploy"); !ok {
 		t.Error("bundle.deploy not findable via ByQualified")
 	}

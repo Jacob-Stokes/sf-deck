@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// --- Chips ---------------------------------------------------------------
-
 func TestUpsertChip_AddAndReplace(t *testing.T) {
 	s := &Settings{}
 	c1 := ChipConfig{ID: "recent", Domain: "records", Label: "Recent"}
@@ -17,7 +15,6 @@ func TestUpsertChip_AddAndReplace(t *testing.T) {
 	if got := len(s.Chips()); got != 2 {
 		t.Fatalf("got %d chips, want 2", got)
 	}
-	// Replace by (id, domain) — same id different domain = new entry.
 	c1b := ChipConfig{ID: "recent", Domain: "records", Label: "Recent (updated)"}
 	s.UpsertChip(c1b)
 	if got := len(s.Chips()); got != 2 {
@@ -88,7 +85,6 @@ func TestChipFavouriteOverrides_PerDomain(t *testing.T) {
 	if len(obj) != 1 || obj["customs"] != true {
 		t.Errorf("objects values wrong: %v", obj)
 	}
-	// Setting again replaces just the records prefix, leaves objects.
 	s.SetChipFavouriteOverridesFor("records", map[string]bool{"only-one": true})
 	if got := len(s.ChipFavouriteOverridesFor("records")); got != 1 {
 		t.Errorf("after replace: records got %d, want 1", got)
@@ -201,8 +197,6 @@ func TestDeleteObjectFilter_NoOpOnMissing(t *testing.T) {
 	}
 }
 
-// --- Org groups ----------------------------------------------------------
-
 func TestOrgGroupForUsername(t *testing.T) {
 	s := &Settings{}
 	s.SetOrgGroups([]OrgGroupConfig{
@@ -298,8 +292,6 @@ func TestPruneOrgGroupMembers_MultiGroupOnlyTouchesChanged(t *testing.T) {
 	}
 }
 
-// --- TreeChip ------------------------------------------------------------
-
 func TestTreeChipForOrg_RoundTrip(t *testing.T) {
 	s := &Settings{}
 	cfg := TreeChipConfig{
@@ -332,8 +324,6 @@ func TestTreeChipForOrg_DistinctByOrgAndDomain(t *testing.T) {
 	}
 }
 
-// --- Recent --------------------------------------------------------------
-
 func TestRecentForOrg_RoundTrip(t *testing.T) {
 	s := &Settings{}
 	now := time.Now()
@@ -363,22 +353,17 @@ func TestRecentForOrg_IsolatedPerOrg(t *testing.T) {
 	}
 }
 
-// --- LoadedDevProject ---------------------------------------------------
-
 func TestLoadedDevProjectForOrg_RoundTrip(t *testing.T) {
 	s := &Settings{}
 	s.SetLoadedDevProjectForOrg("alice@x", "proj-123")
 	if got := s.LoadedDevProjectForOrg("alice@x"); got != "proj-123" {
 		t.Errorf("got %q, want proj-123", got)
 	}
-	// Empty string clears.
 	s.SetLoadedDevProjectForOrg("alice@x", "")
 	if got := s.LoadedDevProjectForOrg("alice@x"); got != "" {
 		t.Errorf("clear failed: got %q, want empty", got)
 	}
 }
-
-// --- Tunables (wheel + recent + boost) ----------------------------------
 
 func TestTunables_DefaultsWhenUnset(t *testing.T) {
 	s := &Settings{}
@@ -423,8 +408,6 @@ func TestTunables_RoundTrip(t *testing.T) {
 	}
 }
 
-// --- Theme favourites --------------------------------------------------
-
 func TestThemeFavourites_ToggleAddRemove(t *testing.T) {
 	s := &Settings{}
 	if s.IsThemeFavourite("dracula") {
@@ -439,8 +422,6 @@ func TestThemeFavourites_ToggleAddRemove(t *testing.T) {
 		t.Error("toggle didn't remove")
 	}
 }
-
-// --- Pinned tabs --------------------------------------------------------
 
 func TestPinnedTabs_RoundTrip(t *testing.T) {
 	s := &Settings{}

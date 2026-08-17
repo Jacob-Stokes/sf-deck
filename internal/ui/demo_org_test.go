@@ -10,13 +10,11 @@ func TestMergeDemoOrgs(t *testing.T) {
 	real := demoOrgs()[:0] // empty real list is fine; use a fake real org
 	real = append(real, sfOrgFake("real@acme.com"))
 
-	// Not imported: unchanged.
 	got := mergeDemoOrgs(real, false)
 	if len(got) != 1 {
 		t.Fatalf("not-imported: expected 1 org, got %d", len(got))
 	}
 
-	// Imported: demo orgs appended.
 	got = mergeDemoOrgs(real, true)
 	if len(got) != 1+len(demoOrgs()) {
 		t.Fatalf("imported: expected %d orgs, got %d", 1+len(demoOrgs()), len(got))

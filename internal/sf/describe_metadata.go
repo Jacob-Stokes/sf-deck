@@ -1,16 +1,5 @@
 package sf
 
-// describeMetadata — enumerate the metadata types an org actually
-// supports, so the /compare scope picker offers exactly what's there
-// (org-driven, self-maintaining) rather than a hardcoded list. Backed by
-// `sf org list metadata-types` (the describeMetadata wrapper).
-//
-// The describe also tells us each type's STRUCTURE, which drives compare
-// routing: inFolder types (Report/Dashboard/Document/EmailTemplate) need
-// folder traversal; childXmlNames are the object-rooted children
-// (CustomField etc. under CustomObject); the rest are standalone and
-// flow through the SOAP readMetadata path unchanged.
-
 import (
 	"encoding/json"
 	"fmt"

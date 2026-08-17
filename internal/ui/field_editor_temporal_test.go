@@ -73,7 +73,6 @@ func TestDatetimeEditor_NormalisesToUTC(t *testing.T) {
 	if mode != CommitValue {
 		t.Fatalf("expected commit, got mode=%v", mode)
 	}
-	// +02:00 noon → 10:00 UTC.
 	want := "2026-05-14T10:00:00.000Z"
 	if val != want {
 		t.Errorf("got %v want %v", val, want)
@@ -91,9 +90,6 @@ func TestDatetimeEditor_ZonelessIsLocalNotUTC(t *testing.T) {
 	if err != nil || mode != CommitValue {
 		t.Fatalf("commit zoneless datetime: mode=%v err=%v", mode, err)
 	}
-	// Compute the expected UTC string from the same local instant, so the
-	// test is correct in any timezone (including CI's UTC, where it equals
-	// the input).
 	want := time.Date(2026, 5, 14, 9, 0, 0, 0, time.Local).UTC().Format("2006-01-02T15:04:05.000Z")
 	if val != want {
 		t.Errorf("zoneless local 09:00 → got %v, want %v (local→UTC)", val, want)

@@ -13,10 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// dispatchNotification routes `sf-deck notification <verb>`. The
-// `list` verb is read-only; `mark-read` is a write that flips state on
-// the user's notification feed and is gated at WriteRecord — it's
-// per-user state, not metadata, but it's still a write.
 func dispatchNotification(a *app.App, args Args, stdout io.Writer, mode headless.WriteMode) int {
 	verb := args.Verb
 	if verb == "" {

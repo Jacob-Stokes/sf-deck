@@ -100,9 +100,6 @@ func (m Model) openInBrowserCmdWith(o sf.Org, t sf.OpenTarget, browserOverride s
 	if browserOverride != "" {
 		browser = browserOverride
 	}
-	// launch routes a resolved URL to private-or-normal open. Private
-	// mode needs a named browser + CLI support; on any gap it falls
-	// back to a normal open so the URL always lands somewhere.
 	allowBrowserExtension := t.AllowBrowserExtension
 	launch := func(url string) error {
 		if private && browser != "" {
@@ -120,10 +117,6 @@ func (m Model) openInBrowserCmdWith(o sf.Org, t sf.OpenTarget, browserOverride s
 		return nil
 	}
 	if Demo {
-		// The demo's URLs are fictional — launching a browser at them
-		// would 404. Instead, render a self-contained local HTML page
-		// that names what WOULD have opened and pop it in the browser,
-		// so the `o` gesture feels real without touching Salesforce.
 		return func() tea.Msg {
 			if err := demoOpenTargetPage(o, t, browser); err != nil {
 				return demoFlashMsg{text: "demo: couldn't open preview (" + err.Error() + ")"}
@@ -157,15 +150,10 @@ func (m Model) openInBrowserCmdWith(o sf.Org, t sf.OpenTarget, browserOverride s
 						return launchResult(u)
 					}
 				}
-				// Exchange failed (offline, scopes) or host mismatch →
-				// direct URL is still a working link, just maybe behind
-				// a login.
 			}
 			return launchResult(direct)
 		}
 	}
-	// Last-resort fallback: shell to `sf` when instanceURL is unavailable.
-	// Surface failures with the recovery hint; yank works without a live session.
 	alias := targetArg(o)
 	path := t.Path
 	return func() tea.Msg {
@@ -177,9 +165,6 @@ func (m Model) openInBrowserCmdWith(o sf.Org, t sf.OpenTarget, browserOverride s
 	}
 }
 
-// yankURLCmd copies the target URL to the system clipboard. For
-// Salesforce targets this is instanceURL+Path; for absolute targets
-// it's the raw URL.
 func yankURLCmd(o sf.Org, t sf.OpenTarget) tea.Cmd {
 	url := t.AbsoluteURL
 	if url == "" {
@@ -209,14 +194,9 @@ func openURL(url, browser string, allowBrowserExtension bool) error {
 		if browser != "" {
 			cmd = exec.Command("open", "-a", browser, url)
 		} else {
-			// `--` stops `open` from treating a leading-dash URL as a
-			// flag (belt-and-braces; safeToOpenURL already rejects those).
 			cmd = exec.Command("open", "--", url)
 		}
 	case "windows":
-		// Argv-passed to the protocol handler — no shell, so URL
-		// metacharacters (&, ^) need no quoting. Exits 0 on success,
-		// unlike `start` via cmd.
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	default: // linux, incl. WSL
 		if browser != "" {
@@ -274,9 +254,6 @@ func openURLPrivate(url, browser string, allowBrowserExtension bool) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		// `open -a <app> -n --args <flag> <url>`: -n forces a new
-		// instance so the flag takes effect even when the browser is
-		// already running; --args passes the rest to the app.
 		cmd = exec.Command("open", "-a", browser, "-n", "--args", flag, url)
 	default:
 		// Linux: invoke the browser binary directly with the flag.

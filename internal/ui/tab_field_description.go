@@ -1,22 +1,11 @@
 package ui
 
-// Lazy fetch of a field's Setup description for the field-detail page.
-//
-// The describe API doesn't return CustomField.description, so the
-// field-detail page (renderFieldDetail) can only show a placeholder
-// until we fetch it separately via Tooling. This mirrors how the object
-// detail page pulls CustomObject.description. Fetched once per field per
-// session and cached in orgData.FieldDescriptions; only custom fields
-// are fetched (standard fields have no editable Setup description).
-
 import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// fieldDescriptionLoadedMsg carries a fetched field description back to
-// the Update loop, which stores it in orgData.FieldDescriptions.
 type fieldDescriptionLoadedMsg struct {
 	orgUser string
 	key     string // "<sobject>.<field>"
@@ -73,8 +62,6 @@ func (m Model) ensureFieldDescriptionCmd() tea.Cmd {
 	}
 }
 
-// fieldDescriptionCache returns the cached description for a field and
-// whether it has been fetched yet. key = "<sobject>.<field>".
 func fieldDescriptionCache(d *orgData, sobject, field string) (desc string, loaded bool) {
 	if d == nil || d.FieldDescriptions == nil {
 		return "", false
@@ -83,9 +70,6 @@ func fieldDescriptionCache(d *orgData, sobject, field string) (desc string, load
 	return v, ok
 }
 
-// applyFieldDescriptionLoaded folds a fetched description into the cache.
-// On error it stores "" (fetched-but-empty) so we don't retry every
-// frame — a stale/absent description is better than a fetch storm.
 func (m *Model) applyFieldDescriptionLoaded(msg fieldDescriptionLoadedMsg) {
 	d := m.data[msg.orgUser]
 	if d == nil {

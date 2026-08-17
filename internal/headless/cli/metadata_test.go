@@ -68,12 +68,10 @@ func TestMetadata_RejectsUnknownType(t *testing.T) {
 
 func TestMetadata_GetRequiresIDAndType(t *testing.T) {
 	a := newMetadataTestApp()
-	// Missing both.
 	code, _ := runMetadataCLI(t, a, "--json", "metadata", "get", "--org", "prod")
 	if code != headless.ExitInvalidArg {
 		t.Errorf("missing both exit = %d", code)
 	}
-	// Missing id.
 	code, _ = runMetadataCLI(t, a, "--json", "metadata", "get",
 		"--org", "prod", "--type", "CustomField")
 	if code != headless.ExitInvalidArg {
@@ -186,17 +184,10 @@ func TestMetadataCreate_PatchFromFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"active":true}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// scratch is full-tier so the gate lets us through; the test
-	// then fails at the network boundary which fine — we just want
-	// to know the patch resolved cleanly.
 	code, got := runMetadataCLI(t, a, "--json", "metadata", "create",
 		"--org", "scr", "--type", "ValidationRule",
 		"--full-name", "Account.MyRule",
 		"--patch-file", path)
-	// We expect anything OTHER than invalid_argument with a patch-
-	// resolution message — the gate would not catch this, and a
-	// network call would fail. Either internal or invalid_argument
-	// from the SF side is acceptable.
 	if code == headless.ExitSafetyBlocked {
 		t.Errorf("scratch should not be safety_blocked")
 	}
@@ -258,7 +249,6 @@ func TestMetadataDelete_BlockedAtMetadataTier(t *testing.T) {
 			{Alias: "sand", Username: "qa@x", IsSandbox: true},
 		},
 	}
-	// Update is allowed at metadata tier.
 	code, _ := runMetadataCLI(t, a, "--json", "metadata", "update",
 		"--org", "sand", "--type", "CustomField",
 		"--id", "00Nxxx", "--patch", `{"description":"x"}`)

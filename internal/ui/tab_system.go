@@ -15,13 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderSystem prepends the shared subtab strip then dispatches to
-// the right subtab renderer. Logs + Deploys reuse the existing
-// renderers verbatim; API has its own.
-//
-// The strip costs one row at the top — we shave that off the inner
-// height passed to the per-subtab renderer so list views still fit
-// within the pane.
 func (m Model) renderSystem(w, innerH int) string {
 	subs := systemSubtabs()
 	sel := m.systemSubtab()
@@ -52,9 +45,6 @@ func (m Model) renderSystem(w, innerH int) string {
 	return strip + "\n" + body
 }
 
-// renderSystemAPI renders the API call log inline — same data the
-// Ctrl+A modal showed. Read-only; cleared on session restart since
-// the underlying ring buffer is in-memory.
 func (m Model) renderSystemAPI(w, innerH int) string {
 	inner := w - 4
 	var lines []string
@@ -81,14 +71,12 @@ func (m Model) renderSystemAPI(w, innerH int) string {
 	lines = append(lines, renderTableHeader(cols, inner))
 
 	now := time.Now()
-	// Cap at 200 rows on screen — the buffer holds 500.
 	limit := len(calls)
 	if limit > 200 {
 		limit = 200
 	}
 	rows := calls[:limit]
 
-	// No selection model on this view — read-only.
 	const sel = -1
 	lines = append(lines, renderRows(
 		len(rows), sel, innerH, len(lines), 1, inner,

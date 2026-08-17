@@ -4,10 +4,6 @@ package sf
 // bundles as AuraDefinitionBundle + per-file AuraDefinition rows
 // (.cmp / .js / .css / .design / .svg / .auradoc / .evt / .tokens /
 // the controller and helper).
-//
-// Same shape as LWC; we surface them on the same /components tab via
-// a chip toggle so the user can swap between "LWC" and "Aura" without
-// changing surfaces.
 
 import (
 	"encoding/json"

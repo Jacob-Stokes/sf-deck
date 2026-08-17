@@ -54,13 +54,11 @@ func TestReportRun_RequiresID(t *testing.T) {
 
 func TestReportExport_RequiresIDAndOutput(t *testing.T) {
 	a := newReportTestApp()
-	// Missing id.
 	code, _ := runReportCLI(t, a, "--json", "report", "export",
 		"--org", "dev", "--output", "/tmp/x.xlsx")
 	if code != headless.ExitInvalidArg {
 		t.Errorf("missing id exit = %d", code)
 	}
-	// Missing output.
 	code, _ = runReportCLI(t, a, "--json", "report", "export",
 		"--org", "dev", "--id", "00OabcdEF")
 	if code != headless.ExitInvalidArg {

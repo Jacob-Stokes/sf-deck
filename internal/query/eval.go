@@ -58,8 +58,6 @@ func Eval(node Node, row Row) bool {
 	return false
 }
 
-// evalCompare runs one CompareNode against a row. Per-op semantics are
-// documented on Op.
 func evalCompare(c CompareNode, row Row) bool {
 	v, ok := row.Field(c.Field)
 	if !ok {
@@ -116,9 +114,6 @@ func evalCompare(c CompareNode, row Row) bool {
 	return false
 }
 
-// equal does a permissive equality check. Numeric types compare by
-// value across int/int64/float64; strings are case-sensitive (use
-// OpContains for fold-equal). Bools and nils compare directly.
 func equal(a, b any) bool {
 	switch av := a.(type) {
 	case string:
@@ -162,7 +157,6 @@ func compareOrdered(a, b any) int {
 		// the eval path checks for this sentinel via comparable().
 		return cmpMismatch
 	}
-	// Both non-numeric — fall back to string compare.
 	return strings.Compare(toString(a), toString(b))
 }
 
@@ -172,9 +166,6 @@ func compareOrdered(a, b any) int {
 // instead of producing a misleading lexical compare.
 const cmpMismatch = -1 << 30
 
-// toString renders any AST-supported value as a string for the
-// string-shaped operators (Contains / StartsWith / EndsWith) or the
-// fallback compare path. nil → "".
 func toString(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -201,9 +192,6 @@ func toString(v any) string {
 	return ""
 }
 
-// toFloat coerces numeric AST values to float64 for ordered compare.
-// String → false (only numeric types are ordered numerically). The
-// caller falls back to lexical compare when toFloat returns false.
 func toFloat(v any) (float64, bool) {
 	switch x := v.(type) {
 	case int:
@@ -216,13 +204,10 @@ func toFloat(v any) (float64, bool) {
 	return 0, false
 }
 
-// isNil — true for an explicit nil interface or a typed nil.
 func isNil(v any) bool {
 	return v == nil
 }
 
-// isZeroString treats the empty string as null too, matching how
-// Salesforce serialises absent values in REST responses.
 func isZeroString(v any) bool {
 	s, ok := v.(string)
 	return ok && s == ""
@@ -238,7 +223,6 @@ func evalDateLiteral(rowDate, literal string) bool {
 	if rowDate == "" || literal == "" {
 		return false
 	}
-	// Normalise the row date to a YYYY-MM-DD prefix for window checks.
 	day := rowDate
 	if len(day) >= 10 {
 		day = day[:10]
@@ -257,7 +241,6 @@ func evalDateLiteral(rowDate, literal string) bool {
 	case upper == "YESTERDAY":
 		return rowT.Equal(today.AddDate(0, 0, -1))
 	case upper == "THIS_WEEK":
-		// Salesforce week starts on Sunday.
 		weekStart := today.AddDate(0, 0, -int(today.Weekday()))
 		weekEnd := weekStart.AddDate(0, 0, 7)
 		return !rowT.Before(weekStart) && rowT.Before(weekEnd)
@@ -350,7 +333,6 @@ func foldHasPrefix(s, prefix string) bool {
 	return true
 }
 
-// foldHasSuffix mirrors foldHasPrefix for HasSuffix.
 func foldHasSuffix(s, suffix string) bool {
 	if len(suffix) > len(s) {
 		return false
@@ -406,9 +388,6 @@ func itoa64(n int64) string {
 }
 
 func ftoa(f float64) string {
-	// Best-effort: rounded to 6 sig figs, no scientific notation. The
-	// exact representation isn't important — this only fires on the
-	// stringly-compare fallback for fractional values.
 	const digits = 6
 	intPart := int64(f)
 	frac := f - float64(intPart)

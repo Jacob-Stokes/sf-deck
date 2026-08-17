@@ -172,8 +172,6 @@ func TestParse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			// Raw is set by Parse to the trimmed input — fill in expected
-			// when the test case doesn't set it explicitly.
 			if c.want.Raw == "" {
 				c.want.Raw = c.input
 			}

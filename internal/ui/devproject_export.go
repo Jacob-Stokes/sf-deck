@@ -1,14 +1,5 @@
 package ui
 
-// DevProject export — the `e` key on /dev-projects (or Dev Project
-// Detail) triggers a two-step modal: pick format → pick save path →
-// write file. Mirrors the report-export flow shape.
-//
-// Format-specific writing happens in internal/exporters; this file
-// is just the TUI glue (modals, key wiring, file I/O, flash) plus
-// the URL resolver that knows how to build a Lightning URL from an
-// Item + the org it came from.
-
 import (
 	"context"
 	"fmt"
@@ -29,14 +20,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// triggerExportProject is the `e` key handler on /dev-projects (and
-// on the rail's Dev Projects panel). Opens the format-picker modal;
-// the save-path picker chains after format is chosen.
-//
-// On TabDevProjectDetail it exports the drilled-in project's items
-// using the active scope (this org / all orgs per
-// devProjectShowAllOrgs). On TabDevProjects (master list) it exports
-// the cursored project, defaulting to "this org" scope.
 func (m *Model) triggerExportProject() tea.Cmd {
 	if m.devProjects == nil {
 		m.flash("dev-projects unavailable")
@@ -47,9 +30,6 @@ func (m *Model) triggerExportProject() tea.Cmd {
 		m.flash("no project selected")
 		return nil
 	}
-	// Default scope: when on the detail tab we honour the user's
-	// current scope toggle (so what they see is what they export).
-	// Elsewhere we default to "this org" — the most common use.
 	scopeAllOrgs := false
 	if m.tab() == TabDevProjectDetail {
 		scopeAllOrgs = m.devProjectShowAllOrgs
@@ -57,10 +37,6 @@ func (m *Model) triggerExportProject() tea.Cmd {
 	return m.openExportFormatPicker(dpID, dpName, scopeAllOrgs)
 }
 
-// exportProjectSelection figures out which DevProject the export is
-// scoped to. On the detail tab it's the drilled-in project; on the
-// master list it's the cursored row; on the rail's Dev Projects
-// panel it's also the cursored row in that list.
 func (m Model) exportProjectSelection() (id, name string, ok bool) {
 	switch m.tab() {
 	case TabDevProjectDetail:
@@ -78,7 +54,6 @@ func (m Model) exportProjectSelection() (id, name string, ok bool) {
 	return "", "", false
 }
 
-// openExportFormatPicker is step 1: pick CSV / Excel / JSON / Manifest.
 func (m *Model) openExportFormatPicker(dpID, dpName string, scopeAllOrgs bool) tea.Cmd {
 	formats := exporters.AllFormats()
 	opts := make([]choiceOption, 0, len(formats))
@@ -121,28 +96,13 @@ func (m *Model) openExportFormatPicker(dpID, dpName string, scopeAllOrgs bool) t
 	return m.openChoiceModal(state)
 }
 
-// exportProjectFormatPickedMsg flows into Update from the format
-// picker; Update opens the path picker as step 2.
 type exportProjectFormatPickedMsg struct {
 	DevID, DevName string
 	Format         exporters.Format
 	ScopeAllOrgs   bool
 }
 
-// applyExportProjectFormatPicked is the Update-side handler — opens
-// the path-picker edit modal pre-populated with a sensible default
-// path. Confirm fires the actual write.
-//
-// File formats default to a single-file path with the extension
-// matching the format. Bundle formats (package.xml) default to a
-// directory path; the writer creates the directory and drops
-// package.xml + sidecars inside.
 func (m *Model) applyExportProjectFormatPicked(msg exportProjectFormatPickedMsg) tea.Cmd {
-	// FormatSfdxProjectRetrieve is the only format that can
-	// "update an existing thing" — the bundle stays on disk between
-	// runs. When the project has existing bundles, ask the user
-	// whether to overwrite one or create a new directory. Other
-	// formats always create a fresh artifact, so skip the prompt.
 	if msg.Format == exporters.FormatSfdxProjectRetrieve && m.devProjects != nil {
 		bundles, err := m.devProjects.ListBundlesFor(msg.DevID)
 		if err == nil && len(bundles) > 0 {
@@ -152,10 +112,6 @@ func (m *Model) applyExportProjectFormatPicked(msg exportProjectFormatPickedMsg)
 	return m.openExportPathPicker(msg, "")
 }
 
-// openBundleTargetPicker asks the user whether to update one of the
-// existing linked bundles or create a fresh one. Each bundle row
-// shows path + last-retrieved age so the user can pick the right
-// target. Last option is always "Create a new bundle".
 func (m *Model) openBundleTargetPicker(msg exportProjectFormatPickedMsg, bundles []devproject.Bundle) tea.Cmd {
 	opts := make([]choiceOption, 0, len(bundles)+1)
 	for _, b := range bundles {
@@ -194,16 +150,11 @@ func (m *Model) openBundleTargetPicker(msg exportProjectFormatPickedMsg, bundles
 	return m.openChoiceModal(state)
 }
 
-// bundleTargetPickedMsg carries the user's bundle-target choice from
-// the picker through Update back into the export flow.
 type bundleTargetPickedMsg struct {
 	Format   exportProjectFormatPickedMsg
 	BundleID string // "" = create new
 }
 
-// applyBundleTargetPicked dispatches to either "update an existing
-// bundle" (skip path picker, reuse the bundle's path) or "create
-// new" (open the path picker as usual).
 func (m *Model) applyBundleTargetPicked(msg bundleTargetPickedMsg) tea.Cmd {
 	if msg.BundleID == "" {
 		return m.openExportPathPicker(msg.Format, "")
@@ -216,8 +167,6 @@ func (m *Model) applyBundleTargetPicked(msg bundleTargetPickedMsg) tea.Cmd {
 		m.flash("bundle lookup failed: " + err.Error())
 		return m.openExportPathPicker(msg.Format, "")
 	}
-	// Path is fixed by the existing bundle — skip the path picker
-	// entirely and go straight to the write+retrieve flow.
 	return func() tea.Msg {
 		return exportProjectPathPickedMsg{
 			DevID:        msg.Format.DevID,
@@ -230,14 +179,6 @@ func (m *Model) applyBundleTargetPicked(msg bundleTargetPickedMsg) tea.Cmd {
 	}
 }
 
-// openExportPathPicker is the path-picker step that runs after the
-// (optional) bundle-target picker for retrieve formats. Pulled out
-// so both paths (no existing bundles, or "create new") share one
-// implementation.
-//
-// presetBundleID, when non-empty, links the new write to that
-// bundle row in the registry so the path stays in sync. "" creates
-// a fresh row after the write succeeds.
 func (m *Model) openExportPathPicker(msg exportProjectFormatPickedMsg, presetBundleID string) tea.Cmd {
 	defaultPath := m.defaultDevProjectExportPath(msg.DevName, msg.Format)
 	id := msg.DevID
@@ -292,13 +233,6 @@ func (m *Model) openExportPathPicker(msg exportProjectFormatPickedMsg, presetBun
 	return m.openEditModal(state)
 }
 
-// exportProjectPathPickedMsg flows into Update once both format and
-// path are confirmed. Update calls writeDevProjectExport.
-//
-// BundleID, when non-empty, identifies an existing bundle the export
-// should overwrite (path is reused, last_retrieved_at is bumped).
-// "" creates a fresh bundle row after the write — the typical
-// "first export" path.
 type exportProjectPathPickedMsg struct {
 	DevID, DevName string
 	Format         exporters.Format
@@ -308,16 +242,6 @@ type exportProjectPathPickedMsg struct {
 	Overwrite      bool
 }
 
-// applyExportProjectPathPicked writes the export file (or bundle).
-// Hits the dev-project store for items, then dispatches by format.
-// Single-file formats route through exporters.Write; bundle formats
-// (package.xml) get their own writer + sidecars. Flash on
-// success / error.
-//
-// Tracked via the export registry the same way report exports are,
-// so Ctrl+J / /home Downloads surface project + manifest writes
-// alongside report runs. Bundle formats register kind=manifest;
-// single-file formats register kind=project.
 func (m *Model) applyExportProjectPathPicked(msg exportProjectPathPickedMsg) tea.Cmd {
 	if m.devProjects == nil {
 		return nil
@@ -346,16 +270,9 @@ func (m *Model) applyExportProjectPathPicked(msg exportProjectPathPickedMsg) tea
 		return m.exportProjectBundle(msg, items, orgFilter)
 	}
 
-	// Register the in-flight job up front so the activity indicator
-	// shows even though this path runs synchronously — at minimum,
-	// the modal + /home Downloads will see "writing → done" once the
-	// caller refreshes. Done immediately on success/failure since
-	// we're not on a goroutine.
 	job := m.exports.startJob(exportKindProject, msg.DevName, orgFilter, msg.Path, string(msg.Format))
 	m.exports.setPhase(job.ID, exportPhaseWriting)
 
-	// Single-file formats: csv / xlsx / json. Build rows, open the
-	// destination file, dispatch to the format writer.
 	resolver := m.itemURLResolver()
 	rows := dpexport.Rows(items, resolver)
 
@@ -382,20 +299,6 @@ func (m *Model) applyExportProjectPathPicked(msg exportProjectPathPickedMsg) tea
 	return nil
 }
 
-// exportProjectBundle writes the package.xml manifest bundle: a
-// directory containing package.xml, optionally records.csv (when
-// the project has KindRecord items), and a README.md describing
-// what's there + how to use it.
-//
-// When the chosen format is FormatSfdxProject we additionally write
-// sfdx-project.json + an empty force-app/main/default/ directory so
-// the bundle is a self-contained sfdx project the user can `cd` into
-// and run sf commands against immediately.
-//
-// Records sidecar uses the same csv writer the standard ExportRow
-// path uses — keeps the records data shape consistent with
-// "export DevProject as CSV" (so users with their own spreadsheet
-// tooling can ingest it the same way).
 func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devproject.Item, orgFilter string) tea.Cmd {
 	// A fresh export must never silently truncate an existing project.
 	// BundleID is populated only after the user explicitly chose "Update"
@@ -415,14 +318,9 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 		return nil
 	}
 
-	// Both FormatSfdxProject and FormatSfdxProjectRetrieve need the
-	// full project scaffold (sfdx-project.json + force-app/). Retrieve
-	// goes one step further by populating force-app/ from the org;
-	// see the goroutine kicked off after the synchronous write below.
 	fullProject := msg.Format == exporters.FormatSfdxProject ||
 		msg.Format == exporters.FormatSfdxProjectRetrieve
 
-	// Write package.xml.
 	manifestPath := filepath.Join(msg.Path, "package.xml")
 	mf, err := os.Create(manifestPath)
 	if err != nil {
@@ -450,11 +348,6 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 		return nil
 	}
 
-	// Full-project mode: scaffold sfdx-project.json + the force-app
-	// directory tree the retrieve command writes into. Empty force-app
-	// on its own works (sfdx creates files inside on retrieve), but
-	// `sf project retrieve` errors if the path doesn't exist at all,
-	// so we pre-create main/default/ to keep the first-run smooth.
 	if fullProject {
 		projectJSON := dpexport.SfdxProjectJSON(msg.DevName, sf.APIVersionForAlias(orgFilter))
 		jsonPath := filepath.Join(msg.Path, "sfdx-project.json")
@@ -471,11 +364,6 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 		}
 	}
 
-	// Records sidecar: emit only when the project has KindRecord
-	// items. Uses the standard exporters.Write CSV path on a Rows()
-	// slice limited to the records — same column shape as a normal
-	// CSV export, so users can ingest with whatever spreadsheet
-	// tooling they already have.
 	if len(result.Records) > 0 {
 		recordsPath := filepath.Join(msg.Path, "records.csv")
 		resolver := m.itemURLResolver()
@@ -489,8 +377,6 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 		}
 	}
 
-	// README.md describing the bundle + how to use it. The fullProject
-	// flag switches the README between the two workflow descriptions.
 	readmePath := filepath.Join(msg.Path, "README.md")
 	if err := os.WriteFile(readmePath, []byte(dpexport.SuggestedReadme(msg.DevName, orgFilter, result, fullProject)), 0o644); err != nil {
 		m.exports.markFailed(job.ID, err)
@@ -511,9 +397,6 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 		"retrieve":     msg.Format.RunsRetrieve(),
 	})
 
-	// When this format includes a follow-up `sf project retrieve`,
-	// keep the job in-flight + flip phase to retrieving. Bundle stays
-	// on disk if retrieve fails so the user has something to inspect.
 	if msg.Format.RunsRetrieve() {
 		alias := ""
 		if len(m.orgs) > 0 {
@@ -538,8 +421,6 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 				applog.Warn("bundle.create_failed", map[string]any{"err": err.Error()})
 			}
 		} else {
-			// Updating an existing bundle — refresh its default org so
-			// later /bundles operations target the right org.
 			_ = m.devProjects.SetDefaultOrgAlias(bundleID, alias)
 		}
 		if bundleID == "" {
@@ -565,14 +446,9 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 				Err:        err,
 			}
 		}
-		// Kick the activity tick so the status-bar indicator animates
-		// during the retrieve window. exportActivityTickCmd is single-
-		// flight so this is a no-op when an unrelated export is also
-		// running.
 		return tea.Batch(worker, m.exportActivityTickCmd())
 	}
 
-	// Synchronous bundle (no retrieve): mark done + flash here.
 	m.exports.markDone(job.ID, msg.Path)
 	parts := []string{fmt.Sprintf("manifest: %d components", result.IncludedCount)}
 	if fullProject {
@@ -591,9 +467,6 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 	return nil
 }
 
-// projectRetrieveDoneMsg lands on Update when the retrieve goroutine
-// returns. Output is the (json-shaped) sf stdout on success, nil on
-// failure — Err carries the typed sf error.
 type projectRetrieveDoneMsg struct {
 	JobID      string
 	BundleID   string // SQLite bundles row id; empty when no bundle was created/linked
@@ -602,12 +475,6 @@ type projectRetrieveDoneMsg struct {
 	Err        error
 }
 
-// applyProjectRetrieveDone folds the retrieve result into the model.
-// On failure the job is still marked failed but the bundle path is
-// preserved so the user has something to navigate to + inspect.
-//
-// On success, also bumps the bundle's last_retrieved_at so the
-// /bundles list shows the right age.
 func (m *Model) applyProjectRetrieveDone(msg projectRetrieveDoneMsg) {
 	if msg.Err != nil {
 		m.exports.markFailed(msg.JobID,
@@ -631,12 +498,6 @@ func (m *Model) applyProjectRetrieveDone(msg projectRetrieveDoneMsg) {
 	})
 }
 
-// defaultDevProjectExportPath builds the pre-filled save path for
-// the path-picker. Single-file formats produce
-// "<exports-dir>/<slug>-<timestamp>.<ext>"; bundle formats produce
-// "<exports-dir>/<slug>-<timestamp>/" (no extension, trailing slash
-// implied). Reuses the user's configured export directory so
-// project exports land alongside report exports.
 func (m Model) defaultDevProjectExportPath(projectName string, format exporters.Format) string {
 	dir := expandTilde(m.settings.ReportExportDir())
 	slug := dpexport.SuggestedFilename(projectName)
@@ -656,8 +517,6 @@ func (m Model) defaultDevProjectExportPath(projectName string, format exporters.
 // templates. Keeping this here (vs. injecting per-call) keeps the
 // exporters/devproject package free of ui/sf imports.
 func (m Model) itemURLResolver() dpexport.URLResolver {
-	// Cache the org → instance URL map once so we're not iterating
-	// m.orgs per item.
 	instances := map[string]string{}
 	for _, o := range m.orgs {
 		if o.InstanceURL != "" {
@@ -677,14 +536,6 @@ func (m Model) itemURLResolver() dpexport.URLResolver {
 	}
 }
 
-// lightningPathForItem returns the Lightning instance-relative path
-// for an item, or "" when the kind has no canonical URL (records
-// without a known sObject context, abstract aggregates, etc.).
-//
-// Keeps the path templates here rather than constructing synthetic
-// sf.Openable values: the templates are short, the inputs are
-// already in Item form, and faking up Openables would mean
-// duplicating each kind's struct fields.
 func lightningPathForItem(it devproject.Item) string {
 	switch it.Kind {
 	case devproject.KindSObject:
@@ -693,7 +544,6 @@ func lightningPathForItem(it devproject.Item) string {
 		}
 		return "/lightning/setup/ObjectManager/" + it.Ref + "/Details/view"
 	case devproject.KindField:
-		// Ref is "<sObject>.<FieldApiName>"; Type is the sObject.
 		sobj := it.Type
 		field := it.Ref
 		if sobj == "" {
@@ -709,7 +559,6 @@ func lightningPathForItem(it devproject.Item) string {
 		}
 		return "/lightning/setup/ObjectManager/" + sobj + "/FieldsAndRelationships/" + field + "/view"
 	case devproject.KindFlow, devproject.KindFlowVersion:
-		// Flows: open the Flow Builder by definition id.
 		defID := it.Ref
 		if it.Kind == devproject.KindFlowVersion && it.Type != "" {
 			defID = it.Type
@@ -754,9 +603,6 @@ func lightningPathForItem(it devproject.Item) string {
 	case devproject.KindProfile:
 		return "/lightning/setup/EnhancedProfiles/page?address=%2F" + it.Ref
 	case devproject.KindValidationRule:
-		// Validation rules don't have a stable Lightning URL — the
-		// rule lives under its sObject's setup page. Best we can do
-		// is link to the sObject's Validation Rules tab.
 		if it.Type == "" {
 			return ""
 		}
@@ -767,8 +613,6 @@ func lightningPathForItem(it devproject.Item) string {
 		}
 		return "/lightning/setup/ObjectManager/" + it.Type + "/RecordTypes/view"
 	case devproject.KindLWC:
-		// LWC bundles don't have a Lightning Setup URL — show the
-		// general LWC setup page.
 		return "/lightning/setup/LightningComponentBundles/home"
 	case devproject.KindAura:
 		return "/lightning/setup/AuraComponents/home"

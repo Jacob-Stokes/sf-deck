@@ -47,5 +47,4 @@ func (p *SettingsPersister) Save(pins []string, lastPath []string) {
 	_ = p.settings.Save()
 }
 
-// Compile-time assertion: SettingsPersister implements treechip.Persister.
 var _ treechip.Persister = (*SettingsPersister)(nil)

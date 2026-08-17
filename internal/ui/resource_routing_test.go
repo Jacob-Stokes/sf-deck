@@ -28,9 +28,6 @@ func TestEveryOrgDataResourceKeyIsRoutable(t *testing.T) {
 	if len(routed) == 0 {
 		t.Fatal("found no case keys in update.go switch — parser stale?")
 	}
-	// A resource is routable EITHER via an explicit switch case (bespoke
-	// apply logic) OR via a listResourceSpec registration (the generic
-	// Apply→sync→refresh path). Fold the registry into the routable set.
 	for _, key := range listResourceOrder {
 		routed[key] = true
 	}
@@ -80,8 +77,6 @@ func TestEveryKeyedResourcePrefixIsRouted(t *testing.T) {
 	}
 }
 
-// keyLiterals extracts the capture group of pattern from a source file
-// into a set.
 func keyLiterals(t *testing.T, file, pattern string) map[string]bool {
 	t.Helper()
 	src, err := os.ReadFile(file)
@@ -96,9 +91,6 @@ func keyLiterals(t *testing.T, file, pattern string) map[string]bool {
 	return out
 }
 
-// switchCaseKeys collects every `case "<key>":` literal in the file.
-// Broad on purpose — we only assert the declared keys are a subset, so
-// picking up unrelated case strings is harmless.
 func switchCaseKeys(t *testing.T, file string) map[string]bool {
 	return keyLiterals(t, file, `case\s+"([a-z0-9_]+)":`)
 }

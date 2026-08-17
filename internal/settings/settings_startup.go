@@ -2,10 +2,6 @@ package settings
 
 import "strings"
 
-// Startup / launch-state accessors: which tab, sidebar layout, query
-// line, SOQL seed, etc. sf-deck restores on launch. Split out of
-// settings.go (which keeps the Settings struct + load/save core).
-
 // StartupSidebarOpen / etc. resolve each tri-state bool. def is the
 // built-in default the caller (model.go) would otherwise use.
 func (s *Settings) StartupSidebarOpen(def bool) bool {

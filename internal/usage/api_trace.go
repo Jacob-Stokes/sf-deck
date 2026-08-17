@@ -1,18 +1,5 @@
 package usage
 
-// Append-only JSONL trace of every API call this process makes.
-// Enabled with SF_DECK_API_TRACE=1 (or any truthy value). Path defaults
-// to ~/.sf-deck/log/api-trace-<ts>-<pid>.jsonl, override with
-// SF_DECK_API_TRACE_PATH=/some/path.jsonl.
-//
-// Designed for one-shot audits: cold-launch with the env var set, walk
-// a baseline journey, then read the file to attribute API traffic. The
-// caller tag (from runtime.Callers in caller.go) gives "which fetcher",
-// the args give "which endpoint", duration gives "how slow."
-//
-// File mode is append: re-running the binary with the same path keeps
-// growing the file. For a clean run, truncate or remove the file first.
-
 import (
 	"encoding/json"
 	"os"
@@ -28,9 +15,6 @@ const (
 	apiTracePathEnv = "SF_DECK_API_TRACE_PATH"
 )
 
-// apiTraceRecord is one JSONL line. Field names match the render
-// trace's convention (lowercase + underscore) so consumers can grep
-// across both files.
 type apiTraceRecord struct {
 	Event  string  `json:"event"`
 	TS     string  `json:"ts"`
@@ -49,15 +33,8 @@ type apiTracer struct {
 	file *os.File
 }
 
-// apiTrace is the process-wide tracer. nil = disabled (the env var
-// wasn't set at startup).
 var apiTrace *apiTracer
 
-// init opens the trace file if the env var is set. Failure to open is
-// silently ignored — tracing is a diagnostic, not load-bearing.
-//
-// Using package-init keeps the tracer wired without main.go needing to
-// know about it; the env var alone toggles the feature.
 func init() {
 	if !envTruthy(os.Getenv(apiTraceEnv)) {
 		return
@@ -111,8 +88,6 @@ func envTruthy(v string) bool {
 	return true
 }
 
-// write emits one JSONL record. Best-effort: errors are swallowed
-// (trace is diagnostic; failing-to-log shouldn't break the TUI).
 func (t *apiTracer) write(rec apiTraceRecord) {
 	if t == nil || t.file == nil {
 		return
@@ -142,8 +117,6 @@ func (t *apiTracer) writeRaw(m map[string]any) {
 	_, _ = t.file.Write(b)
 }
 
-// traceCall fans out a recorded Bump to the JSONL trace if it's
-// enabled. Cheap no-op when the tracer is nil.
 func traceCall(c Call) {
 	if apiTrace == nil {
 		return
@@ -173,12 +146,6 @@ func traceCall(c Call) {
 	apiTrace.write(rec)
 }
 
-// redactSOQL replaces the value of a `q=...` query parameter on a REST
-// path with `<redacted>`, preserving the rest of the path so call
-// attribution still works. SOQL bodies can include Id values, custom
-// field names, and filter literals that read as PII-adjacent — they're
-// useful for in-session debugging (the ring buffer + ctrl+a modal)
-// but shouldn't sit on disk in a JSONL file the user might share.
 func redactSOQL(p string) string {
 	i := strings.Index(p, "?q=")
 	if i < 0 {
@@ -187,8 +154,6 @@ func redactSOQL(p string) string {
 			return p
 		}
 	}
-	// Keep everything up to and including the "q=" marker, then look
-	// for the next "&" (if any) and keep that tail.
 	head := p[:i+3]
 	tail := ""
 	if amp := strings.IndexByte(p[i+3:], '&'); amp >= 0 {
@@ -197,10 +162,6 @@ func redactSOQL(p string) string {
 	return head + "<redacted>" + tail
 }
 
-// redactCLIArgs walks an `sf` argv and replaces the value following a
-// `-q` / `--query` flag with `<redacted>`. Other args (org alias,
-// flags) pass through untouched so the trace still reads as a
-// command shape.
 func redactCLIArgs(args []string) string {
 	if len(args) == 0 {
 		return ""
@@ -223,11 +184,6 @@ func redactCLIArgs(args []string) string {
 	return strings.Join(cleaned, " ")
 }
 
-// splitMethodPath inspects the argv shape Bump was called with and
-// pulls out (method, path). REST calls arrive as ["GET", "/services/.."];
-// CLI calls as ["data", "query", "-q", "..."]. For CLI calls we return
-// (firstToken, "") so the JSON record is still useful — the full argv
-// also rides in rec.Args.
 func splitMethodPath(args []string) (string, string) {
 	if len(args) == 0 {
 		return "", ""

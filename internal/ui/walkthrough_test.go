@@ -9,7 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// tourModel returns a Model with the walkthrough active on a given step list.
 func tourModel(steps []tourStep) Model {
 	m := Model{}
 	m.walkthrough = walkthroughState{active: true, steps: steps, cursor: 0}
@@ -29,8 +28,6 @@ func TestWalkthroughAdvanceIsManual(t *testing.T) {
 	if m.walkthrough.cursor != 0 {
 		t.Fatalf("start cursor = %d", m.walkthrough.cursor)
 	}
-	// Advancing works even though step one's predicate is false — the user
-	// is in control, not the predicate.
 	m.advanceWalkthrough()
 	if m.walkthrough.cursor != 1 {
 		t.Fatalf("after advance cursor = %d, want 1", m.walkthrough.cursor)
@@ -162,7 +159,6 @@ func TestTourStepsWellFormed(t *testing.T) {
 	}
 }
 
-// stepByTitle finds a tour step by title for predicate testing.
 func stepByTitle(t *testing.T, title string) tourStep {
 	t.Helper()
 	return stepByTitleIn(t, tourSteps(), title)

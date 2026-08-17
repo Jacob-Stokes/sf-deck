@@ -1,18 +1,5 @@
 package ui
 
-// /record drill-in — the canonical "show me everything about this
-// record" surface. Reusable from any tab that holds a (sObject, Id)
-// pair: /records list, /objects/<X>/records subtab, /soql results,
-// /recent, /reports detail rows.
-//
-// Opening: triggerRecordDrill(o, sobject, id, returnTab) populates
-// d.RecordDetailCur and switches to TabRecordDetail. The Resource for
-// the (sobject, id) pair is allocated on first hit; subsequent drills
-// to the same record hit cache.
-//
-// Esc pops back to recordDetailReturnTab — set by the opener to "/records"
-// or wherever else the user came from.
-
 import (
 	"fmt"
 	"sort"
@@ -28,10 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// triggerRecordDrill is the canonical opener used by every tab that
-// wants to drill into a record. Sets the per-org RecordDetailCur,
-// remembers where to pop back to, switches to TabRecordDetail, and
-// fires the data fetch.
 func (m *Model) triggerRecordDrill(sobject, id, name string, returnTab Tab) tea.Cmd {
 	if sobject == "" || id == "" || len(m.orgs) == 0 {
 		return nil
@@ -48,16 +31,12 @@ func (m *Model) triggerRecordDrill(sobject, id, name string, returnTab Tab) tea.
 	// entirely, which would be a bug elsewhere worth surfacing
 	// rather than papering over.
 	m.recordDetailReturnTab = returnTab
-	// Pre-allocate the Resource so the renderer immediately shows
-	// "loading…" rather than "press r to fetch."
 	d.EnsureRecordDetail(targetArg(o), sobject, id)
-	// Also bump the recent-visits log — drilling counts as a visit.
 	m.rememberRecentRecord(o.Username, sobject, id, name)
 	m.setTab(TabRecordDetail)
 	return m.onTabChanged()
 }
 
-// renderRecordDetail draws the full KV grid for the drilled-in record.
 func (m Model) renderRecordDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -98,7 +77,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 	}
 	rec := r.Value()
 
-	// Header section: name + sObject + id, plus refresh-state suffix.
 	displayName := recordDisplayName(rec)
 	if displayName == "" {
 		displayName = id
@@ -111,20 +89,12 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 	}
 	lines = append(lines, "")
 
-	// Find pill — shown when the user has pressed / or has a
-	// committed find buffer that n / N can still cycle. The
-	// pill renders as a slim line near the top of the record
-	// detail so users see at a glance "I'm in find mode" and
-	// what they typed.
 	if hint := m.recordFindHint(); hint != "" {
 		lines = append(lines, hint)
 	}
 
-	// Edit-session state for this record (may be nil — no edits yet).
 	session := d.EditSessions[d.RecordDetailCur]
 
-	// Dirty banner — surfaces unsaved-edits count + save hint when
-	// the user has made any local commits.
 	if session != nil && (len(session.Dirty) > 0 || session.LastError != "") {
 		if session.LastError != "" {
 			lines = append(lines, redLine("  save error: "+session.LastError))
@@ -153,9 +123,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 		v := dr.Value()
 		parentDescribe = &v
 	}
-	// Cached resolved Names for reference fields (populated by
-	// EnsureRecordReferenceNames once describe lands). Empty until
-	// the SOQL round-trip completes; renderer falls back to raw Id.
 	resolvedNames := map[string]string{}
 	if r, ok := d.RecordReferenceNames[d.RecordDetailCur]; ok && !r.FetchedAt().IsZero() {
 		resolvedNames = r.Value()
@@ -177,10 +144,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 	for _, s := range sections {
 		allKeys = append(allKeys, s.Keys...)
 	}
-	// Three-column layout: API name | Label | Value. Both label
-	// columns auto-size to the longest content they hold, capped
-	// at fractions of the body width so the Value column always
-	// has breathing room.
 	apiCap := inner / 3
 	if apiCap < 24 {
 		apiCap = 24
@@ -190,10 +153,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 	}
 	labelW := minLabelWidth(allKeys, 18, apiCap)
 
-	// Compute the human-label width from the actual labels in the
-	// describe — not the API names. Falls back to a sensible
-	// default when the describe isn't loaded yet so the value
-	// column doesn't shift right when the describe lands.
 	humanW := 22
 	if parentDescribe != nil {
 		longest := 0
@@ -218,7 +177,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 			humanW = longest
 		}
 	}
-	// Cap humanW so it doesn't dominate; truncate longer labels.
 	humanCap := inner / 4
 	if humanCap < 14 {
 		humanCap = 14
@@ -234,18 +192,10 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 		cursor = d.RecordFieldCursor[d.RecordDetailCur]
 	}
 
-	// Flatten sections into a list of items the viewport can index.
-	// Each item is either a section title or a field row. The cursor
-	// (sel) is the index of the cursored field item; non-field items
-	// don't claim a cursor position so movement skips them naturally
-	// when moveRecordFieldCursor walks the flat field list.
 	type rowItem struct {
-		isSection bool
-		title     string // section title
-		field     string // field API name
-		// related: when isRelated == true, this row is a child-
-		// relationship summary (not an editable field). Enter on
-		// these drops the user into a SOQL of the related rows.
+		isSection   bool
+		title       string // section title
+		field       string // field API name
 		isRelated   bool
 		relName     string
 		relChildObj string
@@ -267,10 +217,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 		}
 	}
 
-	// RELATED rows — appended as ordinary items at the end of the
-	// flat list so the user scrolls past the fields into them.
-	// Inert: the cursor walks fields only (RELATED has no editable
-	// counterpart), and renderRows centers on the field cursor.
 	var resolvedCounts map[string]int
 	if r, ok := d.RecordChildCounts[d.RecordDetailCur]; ok && !r.FetchedAt().IsZero() {
 		resolvedCounts = r.Value()
@@ -309,9 +255,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 		}
 	}
 
-	// Trailing-line budget for the footer hint + its blank
-	// separator (2 rows). renderRows handles the scroll indicator
-	// itself.
 	const footerHeight = 2
 	rowFn := func(i int) string {
 		if i < 0 || i >= len(items) {
@@ -350,11 +293,6 @@ func (m Model) renderRecordDetail(w, innerH int) string {
 //	            rejected this field
 func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW, humanW, inner int,
 	session *recordEditSession, isCursor bool, describe *sf.SObjectDescribe, resolvedNames map[string]string) string {
-	// Full-row highlight: the cursor row gets a subtle BgAlt tint across
-	// every cell + the trailing padding so it reads as a single band, the
-	// same affordance listtable.go applies. Every per-cell style threads
-	// this background so the highlight doesn't end mid-row at the first
-	// padding gap.
 	labelStyle := lipgloss.NewStyle().Foreground(theme.Muted).Width(labelW)
 	humanLabelStyle := lipgloss.NewStyle().Foreground(theme.FgDim).Width(humanW)
 	valueStyle := lipgloss.NewStyle().Foreground(theme.Fg)
@@ -365,17 +303,10 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 		valueStyle = valueStyle.Background(theme.BgAlt)
 		dimValueStyle = dimValueStyle.Background(theme.BgAlt)
 	}
-	// Hard-truncate the API name BEFORE handing to lipgloss so a
-	// 50-char custom API name doesn't wrap onto a second visual
-	// row (wrapping breaks the viewport's row-count math and the
-	// cursor disagrees with the visible position).
 	displayField := fieldName
 	if len(displayField) > labelW {
 		displayField = ansi.Truncate(displayField, labelW, "…")
 	}
-	// Resolve the human label via describe; falls back to "" when
-	// the describe hasn't landed yet OR the field is an internal
-	// (Attributes etc.) that lacks one. Truncate to humanW.
 	humanLabel := ""
 	if describe != nil {
 		if f := findField(describe, fieldName); f != nil {
@@ -383,8 +314,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 		}
 	}
 	if humanLabel == fieldName {
-		// Standard fields often have Label == Name (e.g. "Id" / "Id").
-		// Skip the redundancy.
 		humanLabel = ""
 	}
 	if len(humanLabel) > humanW {
@@ -402,9 +331,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 		prefix = barStyle.Render("▌") + gapStyle.Render(" ")
 	}
 
-	// Find-match highlight terms. Empty when find isn't active OR the
-	// buffer is empty — Highlight short-circuits on empty terms so the
-	// non-find path costs the same as before.
 	hlTerms := []string{}
 	if buf := m.recordFindBuffer(); strings.TrimSpace(buf) != "" {
 		hlTerms = []string{buf}
@@ -414,9 +340,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 		if len(hlTerms) == 0 {
 			return base.Render(text)
 		}
-		// HighlightInStyle returns text with embedded highlight escapes
-		// but doesn't pad to width — wrap with the same width + bg the
-		// base style would have applied so columns stay aligned.
 		hl := uilayout.HighlightInStyle(text, hlTerms, base.Width(0))
 		wrap := lipgloss.NewStyle().Width(base.GetWidth())
 		if isCursor {
@@ -425,9 +348,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 		return wrap.Render(hl)
 	}
 
-	// Editor in progress on THIS field — delegate to the editor's
-	// RenderEditCell. The editor draws the widget; we wrap with label
-	// + cursor + dirty/error markers.
 	if session != nil && session.Editing != nil && session.EditingField == fieldName {
 		editor := resolveFieldEditor(session.Editing.Field)
 		widget := ""
@@ -438,7 +358,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 			renderCell(humanLabel, humanLabelStyle) + gap + widget
 	}
 
-	// Dirty / read-only / error markers + value.
 	val := formatCell(rec[fieldName])
 	vs := valueStyle
 	if val == "" {
@@ -447,8 +366,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 	}
 	if session != nil {
 		if dirty, ok := session.Dirty[fieldName]; ok {
-			// Show the dirty (post-commit) value instead of the
-			// pre-edit record value.
 			if dirty == nil {
 				val = "(cleared)"
 				vs = dimValueStyle
@@ -467,8 +384,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 	// still reachable via the field editor.
 	valDisplay := collapseWhitespace(val)
 	valW := inner - labelW - humanW - 6
-	// Reserve room for the "→ Target  Name" annotation when present so
-	// the truncation doesn't push the annotation off the right edge.
 	annotationW := 0
 	if describe != nil {
 		if fieldMeta := findField(describe, fieldName); fieldMeta != nil && fieldMeta.Type == "reference" && val != "" && val != "—" && len(fieldMeta.ReferenceTo) > 0 {
@@ -497,12 +412,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 	body := prefix + renderCell(displayField, labelStyle) + gap +
 		renderCell(humanLabel, humanLabelStyle) + gap + valOut
 
-	// Reference-field annotation: "→ Account  Acme Holdings Ltd".
-	// Only when the parent describe is cached AND the field is a
-	// reference type AND the value is non-null. resolvedNames
-	// supplies the related record's Name once the per-record SOQL
-	// has landed; until then we just show "→ Account" so the user
-	// at least knows what the Id points at.
 	if describe != nil {
 		if fieldMeta := findField(describe, fieldName); fieldMeta != nil && fieldMeta.Type == "reference" {
 			body += renderReferenceAnnotation(fieldMeta, val, resolvedNames[fieldName], isCursor)
@@ -526,8 +435,6 @@ func (m Model) renderRecordFieldRow(rec map[string]any, fieldName string, labelW
 		}
 	}
 	if isCursor {
-		// Pad trailing width so the BgAlt band runs to the right edge
-		// of the inner pane, matching listtable's full-row highlight.
 		body = lipgloss.NewStyle().Width(inner).Background(theme.BgAlt).Render(body)
 	}
 	return body
@@ -576,10 +483,6 @@ func renderRelatedRow(relName, childObj, parentField string, count int, labelW, 
 	return body
 }
 
-// isSystemChildRelationship mirrors the sf-layer filter so the
-// renderer can drop the same noisy children (Feeds, Histories,
-// Shares, ChangeEvents, etc.). Kept in sync manually — when the
-// sf-layer list changes, update this one too.
 func isSystemChildRelationship(name string) bool {
 	suffixes := []string{
 		"Feeds", "ChangeEvents", "Histories", "Histories__r",
@@ -595,12 +498,6 @@ func isSystemChildRelationship(name string) bool {
 	return false
 }
 
-// renderReferenceAnnotation adds the "→ Target  ResolvedName"
-// trailing fragment for reference fields. Returns "" when the
-// field's value is null/empty (no target to annotate). Polymorphic
-// references show "→ User · polymorphic"; self-references show
-// "→ Request ↻". The resolved Name is appended in a muted style
-// when known.
 func renderReferenceAnnotation(f *sf.Field, rawValue, resolvedName string, isCursor bool) string {
 	if rawValue == "" || rawValue == "—" {
 		return ""
@@ -628,11 +525,6 @@ func renderReferenceAnnotation(f *sf.Field, rawValue, resolvedName string, isCur
 	return out
 }
 
-// collapseWhitespace squashes embedded newlines/tabs and runs of
-// spaces into single spaces so a multi-line field value renders on
-// one terminal line. The value column is single-line by contract —
-// callers truncate after this to fit the column width. Preserves the
-// "—" empty marker untouched.
 func collapseWhitespace(s string) string {
 	if s == "" {
 		return s
@@ -661,9 +553,6 @@ func findField(d *sf.SObjectDescribe, name string) *sf.Field {
 	return nil
 }
 
-// detailSection is one labelled group of fields on the record detail
-// view. Keys are pre-sorted in the order they should appear; the
-// renderer skips empty sections.
 type detailSection struct {
 	Title string
 	Keys  []string
@@ -696,10 +585,6 @@ func groupFieldsForDetailWithDescribe(rec map[string]any, describe *sf.SObjectDe
 	return groupFieldsForDetailCore(rec, relationshipFields)
 }
 
-// groupFieldsForDetailCore is the shared body. relationshipFields is
-// non-nil when the parent describe is cached; entries in that set
-// are routed into the RELATIONSHIPS section regardless of name
-// pattern.
 func groupFieldsForDetailCore(rec map[string]any, relationshipFields map[string]bool) []detailSection {
 	seen := map[string]bool{"attributes": true}
 	pick := func(keys ...string) []string {
@@ -723,12 +608,6 @@ func groupFieldsForDetailCore(rec map[string]any, relationshipFields map[string]
 		"Reason", "Origin")
 	ownership := pick("OwnerId", "AccountId", "ContactId",
 		"OpportunityId", "ParentId", "Manager__c", "AssignedTo__c")
-	// When the parent describe is cached, every reference-type field
-	// not already picked above (Owner / Account / Contact / etc.) gets
-	// pulled into the RELATIONSHIPS section. Custom lookups like
-	// Preferred_Carrier__c, Origin_Warehouse__c, etc. — which don't match
-	// the heuristic name patterns — land here too. Sorted for stable
-	// rendering.
 	var relExtra []string
 	if relationshipFields != nil {
 		var names []string
@@ -759,7 +638,6 @@ func groupFieldsForDetailCore(rec map[string]any, relationshipFields map[string]
 		"LastModifiedById", "SystemModstamp", "LastViewedDate",
 		"LastReferencedDate")
 
-	// Everything else, alphabetised.
 	rest := make([]string, 0, len(rec))
 	for k := range rec {
 		if seen[k] {
@@ -778,8 +656,6 @@ func groupFieldsForDetailCore(rec map[string]any, relationshipFields map[string]
 		{Title: "OTHER", Keys: rest},
 		{Title: "AUDIT", Keys: audit},
 	}
-	// Drop empty sections — common for objects without addresses,
-	// without parent relationships, etc.
 	out := sections[:0]
 	for _, s := range sections {
 		if len(s.Keys) > 0 {
@@ -789,11 +665,6 @@ func groupFieldsForDetailCore(rec map[string]any, relationshipFields map[string]
 	return out
 }
 
-// pickWithSuffix collects field names whose suffix matches one of the
-// supplied tokens. Used by groupFieldsForDetail to bin address /
-// date-shaped fields without enumerating every permutation. Field
-// names are checked AFTER trimming "__c" so MailingStreet and
-// Mailing_Street__c both match the "Street" suffix.
 func pickWithSuffix(rec map[string]any, seen map[string]bool, suffixes []string) []string {
 	var out []string
 	keys := make([]string, 0, len(rec))
@@ -833,14 +704,6 @@ func minLabelWidth(keys []string, min, max int) int {
 	return w
 }
 
-// recordDetailEscLabel returns the user-facing hint for what Esc
-// will do on TabRecordDetail. Three cases:
-//
-//   - drill stack has a parent record → "esc → Account Acme" (or
-//     "esc → Account 0014I…" when no Name is cached for the parent)
-//   - stack empty + recordDetailReturnTab is a real tab → "esc → /soql"
-//   - stack empty + returnTab is TabRecordDetail (self-loop guard) →
-//     bare "esc back"
 func (m Model) recordDetailEscLabel() string {
 	if n := len(m.recordDrillStack); n > 0 {
 		parent := m.recordDrillStack[n-1]
@@ -858,11 +721,6 @@ func (m Model) recordDetailEscLabel() string {
 	return "esc back"
 }
 
-// parentRecordDisplayLabel picks the most-useful label for a parent
-// record frame. Prefers the cached record's Name field (resolved via
-// recordDisplayName); falls back to "<sObject> <id>" with the id
-// truncated to its 15-char prefix so the hint doesn't dominate the
-// title row. Returns "" only when the frame itself is empty.
 func parentRecordDisplayLabel(m Model, f recordDrillFrame) string {
 	if f.SObject == "" || f.ID == "" {
 		return ""
@@ -883,7 +741,6 @@ func parentRecordDisplayLabel(m Model, f recordDrillFrame) string {
 	return f.SObject + " " + id
 }
 
-// splitRecordKey is the inverse of "sobject + ':' + id".
 func splitRecordKey(key string) (sobject, id string) {
 	idx := strings.Index(key, ":")
 	if idx < 0 {
@@ -892,9 +749,6 @@ func splitRecordKey(key string) (sobject, id string) {
 	return key[:idx], key[idx+1:]
 }
 
-// recordRefForDrill is a small adapter used by openable on the
-// detail tab — turns the cached record into a sf.RecordRef so the
-// existing Lightning-open / yank-URL pipeline works unchanged.
 func recordRefForDrill(d *orgData, m Model) *sf.RecordRef {
 	if d == nil || d.RecordDetailCur == "" {
 		return nil
@@ -911,6 +765,4 @@ func recordRefForDrill(d *orgData, m Model) *sf.RecordRef {
 	return &ref
 }
 
-// stateSuffix is reused — keep this comment as a marker that
-// renderRecordDetail depends on the helper defined in views_helpers.go.
 var _ = fmt.Sprintf

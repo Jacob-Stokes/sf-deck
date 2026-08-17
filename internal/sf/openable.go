@@ -8,19 +8,6 @@ import (
 
 // ======================================================================
 // SSOT: every "open in browser" target, per domain type.
-//
-// If you want to know, or change, what `O` / `shift+O` / `Y` / `shift+Y`
-// do for any kind of thing, this file is where it lives. Each type's
-// Targets() returns the ordered list of Lightning / Setup URLs a user
-// might want to jump to; index 0 is the default (what bare `O`/`Y` hit).
-//
-// The UI layer is generic — it never knows what a flow or an sObject
-// is, it just asks `Targets()` and dispatches by index.
-//
-// Add a new type → implement Targets() next to its struct, make sure
-// the type appears in the compile-time check list at the bottom of the
-// file, and you're done. No UI changes needed.
-// ======================================================================
 
 // OpenTarget is one named destination: a human label, a Lightning path
 // relative to the instance URL, and a short ID used for display / future
@@ -32,25 +19,13 @@ import (
 // takes an external host+record as query params. Absolute URLs are
 // opened via the OS default-browser handler (no org auth flow).
 type OpenTarget struct {
-	ID          string // short key: "manager", "list", "builder", "about", "view"
-	Label       string // human label shown in the open-targets menu
-	Path        string // instance-relative Lightning or Setup path
-	AbsoluteURL string // set when this target is a non-Salesforce URL; Path is ignored
-	// AllowBrowserExtension is set only for the configured Salesforce
-	// Inspector target. It lets the UI accept a narrowly validated
-	// chrome-extension:// or moz-extension:// inspect.html URL without
-	// weakening validation for other absolute URLs.
+	ID                    string // short key: "manager", "list", "builder", "about", "view"
+	Label                 string // human label shown in the open-targets menu
+	Path                  string // instance-relative Lightning or Setup path
+	AbsoluteURL           string // set when this target is a non-Salesforce URL; Path is ignored
 	AllowBrowserExtension bool
-	// Shortcut is an optional single-key accelerator shown in the open
-	// menu and matched by handleOpenMenuKey. Lowercase ASCII letter
-	// ("r", "e", "i", …). When multiple targets share the same
-	// shortcut the first match wins.
-	Shortcut string
-	// YankValue, when non-empty, marks this as a VALUE target in the
-	// yank menu: selecting it copies YankValue verbatim instead of
-	// building/copying a URL. Set only by the yank-menu builder from a
-	// YankTarget; URL targets leave it empty.
-	YankValue string
+	Shortcut              string
+	YankValue             string
 }
 
 // Openable is implemented by every domain type with one or more
@@ -111,11 +86,6 @@ func FullURL(instanceURL, path string) string {
 	return strings.TrimRight(instanceURL, "/") + path
 }
 
-// ----------------------------------------------------------------------
-// sObject — Object Manager first (most common admin / dev intent),
-// records list second, then the common sub-tabs.
-// ----------------------------------------------------------------------
-
 func (s SObject) Targets() []OpenTarget {
 	return []OpenTarget{
 		{ID: "manager", Label: "Object Manager — Details",
@@ -151,13 +121,6 @@ func (s SObject) YankTargets() []YankTarget {
 	}
 	return ts
 }
-
-// ----------------------------------------------------------------------
-// Field — needs parent sObject context, so we expose a FieldRef wrapper
-// the UI populates before calling Targets(). Field's DurableId is
-// "<SObject>.<FieldApiName>" for standard and custom fields on standard
-// objects; namespaced fields already carry their namespace in Name.
-// ----------------------------------------------------------------------
 
 type FieldRef struct {
 	SObjectName string
@@ -203,10 +166,6 @@ func (r FieldRef) YankTargets() []YankTarget {
 	return ts
 }
 
-// lightningFieldSegment maps a Field's API name to the URL segment
-// Lightning's Object Manager uses. Reference fields drop the trailing
-// "Id" suffix; custom fields keep their __c suffix; everything else is
-// returned verbatim.
 func lightningFieldSegment(f Field) string {
 	name := f.Name
 	if f.Type == "reference" && strings.HasSuffix(name, "Id") && !strings.HasSuffix(name, "__c") {
@@ -215,20 +174,7 @@ func lightningFieldSegment(f Field) string {
 	return name
 }
 
-// ----------------------------------------------------------------------
-// Flow — Flow Builder for the active (or latest) version by default,
-// then the Setup about page, then the all-Flows list.
-// ----------------------------------------------------------------------
-
 func (f Flow) Targets() []OpenTarget {
-	// Which version `o` opens is a user setting (cfgFlowOpenActive,
-	// pushed down from [ui.extensions] flow_open_version). Default =
-	// LATEST version regardless of status, matching Salesforce Setup's
-	// own flow list: when a draft is newer than the active version,
-	// opening the flow means editing that draft — opening the active
-	// one would edit a stale version (and Builder forces Save-As on
-	// change). "active" flips the ordering; either way the other
-	// version stays available as a secondary target when it differs.
 	latestTarget := func(id string) OpenTarget {
 		label := "Flow Builder (latest"
 		if f.LatestVersionNum > 0 {
@@ -283,8 +229,6 @@ func (f Flow) Targets() []OpenTarget {
 			t = append(t, tgt)
 		}
 	}
-	// Setup "about" / activations page for the flow definition. The
-	// Lightning setup URL uses the DefinitionId as a path query.
 	t = append(t, OpenTarget{
 		ID: "about", Label: "Flow definition (Setup)",
 		Path: "/lightning/setup/Flows/page?address=%2F" + f.DefinitionID,
@@ -330,8 +274,6 @@ func (v FlowVersion) Targets() []OpenTarget {
 			ID: "builder", Label: "Flow Builder (this version)",
 			Path: "/builder_platform_interaction/flowBuilder.app?flowId=" + v.ID,
 		})
-		// In-app: read the raw definition JSON in the terminal. No Path
-		// — fireMenuTarget catches this ID and drills instead of opening.
 		t = append(t, OpenTarget{
 			ID: FlowVersionViewDefinitionTargetID, Label: "View definition (in-terminal)",
 			Shortcut: "d",
@@ -364,32 +306,11 @@ func (v FlowVersion) YankTargets() []YankTarget {
 	return ts
 }
 
-// ----------------------------------------------------------------------
-// Records / SOQL rows: default to the Lightning record detail, plus an
-// edit path and a classic-UI fallback for when the Lightning page
-// misbehaves.
-// ----------------------------------------------------------------------
-
 type RecordRef struct {
-	Record map[string]any
-	// InspectorBase is the user's configured Salesforce Inspector
-	// Reloaded inspect.html URL (from settings.toml — varies per
-	// browser + per install). When set, RecordRef.Targets() prepends
-	// an "Inspector · Show all data" absolute-URL target that opens
-	// the inspector against this record's (host, objectType, id).
+	Record        map[string]any
 	InspectorBase string
-	// InstanceHost is the org's host (e.g. "my.example.my.salesforce.com")
-	// used to build the Inspector URL. Populated by the UI before
-	// calling Targets() since the sf.Org metadata isn't on the raw
-	// record map.
-	InstanceHost string
-	// ExtraTargets are appended to Targets() after the standard
-	// record targets. Used by the UI to inject context-specific
-	// actions that need org state to build (e.g. "Log in to <site>
-	// as user" for Contact rows with a community user — needs the
-	// org's Network list + a ContactId→UserId lookup, neither of
-	// which the bare record map carries).
-	ExtraTargets []OpenTarget
+	InstanceHost  string
+	ExtraTargets  []OpenTarget
 }
 
 func (r RecordRef) Targets() []OpenTarget {
@@ -438,9 +359,6 @@ func (r RecordRef) YankTargets() []YankTarget {
 	return ts
 }
 
-// recordName returns the record's "Name" field as a string when present,
-// for the yank menu's Name target. Empty when the record has no Name
-// (some objects key on a different field; the menu just omits the entry).
 func recordName(rec map[string]any) string {
 	if rec == nil {
 		return ""
@@ -453,11 +371,6 @@ func recordName(rec map[string]any) string {
 	return ""
 }
 
-// buildInspectorURL constructs a Salesforce Inspector Reloaded
-// inspect.html URL from the user's extension base + a record's
-// identity. Base is typically "moz-extension://<guid>/inspect.html"
-// (Firefox) or "chrome-extension://<id>/inspect.html" (Chromium).
-// Any existing query string on the base is preserved.
 func buildInspectorURL(base, host, sobject, id string) string {
 	sep := "?"
 	if strings.Contains(base, "?") {
@@ -491,13 +404,7 @@ func SObjectAndIDFromRecord(rec map[string]any) (string, string) {
 	return sobj, id
 }
 
-// ----------------------------------------------------------------------
-// Apex log / Deploy / Package / Org.
-// ----------------------------------------------------------------------
-
 func (l ApexLogRow) Targets() []OpenTarget {
-	// Lightning has no per-log detail URL. Classic URL still works for
-	// deep-linking; fall back to the list.
 	t := []OpenTarget{
 		{ID: "list", Label: "Apex Debug Logs",
 			Path: "/lightning/setup/ApexDebugLogs/home"},
@@ -527,13 +434,6 @@ func (r DeployRow) Targets() []OpenTarget {
 			Path: "/lightning/setup/DeployStatus/home"},
 	}
 	if r.ID != "" {
-		// Lightning-native wrapper: the Setup page renders the
-		// classic monitorDeploymentsDetails.apexp inside its
-		// Lightning chrome via the address= query param. Same
-		// pattern Apex / Profiles / Perm Sets use to deep-link
-		// from a setup-tree node into a record-specific page.
-		// Earlier this used the bare classic URL which made
-		// Salesforce drop the user out of the Lightning shell.
 		t = append([]OpenTarget{{
 			ID: "detail", Label: "Deploy detail",
 			Path: "/lightning/setup/DeployStatus/page?address=%2Fchangemgmt%2FmonitorDeploymentsDetails.apexp%3FasyncId%3D" + r.ID,
@@ -586,10 +486,6 @@ func (Org) Targets() []OpenTarget {
 			Path: "/lightning/setup/ManageUsers/home"},
 	}
 }
-
-// ----------------------------------------------------------------------
-// Compile-time check that each known type satisfies Openable.
-// ----------------------------------------------------------------------
 
 var (
 	_ Openable = SObject{}

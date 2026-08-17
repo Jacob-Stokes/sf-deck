@@ -111,7 +111,6 @@ func TestUpdate_PartialAndIdempotent(t *testing.T) {
 	s := newTestStore(t)
 	created, _ := Create(s, CreateInput{Name: "old", Color: "blue"})
 
-	// Rename — Changed=true.
 	newName := "new"
 	res, err := Update(s, created.Tag.ID, UpdateInput{Name: &newName})
 	if err != nil {
@@ -121,7 +120,6 @@ func TestUpdate_PartialAndIdempotent(t *testing.T) {
 		t.Errorf("rename res = %+v", res)
 	}
 
-	// Re-set same name — Changed=false.
 	same := "new"
 	res, err = Update(s, created.Tag.ID, UpdateInput{Name: &same})
 	if err != nil {
@@ -163,7 +161,6 @@ func TestDelete_RemovesAndReturnsSnapshot(t *testing.T) {
 	if !res.Changed || res.Tag.Name != "x" {
 		t.Errorf("Delete res = %+v", res)
 	}
-	// Verify gone.
 	if _, err := Show(s, a.Tag.ID, ""); !errors.As(err, new(ErrNotFound)) {
 		t.Errorf("post-delete Show err = %v", err)
 	}
@@ -214,7 +211,6 @@ func TestApply_BadKind(t *testing.T) {
 func TestRemove_ChangedReflectsPresence(t *testing.T) {
 	s := newTestStore(t)
 	a, _ := Create(s, CreateInput{Name: "x"})
-	// Remove from empty — Changed=false.
 	res, err := Remove(s, a.Tag.ID, "record", "ref", "")
 	if err != nil {
 		t.Fatalf("Remove from empty: %v", err)
@@ -223,7 +219,6 @@ func TestRemove_ChangedReflectsPresence(t *testing.T) {
 		t.Error("removing absent reported Changed=true")
 	}
 
-	// Apply then remove — Changed=true.
 	_, _ = Apply(s, a.Tag.ID, "record", "ref", "")
 	res, err = Remove(s, a.Tag.ID, "record", "ref", "")
 	if err != nil {
@@ -239,7 +234,6 @@ func TestSet_ReplacesAndDetectsNoOp(t *testing.T) {
 	a, _ := Create(s, CreateInput{Name: "alpha"})
 	b, _ := Create(s, CreateInput{Name: "beta"})
 
-	// First set: empty → [a, b].
 	res, err := Set(s, "record", "ref", "", []int64{a.Tag.ID, b.Tag.ID})
 	if err != nil {
 		t.Fatalf("Set: %v", err)
@@ -248,7 +242,6 @@ func TestSet_ReplacesAndDetectsNoOp(t *testing.T) {
 		t.Error("initial set Changed=false")
 	}
 
-	// Same set again — Changed=false.
 	res, err = Set(s, "record", "ref", "", []int64{a.Tag.ID, b.Tag.ID})
 	if err != nil {
 		t.Fatalf("Set idempotent: %v", err)
@@ -257,7 +250,6 @@ func TestSet_ReplacesAndDetectsNoOp(t *testing.T) {
 		t.Error("idempotent Set Changed=true")
 	}
 
-	// Shrink to just [a] — Changed=true.
 	res, err = Set(s, "record", "ref", "", []int64{a.Tag.ID})
 	if err != nil {
 		t.Fatalf("Set shrink: %v", err)
@@ -266,7 +258,6 @@ func TestSet_ReplacesAndDetectsNoOp(t *testing.T) {
 		t.Error("shrink Set Changed=false")
 	}
 
-	// Verify final state via TagsFor.
 	tags, err := TagsFor(s, "record", "ref", "")
 	if err != nil {
 		t.Fatalf("TagsFor: %v", err)

@@ -1,16 +1,6 @@
 package ui
 
 // Render smoke tests.
-//
-// Iterates every registered Tab + subtab and asserts that calling
-// View() on a minimal Model doesn't panic. The actual rendered
-// bytes aren't inspected — that would either need golden files
-// (brittle on layout tweaks) or a real terminal harness.
-// "Doesn't panic" is the floor: any change that breaks rendering
-// for any tab is caught at unit-test time, not by a user noticing
-// the TTY freeze on switching tabs.
-//
-// New tabs and subtabs added to the registry are covered automatically.
 
 import (
 	"testing"

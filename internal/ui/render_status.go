@@ -1,13 +1,5 @@
 package ui
 
-// Bottom chrome row: the persistent status bar.
-//
-// Left side is the org-focus shortcut. Tab nav lives in the top tab
-// bar now (see render_tabs.go). Right side is canonical shortcuts
-// (/ search, ↵ drill, o open, y yank, r refresh, q quit, etc.).
-// Every label and every key reads from the configurable keymap
-// (Keys), so remapping a binding automatically updates the hint text.
-
 import (
 	"strings"
 	"time"
@@ -19,9 +11,6 @@ import (
 )
 
 func (m Model) renderStatusBar() string {
-	// Chord mode alert: while active, the whole status bar shows CHORD +
-	// the available next-letters, so the q-<letter> namespace is
-	// discoverable in place. Wins over the normal shortcut bar.
 	if m.chordActive {
 		return m.renderChordBar()
 	}
@@ -40,10 +29,6 @@ func (m Model) renderStatusBar() string {
 			Render(content)
 	}
 
-	// Left side: in-flight export activity indicator. Empty when nothing
-	// is running. While exports are in flight this owns the left third of
-	// the status bar so the user can navigate freely without wondering
-	// whether their report download is still chugging.
 	left := m.renderExportActivity()
 
 	// Right side: canonical shortcuts.
@@ -111,9 +96,6 @@ func (m Model) renderStatusBar() string {
 	}
 	right, dropped := joinRightShortcuts(rightParts, usable)
 	if dropped > 0 {
-		// Some hints didn't fit — flag it so users know the full
-		// list lives behind ? (which is sticky at the tail and
-		// survives every truncation).
 		marker := descStyle.Render("+" + itoaSimple(dropped) + "… ")
 		if lipgloss.Width(marker)+lipgloss.Width(right) <= usable {
 			right = marker + right
@@ -131,14 +113,6 @@ func (m Model) renderStatusBar() string {
 	if lipgloss.Width(content) > m.width {
 		content = ansi.Truncate(content, m.width, "")
 	}
-	// Use NewStyle (no Padding) so our explicit padding inside `content`
-	// is the only padding applied. StatusBar's Padding(0,1) was the
-	// culprit that pushed content past m.width.
-	//
-	// No Background here: the bar reads as "chips on the page"
-	// rather than "tinted strip containing chips".  Matches the
-	// reference agent-deck-style design.  The chips' own bg is the
-	// only colored region.
 	return lipgloss.NewStyle().
 		Foreground(theme.Fg).
 		Width(m.width).
@@ -146,22 +120,9 @@ func (m Model) renderStatusBar() string {
 		Render(content)
 }
 
-// footerHint is one footer shortcut: keycap text + description.
-// Shared between the status bar and the ? modal's "Footer · this
-// view" section, so what the modal lists is BY CONSTRUCTION exactly
-// what the footer would show given infinite width.
 type footerHint struct{ k, d string }
 
-// footerShortcuts builds the contextual footer hint set, in footer
-// order. Front entries are the most context-specific (and the first
-// to be dropped on narrow terminals — see joinRightShortcuts).
 func footerShortcuts(m Model) []footerHint {
-	// Trimmed 2026-06-12: open + open-menu share one chip; the orgs
-	// hint moved to the header org pill (the "0" keycap lives where
-	// the org identity is shown); settings dropped — it's already a
-	// permanent right-nav pill in the tab bar. Everything trimmed
-	// remains in the ? modal's "Footer · this view" section via
-	// footerShortcutsAll.
 	keys := []footerHint{
 		{firstPretty(Keys.GlobalSearch), "global search"},
 		{firstPretty(Keys.Drill), "drill"},
@@ -169,17 +130,10 @@ func footerShortcuts(m Model) []footerHint {
 		{firstPretty(Keys.YankDefault) + "/" + firstPretty(Keys.YankMenu), "yank"},
 		{firstPretty(Keys.Refresh) + "/" + firstPretty(Keys.GlobalRefresh), "refresh"},
 	}
-	// `\ side` only when the sidebar is hidden — when it's visible,
-	// the same hint sits inside the sidebar's bottom-right button so
-	// the global footer doesn't double up. Saves a slot for tab-local
-	// hints.
 	if !m.sidebarOpen {
 		keys = append(keys, footerHint{firstPretty(Keys.ToggleSidebar), "side"})
 	}
 	keys = append(keys,
-		// The command-menu hint moved to the header (next to the
-		// orgs keychip) so the footer has more room for tab-local
-		// hints. See renderHeaderOrgPill.
 		footerHint{firstPretty(Keys.Help), "help"},
 		footerHint{firstPretty(Keys.Quit), "quit"},
 	)
@@ -192,9 +146,6 @@ func footerShortcuts(m Model) []footerHint {
 			{firstPretty(Keys.ZenMode), "zen"},
 		}, keys...)
 	}
-	// The view-cycle hint ([/] view) lives right-aligned on the chip
-	// strip itself — see chip_strip.go's viewStripHint().
-	// Surface subtab-cycling shortcut when the active tab has >1 subtab.
 	if len(m.tabSubtabs()) > 1 {
 		keys = append([]footerHint{
 			{firstPretty(Keys.PrevSubtab) + "/" + firstPretty(Keys.NextSubtab), "subtab"},
@@ -213,11 +164,6 @@ func footerShortcuts(m Model) []footerHint {
 	return keys
 }
 
-// canEscBack reports whether Esc on the current surface pops to a
-// parent/previous view (vs. doing nothing). True on any drill tab
-// (its stem is a different parent tab), when a record→record drill
-// stack is open, or when a dynamic drill-return is recorded for the
-// current tab. Drives the "esc back" footer hint.
 func (m Model) canEscBack() bool {
 	t := m.tab()
 	if t.stem() != t {
@@ -248,10 +194,6 @@ func footerShortcutsAll(m Model) []footerHint {
 	return keys
 }
 
-// joinRightShortcuts joins as many trailing parts as fit in budget
-// cols (double-space separator). Drops leading parts first — callers
-// put the most-droppable hints (search-clear, view, subtab) at the
-// front of the slice.
 func joinRightShortcuts(parts []string, budget int) (string, int) {
 	sep := "  "
 	for start := 0; start < len(parts); start++ {

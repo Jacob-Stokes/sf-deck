@@ -3,17 +3,6 @@ package ui
 // Browser auto-discovery. Rather than show every browser name whether
 // or not it's installed, we filter a known list down to the ones
 // actually present on the machine:
-//
-//   macOS — stat each browser's .app bundle in /Applications and
-//           ~/Applications.
-//   Linux — match known exec names against .desktop files in the
-//           standard applications dirs.
-//   other — fall back to the full known list (better a superset than
-//           an empty picker).
-//
-// The result always leads with "" (system default). The settings
-// browser picker and the open-menu browser sub-picker both consume
-// this, so a machine with only Firefox + Safari shows exactly those.
 
 import (
 	"os"
@@ -35,8 +24,6 @@ type knownBrowser struct {
 	privateFlag string
 }
 
-// knownBrowsers is the discovery catalogue. Order here is the order
-// installed browsers appear in the picker (after the leading default).
 var knownBrowsers = []knownBrowser{
 	{name: "Safari", macApp: "Safari.app"}, // no CLI private mode
 	{name: "Google Chrome", macApp: "Google Chrome.app", linExec: []string{"google-chrome", "google-chrome-stable"}, privateFlag: "--incognito"},
@@ -50,8 +37,6 @@ var knownBrowsers = []knownBrowser{
 	{name: "Vivaldi", macApp: "Vivaldi.app", linExec: []string{"vivaldi", "vivaldi-stable"}, privateFlag: "--incognito"},
 }
 
-// browserPrivateFlag returns the private/incognito CLI flag for a
-// browser name, and whether that browser supports one at all.
 func browserPrivateFlag(name string) (string, bool) {
 	for _, b := range knownBrowsers {
 		if b.name == name {
@@ -75,9 +60,6 @@ func discoverBrowsers() []string {
 		found = discoverBrowsersLinux()
 	}
 	if len(found) == 0 {
-		// Unknown OS or nothing detected — return the full catalogue
-		// so the user still has choices (open -a resolves whatever is
-		// actually installed; a missing one just errors on launch).
 		for _, b := range knownBrowsers {
 			found = append(found, b.name)
 		}
@@ -85,8 +67,6 @@ func discoverBrowsers() []string {
 	return found
 }
 
-// discoverBrowsersMac stats each known .app bundle in the system and
-// user Applications dirs.
 func discoverBrowsersMac() []string {
 	dirs := []string{"/Applications"}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
@@ -107,8 +87,6 @@ func discoverBrowsersMac() []string {
 	return out
 }
 
-// discoverBrowsersLinux scans the standard .desktop application dirs
-// for files whose basename matches a known browser exec stem.
 func discoverBrowsersLinux() []string {
 	dirs := []string{
 		"/usr/share/applications",
@@ -121,7 +99,6 @@ func discoverBrowsersLinux() []string {
 			filepath.Join(home, ".local/share/flatpak/exports/share/applications"),
 		)
 	}
-	// Gather every .desktop basename (lowercased, sans extension) once.
 	present := map[string]bool{}
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
@@ -138,8 +115,6 @@ func discoverBrowsersLinux() []string {
 	var out []string
 	for _, b := range knownBrowsers {
 		for _, stem := range b.linExec {
-			// Match either an exact stem or a reverse-DNS .desktop id
-			// ending in the stem (e.g. org.mozilla.firefox).
 			hit := present[stem]
 			if !hit {
 				for id := range present {
@@ -158,9 +133,6 @@ func discoverBrowsersLinux() []string {
 	return out
 }
 
-// browserChoiceOptions builds the choiceOption list for a browser
-// picker: "(system default)" first, then each discovered browser.
-// `current` pre-positions the returned cursor. Returns (opts, cursor).
 func browserChoiceOptions(current string) ([]choiceOption, int) {
 	opts := []choiceOption{
 		{Label: "(system default)", Hint: "your OS default browser", Value: ""},

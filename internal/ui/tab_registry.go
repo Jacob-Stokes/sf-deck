@@ -2,31 +2,6 @@ package ui
 
 // Tab registry — declarative metadata for each top-level Tab so the
 // common dispatchers don't have to grow a switch arm per tab.
-//
-// The main per-tab surface areas are covered by TabSpec hooks:
-//
-//   1. EnsureData    — fires on tab entry; primes Resources.
-//   2. RefreshData   — fires on `r`.
-//   3. SearchPtr     — returns the active list's *searchState.
-//   4. MoveCursor    — applies a delta to the active list.
-//   5. ResetCursor   — used by `home`, search activation, etc.
-//   6. Activate      — what Enter does.
-//   7. EscBack       — what tab to pop to on Esc; 0 means default.
-//
-// Uniform chip/open/list behavior lives in chipSurface, openSurface,
-// and listSurface vars referenced by the spec. Bespoke surfaces use
-// closures on TabSpec/SubtabSpec as escape hatches.
-//
-// Adding a new tab now means:
-//   1. Declare a TabSpec with whichever hooks make sense.
-//   2. Register it in tabRegistry().
-//   3. Add renderer/data/surface hooks here before reaching for a
-//      dispatcher switch.
-//
-// Per-hook fallback: every dispatcher consults the registry first,
-// then falls through to its in-place switch for tabs that haven't
-// been migrated yet. This lets us migrate one tab at a time without
-// rewiring every dispatcher in lockstep.
 
 import (
 	"sync"
@@ -91,10 +66,7 @@ import (
 //	Subtabs        — only if the tab branches by subtab. Each SubtabSpec
 //	                 can override every behavioral hook above.
 type TabSpec struct {
-	Tab Tab
-	// Stem is the top-level Tab this one belongs to for number-key
-	// nav; drill tabs return their parent. For non-drill tabs this
-	// is the tab itself. Tab.stem() reads this field.
+	Tab  Tab
 	Stem Tab
 	// OverflowHint is the one-line description shown beside the tab
 	// in the More… overflow modal. Optional; blank falls back to
@@ -117,54 +89,21 @@ type TabSpec struct {
 	// 2026-06-14) — per-tab checks are the seam class.
 	OrgIndependent bool
 
-	// ---- Data lifecycle ----
 	EnsureData  func(m *Model, d *orgData, o sf.Org) tea.Cmd
 	RefreshData func(m Model, d *orgData) tea.Cmd
 
-	// ---- Top-level surface bindings ----
-	// These apply when no subtab is active (or as the default for
-	// every subtab unless overridden). Subtabs[i].XYZ shadows the
-	// tab-level XYZ when set.
 	Renderer func(m Model, w, innerH int) string // top-level render path; ignored when Subtabs non-empty unless subtab has nil Renderer
 
-	// Surface registries — pointers so nil = "no chip strip / no
-	// list / no o-target on this surface".
 	Chips *chipSurface
 	Open  *openSurface
 	List  *listSurface
 
-	// ---- Bespoke escape hatches ----
-	// SearchPtr / MoveCursor / ResetCursor / Activate are the
-	// hand-rolled closures used by surfaces whose behavior doesn't
-	// fit the surface registries. The dispatcher calls these AFTER
-	// the registry pointers fail to resolve, so a TabSpec entry can
-	// say "uniform list surface for chip+open+list" or "everything
-	// uniform but Activate is bespoke" or "all four bespoke".
 	SearchPtr   func(m Model) *searchState
 	MoveCursor  func(m *Model, delta int)
 	ResetCursor func(m *Model)
 	Activate    func(m *Model) tea.Cmd
-	// CycleChip is the bespoke ← / → handler for tabs whose chip
-	// strip lives outside the chipSurface registry — multi-axis
-	// chip cursors (TabObjectDetail's per-subtab chip strips,
-	// TabPermParentDetail's per-sobject FLS drill, TabRecords'
-	// synth-views in drill mode).
-	CycleChip func(m *Model, delta int) tea.Cmd
+	CycleChip   func(m *Model, delta int) tea.Cmd
 
-	// Identity returns the stable selected item under the cursor on
-	// this tab. Strict scope: it answers ONE question — "what
-	// concrete thing is highlighted right now?" — and returns the
-	// canonical (kind, ref, label, openable) tuple.
-	//
-	// Identity is NOT for arbitrary tab actions, side-effects, or
-	// contextual data. Surfaces that need bespoke gesture behavior
-	// (multi-target opens, tab-specific commit flows, …) keep their
-	// own dispatchers; this hook only feeds the things that key off
-	// "the row I'm currently on": tag picker, openable lookup,
-	// future collect/yank/where-used routes.
-	//
-	// Returns ok=false when there's nothing actionable selected
-	// (empty list, fetch in flight, no org).
 	Identity func(m Model) (ItemIdentity, bool)
 
 	// NoCollectReason documents why a List+Open tab deliberately has no
@@ -180,93 +119,32 @@ type TabSpec struct {
 	// yet for this tab).
 	Sidebar func(m Model, inner int) string
 
-	// ListTable returns the per-surface list-table state +
-	// columns for the c (column-mode) / s (sort) / [ ] (resize)
-	// / , . (scroll) gestures. Surfaces with dynamic columns
-	// (SOQL, ReportDetail's run, Records list-view results)
-	// declare their own resolver here; uniform list surfaces
-	// reuse the listSurface registry via List + a thin shim.
-	// Nil = fall through to listSurface-driven default.
 	ListTable func(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn)
 
-	// MeasureCell, when non-nil, returns the rendered width of
-	// the widest cell in column `col` across the data currently
-	// behind ListTable. Drives snap-to-content (}). Only
-	// meaningful when ListTable is set; uniform list surfaces
-	// derive this automatically from listSurface.BuildRenderModel.
 	MeasureCell func(m *Model, col int) int
 
-	// Breadcrumb returns the path segments shown after the tab
-	// name in the header — typically (sObject, subtab, cursored
-	// item) for drill tabs. Segments render with " › " between
-	// them; nil / empty slice = no breadcrumb beyond the tab name.
-	// Per-subtab breadcrumbs declared on SubtabSpec.Breadcrumb
-	// take precedence.
 	Breadcrumb func(m Model) []string
 
-	// BusyLabel returns the activity-zone label rendered with a
-	// spinner glyph when this tab's primary resource is loading
-	// ("syncing flows…", "describing Account…"). Empty string =
-	// no activity to surface. The activity zone fades when both
-	// busy and error are empty so narrow terminals collapse
-	// gracefully.
 	BusyLabel func(m Model, d *orgData) string
 
-	// ErrorLabel returns the activity-zone error text when this
-	// tab's primary resource has an Err. Empty string = no error.
-	// Rendered red with a "!" prefix.
 	ErrorLabel func(m Model, d *orgData) string
 
-	// PrimaryFetchedAt returns the FetchedAt() time of the resource
-	// that represents the "main data on screen" for this tab. Drives
-	// the header's "X seconds ago" age stamp. Return zero time when
-	// the view doesn't map to a single resource or nothing's loaded.
-	// Per-subtab variants live on SubtabSpec.
 	PrimaryFetchedAt func(m Model, d *orgData) time.Time
 
-	// Help returns the per-tab `?` help-modal state. Empty
-	// infoModalState (Title == "") means "no tab-specific help —
-	// fall back to the generic placeholder." Per-subtab variants
-	// live on SubtabSpec.Help.
 	Help func(m Model) infoModalState
 
-	// RecordRecentVisit, if non-nil, fires on tab entry to register
-	// a recent-visit entry in the per-org log. Drill tabs implement
-	// this; list/dashboard tabs leave it nil so the recent log only
-	// captures real "I drilled into X" events.
 	RecordRecentVisit func(m *Model, d *orgData, orgUser string)
 
-	// EscBack is the tab to pop to on Esc. Zero (== TabHome) is
-	// treated as "no override — let the global handler decide."
-	// Set explicitly for drill tabs that pop to a parent.
 	EscBack Tab
 
-	// SidebarFocusable, when true, opts the tab into Tab/Shift+Tab
-	// swapping focus between the main pane and the right sidebar
-	// (m.bodyFocus). Detail surfaces that pair an interactive
-	// sidebar action menu with the body set this true so j/k/Enter
-	// route to whichever pane is currently focused. Default false:
-	// Tab cycles subtabs as on every list-shaped tab.
 	SidebarFocusable bool
 
-	// ---- Subtabs ----
-	// Subtabs is the per-subtab spec list. When non-empty the
-	// tab's behavior is per-subtab — the dispatcher resolves to
-	// the active SubtabSpec before walking the spec hooks above.
 	Subtabs []SubtabSpec
 
-	// GetSubtabIdx / SetSubtabIdx / SubtabReloadOnSwitch are the
-	// subtab cursor accessors. Required when Subtabs is non-empty.
 	GetSubtabIdx         func(m Model) int
 	SetSubtabIdx         func(m *Model, i int)
 	SubtabReloadOnSwitch func(m Model, idx int) bool
 
-	// SubtabsResolver, when non-nil, returns the *dynamic* subtab
-	// list for this tab. Beats the static Subtabs slice when set —
-	// the resolver runs per-render so subtabs whose shape depends on
-	// model state (LWC bundle's per-file subtabs, perm-parent's
-	// per-kind subtabs) get the right list at the right time.
-	// Static-subtab tabs leave this nil and use Subtabs directly.
 	SubtabsResolver func(m Model) []subtabInfo
 
 	// SubtabPinned, when > 0, caps the strip-rendered subtab count.
@@ -276,11 +154,6 @@ type TabSpec struct {
 	// onto a 6-slot strip without truncation.
 	SubtabPinned int
 
-	// ---- Widget ----
-	// Widget is an interactive component pinned at the top of the
-	// tab body — Home's ORG card, SOQL's editor, future deploy /
-	// import widgets. Nil = no widget. See Widget docs for focus
-	// + key-routing semantics.
 	Widget *Widget
 }
 
@@ -297,20 +170,11 @@ type SubtabSpec struct {
 	Open     *openSurface
 	List     *listSurface
 
-	// Per-subtab hand-rolled hooks. When TabObjectDetail's Schema
-	// subtab needs a different cursor model from its Records subtab,
-	// each subtab's MoveCursor closure encapsulates its own logic
-	// — the dispatcher just walks subtab.MoveCursor without caring
-	// what's inside. Nil = inherit from parent TabSpec.
 	SearchPtr   func(m Model) *searchState
 	MoveCursor  func(m *Model, delta int)
 	ResetCursor func(m *Model)
 	Activate    func(m *Model) tea.Cmd
 
-	// Identity is the per-subtab cursored-item resolver. See
-	// TabSpec.Identity. Subtabs typically need their own resolver
-	// since each subtab has a different "what's under the cursor"
-	// answer (Object Detail's Schema vs Validation vs Records).
 	Identity func(m Model) (ItemIdentity, bool)
 
 	// NoCollectReason documents why a List+Open surface deliberately
@@ -323,52 +187,24 @@ type SubtabSpec struct {
 	// must be a conscious decision, not an oversight.
 	NoCollectReason string
 
-	// Sidebar is the per-subtab right-pane renderer. See
-	// TabSpec.Sidebar. Object Detail's subtabs each have a
-	// different sidebar (object actions / per-field detail / per-
-	// rule detail / record KV dump) — declaring per-subtab keeps
-	// the dispatch in one place.
 	Sidebar func(m Model, inner int) string
 
-	// ListTable is the per-subtab list-table resolver. See
-	// TabSpec.ListTable. Object Detail's Records subtab has a
-	// dynamic column spec (visible record-list cols) so it
-	// declares its own resolver here.
 	ListTable func(m *Model) (*uilayout.ListTableState, []uilayout.ListColumn)
 
-	// MeasureCell mirrors TabSpec.MeasureCell at the subtab
-	// scope. Set when ListTable is set per-subtab and the
-	// surface wants snap-to-content (}) without falling
-	// back to header-width.
 	MeasureCell func(m *Model, col int) int
 
-	// Breadcrumb is the per-subtab breadcrumb-segment resolver.
-	// See TabSpec.Breadcrumb.
 	Breadcrumb func(m Model) []string
 
-	// BusyLabel is the per-subtab activity-zone resolver. See
-	// TabSpec.BusyLabel.
 	BusyLabel func(m Model, d *orgData) string
 
-	// ErrorLabel is the per-subtab error-zone resolver. See
-	// TabSpec.ErrorLabel.
 	ErrorLabel func(m Model, d *orgData) string
 
-	// PrimaryFetchedAt is the per-subtab age-stamp resolver. See
-	// TabSpec.PrimaryFetchedAt.
 	PrimaryFetchedAt func(m Model, d *orgData) time.Time
 
-	// Help is the per-subtab help-modal resolver. See TabSpec.Help.
 	Help func(m Model) infoModalState
 
-	// Widget is a per-subtab pinned widget — e.g. an "add user"
-	// search-box on /perms permset Members. Nil = no widget for
-	// this subtab.
 	Widget *Widget
 
-	// EnsureData fires on subtab entry when SubtabReloadOnSwitch
-	// returns true. Lets a subtab pull data the parent tab didn't
-	// load up front.
 	EnsureData func(m *Model, d *orgData, o sf.Org) tea.Cmd
 
 	// OnEnter fires synchronously when the user navigates into
@@ -407,27 +243,13 @@ func lazyLoadOnEnter(notLoaded func(d *orgData) bool, reload func(m *Model, d *o
 // "active focus target", the global handler defers to HandlesKey
 // before its own dispatch.
 type Widget struct {
-	// Render returns the widget block. innerH is its budget — the
-	// widget decides how tall to be. Empty string = invisible
-	// (e.g. SOQL editor collapsed).
 	Render func(m Model, w, innerH int) string
 
-	// Focusable reports whether the widget participates in the
-	// tab's focus order. Read-only widgets (Home's ORG card) are
-	// non-focusable; editors and forms are focusable.
 	Focusable bool
 
-	// HandlesKey is consulted when the widget owns focus. Returns
-	// (cmd, true) to consume the key; (_, false) to pass through
-	// to the global dispatcher. Nil = pass everything through (a
-	// non-interactive focusable widget — uncommon).
 	HandlesKey func(m *Model, msg tea.KeyMsg) (tea.Cmd, bool)
 }
 
-// tabRegistry returns the full set of registered TabSpecs keyed by
-// Tab. It's a function (not a var) so it's free of init-order
-// surprises — every field that a spec closes over is already set
-// on first call. Callers should use lookupTabSpec for lookup.
 func tabRegistry() map[Tab]TabSpec {
 	return map[Tab]TabSpec{
 		TabObjects: {
@@ -454,18 +276,12 @@ func tabRegistry() map[Tab]TabSpec {
 			},
 		},
 		TabHome: {
-			OverflowHint: "landing / recent / notifications",
-			Tab:          TabHome,
-			Stem:         TabHome,
-			Open:         &homeFallbackOpenSurface,
-			Renderer:     Model.renderHome,
-			Sidebar:      Model.sidebarHome,
-			// Landing destinations move via the bespoke key handler too,
-			// but wiring MoveCursor here lets the scroll wheel + arrow
-			// keys drive the same cursor (the wheel handler calls
-			// moveCursor → resolveMoveCursor). No-op off the Landing
-			// subtab; the list-table subtabs (Limits/Licenses/etc.) own
-			// their own cursors via their list surfaces.
+			OverflowHint:         "landing / recent / notifications",
+			Tab:                  TabHome,
+			Stem:                 TabHome,
+			Open:                 &homeFallbackOpenSurface,
+			Renderer:             Model.renderHome,
+			Sidebar:              Model.sidebarHome,
 			MoveCursor:           func(m *Model, delta int) { m.moveHomeDestCursor(delta) },
 			BusyLabel:            busyHome,
 			ErrorLabel:           errHome,
@@ -477,7 +293,6 @@ func tabRegistry() map[Tab]TabSpec {
 			EnsureData:           (*Model).ensureHomeData,
 			RefreshData:          Model.refreshHomeData,
 			Subtabs: []SubtabSpec{
-				// Landing is the splash pane — figlet logo + tagline.
 				{ID: SubtabHomeLanding, Label: "Landing"},
 				{ID: SubtabHomeRecent, Label: "Recently Viewed", Open: &homeRecentOpenSurface, List: &homeRecentListSurface, Chips: &recentChipSurface,
 					NoCollectReason: "recently-viewed history is a heterogeneous activity log, not a set of collectable resources; open (o) is the only meaningful gesture"},
@@ -527,8 +342,6 @@ func tabRegistry() map[Tab]TabSpec {
 			GetSubtabIdx:         func(m Model) int { return m.apexSubtab() },
 			SetSubtabIdx:         func(m *Model, i int) { m.setApexSubtab(i) },
 			SubtabReloadOnSwitch: func(m Model, i int) bool { return true },
-			// Subtab declarations carry the chip / open / list
-			// surfaces directly. Anyone extending /apex starts here.
 			Subtabs: []SubtabSpec{
 				{ID: SubtabApexClasses, Label: "Classes", Chips: &apexClassesChipSurface, Open: &apexClassesOpenSurface, List: &apexClassesListSurface, Identity: identityFromApexClassesList, PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.ApexClasses.FetchedAt() }},
 				{ID: SubtabApexTriggers, Label: "Triggers", Chips: &apexTriggersChipSurface, Open: &apexTriggersOpenSurface, List: &apexTriggersListSurface, Identity: identityFromApexTriggersList, PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.ApexTriggersFlat.FetchedAt() }},
@@ -569,15 +382,11 @@ func tabRegistry() map[Tab]TabSpec {
 			Renderer:          Model.renderComponentsDetail,
 			PrimaryFetchedAt:  componentsDetailFetchedAt,
 			Sidebar:           Model.sidebarComponentsDetail,
-			// Dynamic per-bundle subtabs: one per resource file in the
-			// drilled-in LWC / Aura bundle, in declared order. Each
-			// becomes a real subtab so Tab / Shift+Tab / Shift+1..9 all
-			// work the standard way for free.
-			SubtabsResolver: func(m Model) []subtabInfo { return m.lwcDetailSubtabs() },
-			MoveCursor:      (*Model).moveBundleDetailCursor,
-			GetSubtabIdx:    (Model).bundleSubtabIdx,
-			SetSubtabIdx:    (*Model).setBundleSubtabIdx,
-			EscBack:         TabLWC,
+			SubtabsResolver:   func(m Model) []subtabInfo { return m.lwcDetailSubtabs() },
+			MoveCursor:        (*Model).moveBundleDetailCursor,
+			GetSubtabIdx:      (Model).bundleSubtabIdx,
+			SetSubtabIdx:      (*Model).setBundleSubtabIdx,
+			EscBack:           TabLWC,
 		},
 		TabMeta: {
 			OverflowHint:         "metadata long-tail (browse all types, labels, …)",
@@ -646,13 +455,6 @@ func tabRegistry() map[Tab]TabSpec {
 				return d.Packages.Refresh(m.cache)
 			},
 		},
-		// /users — top-level User browser with two subtabs:
-		//   Recent logins (HomeUserList, populated by d.Home.Ensure
-		//     so /home and /users share the same recent-login slice)
-		//   All users (AllUsers resource — broader pull with chip
-		//     filters, capped at sf.AllUsersDefaultLimit)
-		// Per-subtab List + Open declarations so cursor-aware actions
-		// (open / yank / drill) read from whichever subtab is active.
 		TabUsers: {
 			OverflowHint:         "user list + recent logins",
 			Tab:                  TabUsers,
@@ -717,13 +519,11 @@ func tabRegistry() map[Tab]TabSpec {
 			Tab:               TabUserDetail,
 			Stem:              TabUsers,
 			Renderer:          Model.renderUserDetail,
-			// The detail rows come from the ActiveUsers list fetch, so
-			// its age IS the data's age.
-			PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.ActiveUsers.FetchedAt() },
-			Sidebar:          Model.sidebarUserDetail,
-			MoveCursor:       (*Model).moveUserDetailCursor,
-			Activate:         (*Model).activateUserDetail,
-			EscBack:          TabUsers,
+			PrimaryFetchedAt:  func(m Model, d *orgData) time.Time { return d.ActiveUsers.FetchedAt() },
+			Sidebar:           Model.sidebarUserDetail,
+			MoveCursor:        (*Model).moveUserDetailCursor,
+			Activate:          (*Model).activateUserDetail,
+			EscBack:           TabUsers,
 			RefreshData: func(m Model, d *orgData) tea.Cmd {
 				if d == nil || d.UserCur == "" || len(m.orgs) == 0 {
 					return nil
@@ -1010,10 +810,6 @@ func tabRegistry() map[Tab]TabSpec {
 				// kick the appropriate Ensure.
 				return true
 			},
-			// Logs + Deploys carry the FULL former top-level
-			// surfaces (2026-06-12 move): same list specs, chip
-			// strip, Enter drill into the deploy detail, live
-			// watch. /logs and /deploys as top-level tabs are gone.
 			Subtabs: []SubtabSpec{
 				{
 					ID: SubtabSystemLogs, Label: "Logs",
@@ -1061,17 +857,15 @@ func tabRegistry() map[Tab]TabSpec {
 			},
 		},
 		TabPerms: {
-			OverflowHint: "permsets / PSGs / profiles / queues / public groups",
-			Tab:          TabPerms,
-			Stem:         TabPerms,
-			Renderer:     Model.renderPermsDashboard,
-			EnsureData:   (*Model).ensurePermsDashboardData,
-			RefreshData:  Model.refreshPermsDashboardData,
-			GetSubtabIdx: func(m Model) int { return m.permsDashboardSubtab() },
-			SetSubtabIdx: func(m *Model, i int) { m.setPermsDashboardSubtab(i) },
-			Sidebar:      Model.sidebarPerms,
-			// All five lists are pre-loaded by EnsureData above; no
-			// need to re-fire onTabChanged on a switch.
+			OverflowHint:         "permsets / PSGs / profiles / queues / public groups",
+			Tab:                  TabPerms,
+			Stem:                 TabPerms,
+			Renderer:             Model.renderPermsDashboard,
+			EnsureData:           (*Model).ensurePermsDashboardData,
+			RefreshData:          Model.refreshPermsDashboardData,
+			GetSubtabIdx:         func(m Model) int { return m.permsDashboardSubtab() },
+			SetSubtabIdx:         func(m *Model, i int) { m.setPermsDashboardSubtab(i) },
+			Sidebar:              Model.sidebarPerms,
 			SubtabReloadOnSwitch: func(m Model, _ int) bool { return false },
 			Subtabs: []SubtabSpec{
 				{ID: SubtabPermSets, Label: "Permission Sets", Chips: &permsetsChipSurface, Open: &permsetsOpenSurface, List: &permsetsListSurface, Identity: identityFromPermSetsList, PrimaryFetchedAt: func(m Model, d *orgData) time.Time { return d.PermSets.FetchedAt() }},
@@ -1105,10 +899,6 @@ func tabRegistry() map[Tab]TabSpec {
 			SetSubtabIdx:         setSubtabWithOnEnter(TabSOQL, func(m *Model, i int) { m.soqlSubtabIdx = i }),
 			SubtabReloadOnSwitch: func(m Model, _ int) bool { return false },
 			Subtabs: []SubtabSpec{
-				// Open lives on the Editor subtab, not the tab: o/y
-				// target the cursored RESULT row, which only exists
-				// under the editor. On Saved/History a tab-level
-				// surface would open a stale result record.
 				{ID: SubtabSOQLEditor, Label: "Editor", Open: &soqlOpenSurface},
 				{
 					ID:       SubtabSOQLSaved,
@@ -1177,17 +967,10 @@ func tabRegistry() map[Tab]TabSpec {
 				{
 					ID:    SubtabCompareNew,
 					Label: "New",
-					// New is the setup form only. Running a comparison
-					// auto-switches to Result (which owns the results views).
 				},
 				{
 					ID:    SubtabCompareResult,
 					Label: "Result",
-					// Result has no static List: it shows the active run's
-					// retrieving / inventory / drill-in diff. The inventory
-					// list is routed via the tab-level MoveCursor / ListTable
-					// hooks (gated to this subtab). Its Sidebar shows a live
-					// diff preview of the selected inventory row.
 					Sidebar: func(m Model, inner int) string {
 						return m.renderComparePreviewSidebar(inner)
 					},
@@ -1228,17 +1011,12 @@ func tabRegistry() map[Tab]TabSpec {
 			RefreshData:          Model.refreshObjectDetailData,
 			Activate:             (*Model).activateObjectDetail,
 			Identity:             identityFromObjectDetail,
-			// Per-subtab sidebars still dispatch here while the renderer
-			// and cursor hooks remain bespoke. Static subtabs above let
-			// common navigation resolve through TabSpec.
-			Sidebar:           sidebarObjectDetailDispatch,
-			ListTable:         listTableObjectDetailDispatch,
-			Breadcrumb:        breadcrumbFromObjectDetail,
-			BusyLabel:         busyObjectDetail,
-			ErrorLabel:        errObjectDetail,
-			RecordRecentVisit: recentVisitObjectDetail,
-			// Subtab variants override per-subtab below; this falls
-			// through to "describe" for Details/Schema.
+			Sidebar:              sidebarObjectDetailDispatch,
+			ListTable:            listTableObjectDetailDispatch,
+			Breadcrumb:           breadcrumbFromObjectDetail,
+			BusyLabel:            busyObjectDetail,
+			ErrorLabel:           errObjectDetail,
+			RecordRecentVisit:    recentVisitObjectDetail,
 			PrimaryFetchedAt: func(m Model, d *orgData) time.Time {
 				if r, ok := d.Describes[d.DescribeCur]; ok {
 					return r.FetchedAt()
@@ -1361,16 +1139,12 @@ func tabRegistry() map[Tab]TabSpec {
 			PrimaryFetchedAt:  recordDetailFetchedAt,
 		},
 		TabPermParentDetail: {
-			Tab:              TabPermParentDetail,
-			Stem:             TabPerms,
-			Open:             &permParentOpenSurface,
-			Renderer:         Model.renderPermParentDetail,
-			PrimaryFetchedAt: permParentFetchedAt,
-			EscBack:          TabPerms,
-			// Per-kind subtab list. permParentDetailSubtabs("permset")
-			// vs ("psg") vs ("profile") return different shapes, so
-			// the resolver reads the active kind off orgData each
-			// render rather than freezing one list on the spec.
+			Tab:                  TabPermParentDetail,
+			Stem:                 TabPerms,
+			Open:                 &permParentOpenSurface,
+			Renderer:             Model.renderPermParentDetail,
+			PrimaryFetchedAt:     permParentFetchedAt,
+			EscBack:              TabPerms,
 			SubtabsResolver:      permParentSubtabsResolver,
 			GetSubtabIdx:         func(m Model) int { return m.permParentSubtab() },
 			SetSubtabIdx:         func(m *Model, i int) { m.setPermParentSubtab(i) },
@@ -1410,11 +1184,6 @@ func tabRegistry() map[Tab]TabSpec {
 	}
 }
 
-// activeSubtabSpec returns the SubtabSpec for the currently-selected
-// subtab on the given TabSpec, or nil if the tab has no subtabs or
-// the active index is out of range. Used by the unified dispatchers
-// — they consult the subtab spec first, then fall back to the parent
-// TabSpec's fields.
 func (s *TabSpec) activeSubtabSpec(m Model) *SubtabSpec {
 	if s == nil || len(s.Subtabs) == 0 {
 		return nil
@@ -1425,7 +1194,6 @@ func (s *TabSpec) activeSubtabSpec(m Model) *SubtabSpec {
 			return &s.Subtabs[i]
 		}
 	}
-	// No match by ID — fall back to the GetSubtabIdx-resolved one.
 	if s.GetSubtabIdx != nil {
 		i := s.GetSubtabIdx(m)
 		if i >= 0 && i < len(s.Subtabs) {
@@ -1459,15 +1227,6 @@ func lookupTabSpec(t Tab) *TabSpec {
 	return tabSpecs()[t]
 }
 
-// activeSpec returns the TabSpec + active SubtabSpec for the
-// currently-rendered tab. Either may be nil — callers should
-// nil-check.
-//
-// Walks the same subtab → tab chain every resolver wants ("does
-// this subtab override the parent's hook?") so we only have to
-// write that pattern once. Routes through the cached tabSpecs(),
-// not the rebuilt tabRegistry(), so hot-path callers don't pay
-// the map-rebuild cost on every keystroke.
 func (m Model) activeSpec() (*TabSpec, *SubtabSpec) {
 	spec := lookupTabSpec(m.tab())
 	if spec == nil {

@@ -1,21 +1,6 @@
 package ui
 
 // SOQL result export.
-//
-// Pressing x on the SOQL Editor with results loaded opens a two-step
-// flow:
-//
-//   1. format picker: csv / xlsx / json
-//   2. path picker: pre-populated with <export-dir>/soql-<timestamp>.<ext>
-//
-// The data is already in memory (m.soqlResult.Records) — there's no
-// network call. The shape pass turns those records into the standard
-// exporters.ExportRow form (see internal/exporters/soql) and the
-// regular exporters.Write writes the file.
-//
-// This deliberately reuses the same export-dir + filename-pattern
-// settings as report export so users have one place to configure
-// "where exports land," not two.
 
 import (
 	"fmt"
@@ -31,8 +16,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/securefile"
 )
 
-// triggerSOQLExport opens the format picker for the current SOQL
-// result set. No-ops when the editor has no results.
 func (m Model) triggerSOQLExport() (Model, tea.Cmd) {
 	if len(m.soqlResult.Records) == 0 {
 		m.flash("nothing to export — run a query first")
@@ -58,16 +41,10 @@ func (m Model) triggerSOQLExport() (Model, tea.Cmd) {
 	return m, m.openChoiceModal(state)
 }
 
-// openSOQLExportPathMsg arrives after the user picks a format. The
-// reducer in update.go routes it to openSOQLExportPathPicker.
 type openSOQLExportPathMsg struct {
 	Format exporters.Format
 }
 
-// openSOQLExportPathPicker opens the 2-field save modal pre-populated
-// with <export-dir>/soql-<timestamp>.<ext> and the auto-open
-// checkbox on by default. On confirm, fires startSOQLExport which
-// writes the file.
 func (m *Model) openSOQLExportPathPicker(msg openSOQLExportPathMsg) tea.Cmd {
 	defaultPath := m.defaultSOQLExportPath(msg.Format)
 	format := msg.Format
@@ -90,8 +67,6 @@ func (m *Model) openSOQLExportPathPicker(msg openSOQLExportPathMsg) tea.Cmd {
 	return m.openExportSaveModal(state)
 }
 
-// startSOQLExportMsg lands on the main loop after both format and
-// path are confirmed. The reducer calls startSOQLExport.
 type startSOQLExportMsg struct {
 	Format    exporters.Format
 	Path      string
@@ -99,11 +74,6 @@ type startSOQLExportMsg struct {
 	Overwrite bool
 }
 
-// startSOQLExport runs the export pipeline against the current
-// in-memory result set. Synchronous-feeling but goroutine-backed via
-// tea.Cmd so a giant write doesn't block the TUI; in practice the
-// data is already loaded and the write is fast (<100ms for typical
-// result sets).
 func (m *Model) startSOQLExport(msg startSOQLExportMsg) tea.Cmd {
 	records := m.soqlResult.Records
 	cols := collectColumns(records, m.soqlInput.Value()) // SELECT-order columns
@@ -132,10 +102,6 @@ type soqlExportDoneMsg struct {
 	OpenAfter bool
 }
 
-// applySOQLExportDone folds the result message into the model — a
-// short flash on success, a longer one on failure so the path /
-// error stays readable. Fires openPath in the background when the
-// user asked for auto-open.
 func (m *Model) applySOQLExportDone(msg soqlExportDoneMsg) {
 	if msg.Err != nil {
 		m.flashFor("export failed: "+msg.Err.Error(), 8*time.Second)
@@ -158,11 +124,6 @@ func (m *Model) applySOQLExportDone(msg soqlExportDoneMsg) {
 	}
 }
 
-// defaultSOQLExportPath resolves the default save path for a SOQL
-// export. Reuses the same export-dir setting as report export so
-// users only configure "where exports land" once. Filename is a
-// fixed pattern — the renderer doesn't have a name like a report
-// does, so we use "soql-<timestamp>".
 func (m Model) defaultSOQLExportPath(format exporters.Format) string {
 	dir := expandTilde(m.settings.ReportExportDir())
 	ts := time.Now().Format("20060102-150405")

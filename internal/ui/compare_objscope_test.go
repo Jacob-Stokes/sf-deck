@@ -21,7 +21,6 @@ func TestSplitObjectChildScope(t *testing.T) {
 		t.Errorf("perType = %v, want %v", per, wantPer)
 	}
 
-	// No object-child types → all per-type, nil objChildren.
 	obj, per = splitObjectChildScope([]string{"ApexClass", "Flow"})
 	if len(obj) != 0 {
 		t.Errorf("objChildren should be empty, got %v", obj)
@@ -30,8 +29,6 @@ func TestSplitObjectChildScope(t *testing.T) {
 		t.Errorf("perType = %v", per)
 	}
 
-	// Explicit child-only scopes stay narrow; selecting CustomObject is what
-	// expands to the full object-rooted surface.
 	obj, per = splitObjectChildScope([]string{"CustomField", "Flow"})
 	if !reflect.DeepEqual(obj, []string{"CustomField"}) {
 		t.Errorf("child-only objChildren = %v, want [CustomField]", obj)
@@ -97,10 +94,6 @@ func TestShortErr(t *testing.T) {
 			t.Errorf("shortErr(%v) = %q, want %q", c.in, got, c.want)
 		}
 	}
-	// Long messages are truncated with an ellipsis.
-	// Printable padding — the truncator is display-width-aware now,
-	// and 200 NUL bytes are zero display cells (the old byte-based
-	// version "passed" on them by accident).
 	long := errStr("readMetadata X: " + strings.Repeat("x", 200))
 	if got := shortErr(long); len([]rune(got)) > 60 {
 		t.Errorf("shortErr did not truncate: len=%d", len([]rune(got)))

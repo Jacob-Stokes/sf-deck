@@ -1,13 +1,5 @@
 package sf
 
-// Batched home-stats fetch.
-//
-// /home renders five independent data widgets (Users/Licenses/PermSet
-// licenses/Jobs/Recent deploys) plus two counts (active/inactive
-// users). Calling each as a separate SOQL is 8 round-trips per Home
-// fetch — and Home fetches per-org. Bundling into one /composite call
-// brings that down to 1.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -66,7 +58,6 @@ func FetchHomeStats(target string, recentLoginLimit, asyncJobLimit, deployLimit 
 		{Method: "GET", URL: c.QueryURL(soqlRecentLogins, false), ReferenceID: "logins"},
 		{Method: "GET", URL: c.QueryURL(soqlUserLics, false), ReferenceID: "userlics"},
 		{Method: "GET", URL: c.QueryURL(soqlPSLics, false), ReferenceID: "pslics"},
-		// AsyncApexJob and DeployRequest are Tooling sobjects.
 		{Method: "GET", URL: c.QueryURL(soqlJobs, true), ReferenceID: "jobs"},
 		{Method: "GET", URL: c.QueryURL(soqlDeploys, true), ReferenceID: "deploys"},
 	}
@@ -162,7 +153,4 @@ func FetchHomeStats(target string, recentLoginLimit, asyncJobLimit, deployLimit 
 	return stats, nil
 }
 
-// _ keeps json imported even when nothing in this file currently
-// uses it directly — composite responses arrive as json.RawMessage
-// and we may extend the helpers to peek at error bodies in future.
 var _ = json.Marshal

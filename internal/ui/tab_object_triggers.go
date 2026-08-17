@@ -1,12 +1,5 @@
 package ui
 
-// Triggers subtab of TabObjectDetail — the list of ApexTrigger
-// records defined on the currently-drilled sObject.
-//
-// Structurally identical to Validation / Record Types: list in the
-// main pane, compact summary of the selected row in the sidebar.
-// Drill via Enter for Body + action menu (TabTriggerDetail).
-
 import (
 	"fmt"
 	"strings"
@@ -18,8 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderObjectTriggers is the main-pane renderer for the Triggers
-// subtab.
 func (m Model) renderObjectTriggers(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -78,7 +69,6 @@ func (m Model) renderObjectTriggers(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderTriggerRow is one row of the trigger list.
 func renderTriggerRow(t sf.TriggerRow, selected, mainFocused bool, nameW, eventsW, lenW, inner int) string {
 	dot := triggerStatusDot(t.Status, t.Valid)
 	nameStyle := lipgloss.NewStyle().Foreground(theme.Fg).Width(nameW)
@@ -101,9 +91,6 @@ func renderTriggerRow(t sf.TriggerRow, selected, mainFocused bool, nameW, events
 	return ansi.Truncate(prefix+dot+" "+name+"  "+events+" "+length, inner, "…")
 }
 
-// triggerStatusDot picks a dot colour from Status + IsValid. Active +
-// valid = green; active + invalid = yellow (compilation error);
-// inactive = muted.
 func triggerStatusDot(status string, valid bool) string {
 	color := theme.Muted
 	if status == "Active" {

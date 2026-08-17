@@ -11,13 +11,10 @@ func TestFlowOpenVersionDefaultsToLatest(t *testing.T) {
 	if got := (&Settings{}).FlowOpenVersion(); got != "latest" {
 		t.Fatalf("FlowOpenVersion() default = %q, want \"latest\"", got)
 	}
-	// nil receiver takes the same default (used on the nil-settings path).
 	var s *Settings
 	if got := s.FlowOpenVersion(); got != "latest" {
 		t.Fatalf("nil FlowOpenVersion() = %q, want \"latest\"", got)
 	}
-	// Unknown values fall back to the default rather than leaking a
-	// nonsense mode into Flow.Targets().
 	bad := &Settings{}
 	bad.SetFlowOpenVersion("draft")
 	if got := bad.FlowOpenVersion(); got != "latest" {

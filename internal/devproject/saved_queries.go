@@ -5,18 +5,6 @@ package devproject
 // tag_bindings + dev_project_items tables with kind='soql_query',
 // so all the existing tag and project machinery works for queries
 // without per-kind shims.
-//
-// Why SQLite (rather than ~/.sf-deck/queries/*.toml):
-//   - Tag bindings reference items by (kind, ref); cross-table
-//     joins work only if queries live in the same store.
-//   - DevProject items are SQL-rooted; pinning a query is the
-//     same row shape as pinning any other Kind.
-//   - One persistence paradigm rather than two.
-//   - History needs SQL anyway; queries piggyback on the same
-//     transactions.
-//
-// Identifiers: "sq_" + base32-of-12-random-bytes. Short, sortable
-// roughly by creation order, easy to recognise as ours in logs.
 
 import (
 	"crypto/rand"

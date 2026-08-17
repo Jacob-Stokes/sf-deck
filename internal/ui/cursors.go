@@ -2,12 +2,6 @@ package ui
 
 // CursorStore owns cursor positions for list/grid surfaces in one place,
 // including key construction and bounds clamping.
-//
-// All values are plain ints — except ListViewCur, which holds a
-// string chip ID (not a row index) and stays separate.
-//
-// Adding a new cursor kind: pick a Kind constant and add a typed
-// accessor. Don't add another map field on orgData.
 
 import (
 	"strings"
@@ -19,15 +13,11 @@ import (
 type CursorKind string
 
 const (
-	cursorKindFLS           CursorKind = "fls"
-	cursorKindObjectPerms   CursorKind = "objperms"
-	cursorKindSystemPerms   CursorKind = "sysperms"
-	cursorKindAssignedUsers CursorKind = "assigned"
-	cursorKindRecordsRow    CursorKind = "records"
-	// cursorKindRecordsAnchor stashes the pre-search cursor position so
-	// clearing the filter restores the user to where they were before
-	// they typed `/`. Captured on SearchStart for records views;
-	// consumed by clearCommittedSearch.
+	cursorKindFLS            CursorKind = "fls"
+	cursorKindObjectPerms    CursorKind = "objperms"
+	cursorKindSystemPerms    CursorKind = "sysperms"
+	cursorKindAssignedUsers  CursorKind = "assigned"
+	cursorKindRecordsRow     CursorKind = "records"
 	cursorKindRecordsAnchor  CursorKind = "recordsanchor"
 	cursorKindFlowVersion    CursorKind = "flowver"
 	cursorKindReportRow      CursorKind = "reportrow"

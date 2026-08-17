@@ -1,19 +1,6 @@
 package ui
 
 // Object and system permission write paths.
-//
-// objPermToggleCell fires a single-cell write on the ObjectPermissions
-// grid (Phase G). sysPermToggleCell patches a single boolean on the
-// PermissionSet sobject (Phase H).
-//
-// Invariants for object perms (enforced in applyObjPermInvariants):
-//   Edit        on  → Read on
-//   Delete      on  → Edit on, Read on
-//   ViewAll     on  → Read on
-//   ModifyAll   on  → ViewAll on, Read on, Create on, Edit on, Delete on
-//   Read        off → Edit off, Delete off, ViewAll off, ModifyAll off
-//   Edit        off → Delete off, ModifyAll off
-//   ViewAll     off → ModifyAll off
 
 import (
 	"context"
@@ -27,13 +14,10 @@ import (
 
 // ======== Object permission invariants ====================================
 
-// objPermState holds the six booleans.
 type objPermState struct {
 	Read, Create, Edit, Delete, ViewAllRecords, ModifyAllRecords bool
 }
 
-// applyObjPermInvariants enforces the Salesforce object-perm dependency
-// rules after toggling one bit. `which` is the field that was toggled.
 func applyObjPermInvariants(s objPermState, which string) objPermState {
 	switch which {
 	case "read":
@@ -78,10 +62,6 @@ func applyObjPermInvariants(s objPermState, which string) objPermState {
 	return s
 }
 
-// ======== Object permissions write path ===================================
-
-// objPermToggleCell fires a toggle on the cursored ObjectPermissions row.
-// `which` is one of "read", "create", "edit", "delete", "viewall", "modifyall".
 func (m Model) objPermToggleCell(which string) (Model, tea.Cmd) {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -109,7 +89,6 @@ func (m Model) objPermToggleCell(which string) (Model, tea.Cmd) {
 	cur := d.Cursors.Get(cursorKindObjectPerms, len(rows), d.PermParentKind, d.PermParentPermSetID)
 	row := rows[cur]
 
-	// Build current state, toggle the target bit, apply invariants.
 	cur_s := objPermState{
 		Read:             row.Read,
 		Create:           row.Create,
@@ -118,7 +97,6 @@ func (m Model) objPermToggleCell(which string) (Model, tea.Cmd) {
 		ViewAllRecords:   row.ViewAllRecords,
 		ModifyAllRecords: row.ModifyAllRecords,
 	}
-	// Toggle the target field.
 	switch which {
 	case "read":
 		cur_s.Read = !cur_s.Read
@@ -152,14 +130,12 @@ func (m Model) objPermToggleCell(which string) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// objPermWriteDoneMsg is the result of a single-cell object perm toggle.
 type objPermWriteDoneMsg struct {
 	ok   bool
 	noop bool
 	err  error
 }
 
-// applyObjPermWriteDone handles objPermWriteDoneMsg in Update.
 func (m Model) applyObjPermWriteDone(msg objPermWriteDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		if typed := sf.AsSFError(msg.err); typed != nil {
@@ -186,9 +162,6 @@ func (m Model) applyObjPermWriteDone(msg objPermWriteDoneMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// ======== System permissions write path ===================================
-
-// sysPermToggleCell fires a toggle on the cursored SystemPermission.
 func (m Model) sysPermToggleCell() (Model, tea.Cmd) {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -230,14 +203,12 @@ func (m Model) sysPermToggleCell() (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// sysPermWriteDoneMsg is the result of a system perm toggle.
 type sysPermWriteDoneMsg struct {
 	ok    bool
 	err   error
 	field string
 }
 
-// applySysPermWriteDone handles sysPermWriteDoneMsg in Update.
 func (m Model) applySysPermWriteDone(msg sysPermWriteDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		if typed := sf.AsSFError(msg.err); typed != nil {

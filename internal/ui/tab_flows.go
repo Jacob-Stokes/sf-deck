@@ -12,26 +12,16 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// bulkTagsForFlows pre-fetches tag bindings for every flow in the
-// supplied slice. Memoised on *orgData via the gutter cache —
-// successive renders within the same generation reuse the result.
-// Returns nil when the gutter is hidden / store is unavailable / no
-// current org / empty flows.
 func (m Model) bulkTagsForFlows(flows []sf.Flow) map[string][]devproject.Tag {
 	return bulkTagsForItems(m, flows, gutterDomainFlow, devproject.KindFlow,
 		func(f sf.Flow) string { return f.DefinitionID })
 }
 
-// bulkProjectsForFlows is the project-membership equivalent. Same
-// caching + early-return shape as bulkTagsForFlows.
 func (m Model) bulkProjectsForFlows(flows []sf.Flow) map[string][]devproject.DevProject {
 	return bulkProjectsForItems(m, flows, gutterDomainFlow, devproject.KindFlow,
 		func(f sf.Flow) string { return f.DefinitionID })
 }
 
-// renderFlows draws the flows list as a tabulated NAME · TYPE · STATUS ·
-// VERSION · LABEL grid. Status pops via per-row colour overrides on
-// the STATUS column.
 func (m Model) renderFlows(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -58,18 +48,10 @@ func (m Model) renderFlows(w, innerH int) string {
 		lines = append(lines, dash)
 	}
 
-	// Tab-specific empty-state overrides — only the busy/loading and
-	// project-mode hints diverge from the shared renderer's default
-	// "no matches". The shared renderer handles the search-applied
-	// case via the model's Empty fallback.
 	if d.FlowList.Len() == 0 && d.Flows.Busy() {
 		lines = append(lines, theme.Subtle.Render("  loading…"))
 		return strings.Join(lines, "\n")
 	}
-	// Project-chip empty-state: gate on ExtraCount so a project with
-	// no flows shows the collect hint, while an active search inside
-	// a non-empty project still falls through to the shared renderer
-	// (keeps the search box visible + shows "no matches" inline).
 	if d.FlowList.ExtraCount() == 0 && m.projectChipActive() {
 		lines = append(lines, theme.Subtle.Render(m.projectEmptyHint("flows")))
 		return strings.Join(lines, "\n")
@@ -86,16 +68,6 @@ func (m Model) renderFlows(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// flowVersionCell formats the cell for the VERSION column. Normally
-// just "v3" (the active version) or "—". When the newest version is a
-// later DRAFT than the active one — i.e. someone edited the flow but
-// hasn't activated the change — the cell shows "v3 (v4)": active
-// first, latest-draft in brackets. A conditional footer hint explains
-// the brackets when such a row is highlighted (see flowVersionMismatch).
-//
-// The bracketed form only appears when there's a distinct newer
-// version; a flow whose active version IS its latest stays tight at
-// "v3". Flows with no active version fall back to the latest number.
 func flowVersionCell(f sf.Flow) string {
 	switch {
 	case f.ActiveVersionNum > 0:
@@ -120,19 +92,10 @@ func flowSortVersion(f sf.Flow) int {
 	return f.LatestVersionNum
 }
 
-// flowVersionMismatch reports whether a flow's newest version is a
-// later version than its active one — the case flowVersionCell
-// renders as "v3 (v4)". Drives the conditional footer hint.
 func flowVersionMismatch(f sf.Flow) bool {
 	return f.ActiveVersionNum > 0 && f.LatestVersionNum > f.ActiveVersionNum
 }
 
-// flowLatestStatusWord gives a status-accurate lowercase word for the
-// LATEST version, used in the "(v4) = newer <word> version" footer
-// hint. Almost always "draft" in practice, but a newer version can
-// also be Obsolete or an InvalidDraft, so we report what it actually
-// is rather than assuming. Falls back to a neutral word when the
-// latest version's status wasn't captured.
 func flowLatestStatusWord(f sf.Flow) string {
 	switch f.LatestVersionStatus {
 	case "Draft":
@@ -142,8 +105,6 @@ func flowLatestStatusWord(f sf.Flow) string {
 	case "InvalidDraft":
 		return "invalid draft"
 	case "Active":
-		// A newer version that is itself Active is unusual (only one
-		// version is active at a time) but describe it plainly if seen.
 		return "active"
 	case "":
 		return "unactivated" // status not fetched — neutral fallback
@@ -152,8 +113,6 @@ func flowLatestStatusWord(f sf.Flow) string {
 	}
 }
 
-// flowStatusColor returns the tint for STATUS cells — green active,
-// yellow draft, red invalid, muted everything else.
 func flowStatusColor(status string) color.Color {
 	switch status {
 	case "Active":
@@ -168,8 +127,6 @@ func flowStatusColor(status string) color.Color {
 	return theme.Muted
 }
 
-// flowNameColor tints flow names by status so at-a-glance state is
-// readable without peeking at the dot.
 func flowNameColor(f sf.Flow) color.Color {
 	switch f.Status {
 	case "Active":
@@ -208,9 +165,6 @@ func shortenProcessType(p string) string {
 	return strings.ToLower(p)
 }
 
-// renderFlowDetail draws the version history for a specific flow
-// definition. Active version is marked with a ★. Enter on a version is
-// a no-op; o/ctrl+o open the version in the Flow Builder.
 func (m Model) renderFlowDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -222,7 +176,6 @@ func (m Model) renderFlowDetail(w, innerH int) string {
 		return theme.Subtle.Render("  press enter on a flow in /flows first")
 	}
 
-	// Header: flow definition info from the list row.
 	var header sf.Flow
 	for _, f := range d.Flows.Value() {
 		if f.DefinitionID == d.FlowCur {
@@ -261,7 +214,6 @@ func (m Model) renderFlowDetail(w, innerH int) string {
 		lines = append(lines, "")
 	}
 
-	// Version list.
 	r, ok := d.FlowVersions[d.FlowCur]
 	if !ok || r.FetchedAt().IsZero() {
 		if r != nil && r.Busy() {
@@ -292,7 +244,6 @@ func (m Model) renderFlowDetail(w, innerH int) string {
 		{Header: "BY", Width: -1, Style: lipgloss.NewStyle().Foreground(theme.FgDim)},
 	}
 	lines = append(lines, renderTableHeader(cols, inner))
-	// trailing=2 reserves the blank + help line appended below.
 	lines = append(lines, renderRows(
 		len(versions), sel, innerH, len(lines), 2, inner,
 		func(i int) string {
@@ -314,12 +265,8 @@ func (m Model) renderFlowDetail(w, innerH int) string {
 			}, i == sel, m.focus == focusMain, inner)
 		},
 	)...)
-	// Enter behaviour is configurable (Settings → Navigation & input):
-	// open Flow Builder (default) or view the definition in-terminal.
-	// The hint follows it so ↵ always reads true.
 	var enterHint string
 	if m.settings.FlowVersionEnterOpens() {
-		// ↵ and o both open Flow Builder — collapse them.
 		enterHint = "↵/" + firstPretty(Keys.OpenDefault) + " → Flow Builder"
 	} else {
 		enterHint = "↵ view definition · " + firstPretty(Keys.OpenDefault) + " → Flow Builder"

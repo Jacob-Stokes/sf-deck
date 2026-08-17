@@ -118,9 +118,6 @@ func objectShow(
 	return headless.ExitCodeFor(r)
 }
 
-// objectFields is a convenience verb — same data as object.show, but
-// projected to just the fields slice + a count. Saves agents from
-// having to dig into data.object.fields[].
 func objectFields(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	fs := newFlagSet("object fields")
 	target := fs.String("org", "", "Alias or username (empty = default)")

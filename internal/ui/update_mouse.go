@@ -73,12 +73,9 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case zoneSidebarHide:
-		// Click parity with `\`: just toggle sidebarOpen.
 		m.sidebarOpen = !m.sidebarOpen
 		return m, nil
 	case zoneSidebarStack:
-		// Click parity with `ctrl+\`: stack-toggle, auto-open if
-		// currently hidden so the gesture is always visible.
 		if !m.sidebarOpen {
 			m.sidebarOpen = true
 		}

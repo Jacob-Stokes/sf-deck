@@ -1,56 +1,17 @@
 package ui
 
 // Subtab dispatch helper.
-//
-// Multiple tabs (Apex, Components, Reports, SOQL, Meta, Home) share the
-// same shape: render the subtab strip, branch on the active subtab ID, and
-// fall through to a default. This helper owns declaration-to-render routing.
-//
-// Use it like this:
-//
-//   func (m Model) renderFoo(w, innerH int) string {
-//       return m.dispatchSubtab(w, innerH, fooSubtabs(), m.fooSubtab(),
-//           map[Subtab]subtabBranch{
-//               SubtabFooBlue:  {Render: m.renderFooBlue},
-//               SubtabFooGreen: {Render: m.renderFooGreen},
-//           },
-//           subtabBranch{Render: m.renderFooDefault},
-//       )
-//   }
-//
-// Each subtabBranch carries either a Render closure (rendered with
-// the subtab strip prepended automatically) or a Placeholder
-// (renders the standard "coming soon" placeholder). The dispatcher
-// clamps the cursor, draws the strip once, dispatches, joins.
-//
-// Tabs whose subtab list is dynamic (LWC bundle files, PermParent
-// kind-dependent subtabs) don't fit and stay bespoke.
 
 import (
 	"strings"
 )
 
-// subtabBranch describes one subtab's render path. Exactly one of
-// Render or Placeholder is set; Placeholder is the convenience for
-// "coming soon"-style stubs that all look the same today.
 type subtabBranch struct {
-	// Render is called with the inner pane width and the budget
-	// REMAINING after the subtab strip is drawn. The closure should
-	// not draw the strip itself — dispatchSubtab handles that.
 	Render func(w, innerH int) string
 
-	// Placeholder, when set, takes precedence over Render. Wraps
-	// the standard joinPlaceholder helper so coming-soon stubs are
-	// one struct literal in the dispatch map rather than three
-	// repeated lines per subtab.
 	Placeholder *subtabPlaceholder
 }
 
-// subtabPlaceholder describes a "coming soon" stub. Header is the
-// section title (uppercase shown in the placeholder); Description
-// is the muted body text; SetupURL is the Lightning URL the
-// placeholder's "open in SF" affordance points at. Empty fields
-// fall through to sane defaults.
 type subtabPlaceholder struct {
 	Header      string
 	Description string
@@ -86,11 +47,6 @@ func (m Model) dispatchSubtab(
 	if strip := renderSubtabStrip(subs, selected, inner); strip != "" {
 		stripLines = append(stripLines, strip)
 	}
-	// Count ACTUAL terminal lines in the strip — pills with rounded
-	// borders render multi-line but live as one slice element. Using
-	// len(stripLines) undercounted by ~2, so the body computed its
-	// budget against a too-large innerH and ran past the pane bottom
-	// (visible as the hint disappearing on subtab surfaces).
 	budget := innerH - usedLines(stripLines)
 	if budget < 5 {
 		budget = 5
@@ -121,7 +77,5 @@ func renderSubtabBranch(b subtabBranch, w, budget, inner int) string {
 	if b.Render != nil {
 		return b.Render(w, budget)
 	}
-	// No branch declared and no default — render an empty body
-	// rather than crashing. Should be unreachable in practice.
 	return ""
 }

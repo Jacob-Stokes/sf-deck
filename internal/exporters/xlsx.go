@@ -4,10 +4,6 @@ package exporters
 // post-processor pipeline). Header row is bold; data rows are plain
 // text so users can sort/filter without inheriting any styling that
 // would interfere with their own conditional formatting.
-//
-// Single sheet per export; sheet name is caller-supplied so it
-// reads as the export's subject ("Q2 migration" rather than the
-// default "Sheet1").
 
 import (
 	"fmt"
@@ -21,13 +17,10 @@ func writeXLSX(w io.Writer, headers []string, rows []ExportRow, sheetName string
 	sheetName = sanitizeSheetName(sheetName)
 	f := excelize.NewFile()
 	defer f.Close()
-	// excelize creates "Sheet1" by default. Rename it to our chosen
-	// sheet name so the file reads sensibly when opened.
 	if err := f.SetSheetName("Sheet1", sheetName); err != nil {
 		return fmt.Errorf("rename sheet: %w", err)
 	}
 
-	// Header row, bold. Data rows are plain.
 	headerStyle, err := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true},
 	})
@@ -35,7 +28,6 @@ func writeXLSX(w io.Writer, headers []string, rows []ExportRow, sheetName string
 		return fmt.Errorf("header style: %w", err)
 	}
 
-	// Write headers (row 1).
 	headerRow := make([]any, len(headers))
 	for i, h := range headers {
 		headerRow[i] = h
@@ -51,7 +43,6 @@ func writeXLSX(w io.Writer, headers []string, rows []ExportRow, sheetName string
 		}
 	}
 
-	// Data rows (row 2 onwards).
 	for i, r := range rows {
 		dataRow := make([]any, len(headers))
 		for j, h := range headers {
@@ -63,15 +54,11 @@ func writeXLSX(w io.Writer, headers []string, rows []ExportRow, sheetName string
 		}
 	}
 
-	// Auto-fit-ish column widths: cap at 60 cols so a long URL or
-	// description doesn't blow up the layout. Excel users can resize
-	// as needed.
 	for i := range headers {
 		col, err := excelize.ColumnNumberToName(i + 1)
 		if err != nil {
 			continue
 		}
-		// Estimate by max content width, capped.
 		maxW := len(headers[i])
 		for _, r := range rows {
 			if l := len(r.Get(headers[i])); l > maxW {
@@ -111,9 +98,6 @@ func sanitizeSheetName(name string) string {
 	if name == "" {
 		return fallback
 	}
-	// Replace each forbidden character. Excel rejects the file
-	// outright if any of these appear, so substitute rather than
-	// strip — preserves visible word boundaries.
 	replacer := strings.NewReplacer(
 		"/", "-",
 		"\\", "-",

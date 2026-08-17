@@ -4,12 +4,6 @@ package ui
 // delete an individual (inactive) flow version. Both are metadata
 // writes, gated by the org's safety level (WriteMetadata) — the same
 // chokepoint every other schema mutation goes through.
-//
-// Reached from the tab=flow-detail versions view:
-//   e  → rename flow label (edit modal)
-//   D  → delete cursored version (confirm modal; blocks the active
-//        version with a flash, since Salesforce refuses that delete
-//        with an opaque error)
 
 import (
 	"errors"
@@ -22,9 +16,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// flowDetailHeader returns the Flow list-row for the drilled-in
-// definition, plus the org and orgData, or ok=false when the view
-// isn't in a state where a write makes sense.
 func (m Model) flowDetailContext() (o sf.Org, d *orgData, header sf.Flow, ok bool) {
 	o, ok = m.currentOrg()
 	if !ok {
@@ -39,15 +30,9 @@ func (m Model) flowDetailContext() (o sf.Org, d *orgData, header sf.Flow, ok boo
 			return o, d, f, true
 		}
 	}
-	// Header row not loaded (rare — versions came from a direct drill
-	// before the list finished). Fall back to a stub carrying just the
-	// definition id so rename still works; delete needs the version
-	// list which is independent of the header.
 	return o, d, sf.Flow{DefinitionID: d.FlowCur}, true
 }
 
-// cursoredFlowVersion returns the version under the cursor in the
-// flow-detail versions view, or ok=false when none is loaded.
 func (m Model) cursoredFlowVersion(d *orgData) (sf.FlowVersion, bool) {
 	r, ok := d.FlowVersions[d.FlowCur]
 	if !ok || r.FetchedAt().IsZero() {
@@ -77,8 +62,6 @@ func (m Model) handleFlowRename() (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Pre-fill with the current label; fall back to the API name when
-	// the flow has no label set (common — see the rename design notes).
 	initial := header.MasterLabel
 	if initial == "" {
 		initial = header.DeveloperName
@@ -182,7 +165,4 @@ func flowVersionIsActive(v sf.FlowVersion, header sf.Flow) bool {
 	return v.Status == "Active"
 }
 
-// flowChangedMsg is emitted after a successful flow-detail write so
-// Update can refresh both the version list (the deleted/renamed row)
-// and the Flows list (a label change shows there too).
 type flowChangedMsg struct{ username string }

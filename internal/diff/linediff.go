@@ -2,11 +2,6 @@
 // compare feature. No external diff library exists in the dependency
 // tree, so this is a self-contained LCS-based line differ producing
 // aligned hunks suitable for both unified and side-by-side rendering.
-//
-// The algorithm is the classic longest-common-subsequence dynamic
-// program over whole lines (not characters). Metadata bodies are
-// modest (a few hundred to low-thousands of lines), so the O(n·m)
-// table is fine — we don't need the memory-optimised Myers variant.
 package diff
 
 // Op is the role of one aligned row in a diff.
@@ -45,7 +40,6 @@ func (r Result) Changed() bool { return r.Added > 0 || r.Removed > 0 }
 // equal runs are emitted as OpEqual, divergences as OpDelete (A) then
 // OpInsert (B), in source order.
 func Lines(a, b []string) Result {
-	// LCS length table. lcs[i][j] = LCS length of a[i:] and b[j:].
 	n, m := len(a), len(b)
 	lcs := make([][]int, n+1)
 	for i := range lcs {
@@ -114,7 +108,6 @@ func splitLines(s string) []string {
 	for i := 0; i < len(s); i++ {
 		if s[i] == '\n' {
 			line := s[start:i]
-			// Drop a trailing \r so CRLF and LF inputs compare equal.
 			if len(line) > 0 && line[len(line)-1] == '\r' {
 				line = line[:len(line)-1]
 			}

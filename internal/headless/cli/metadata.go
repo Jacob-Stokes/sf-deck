@@ -47,14 +47,6 @@ func dispatchMetadata(a *app.App, args Args, stdout io.Writer, mode headless.Wri
 	return headless.ExitCodeFor(r)
 }
 
-// knownToolingTypes is the gate for --type. Salesforce will accept
-// any string and return INVALID_TYPE for unrecognised ones, but we
-// reject up-front so agents get a clean invalid_argument with the
-// allowed set listed.
-//
-// Not exhaustive — Tooling has dozens of metadata sobjects. Add a
-// type here when an agent workflow actually needs it; over-listing
-// adds noise to the help text and invites typos.
 var knownToolingTypes = func() map[string]bool {
 	out := make(map[string]bool)
 	for _, metadataType := range metadataops.KnownTypes() {
@@ -67,8 +59,6 @@ func knownToolingTypesList() []string {
 	return metadataops.KnownTypes()
 }
 
-// validateToolingType returns invalid_argument-ready error if the
-// type isn't in the closed set.
 func validateToolingType(t string) error {
 	if t == "" {
 		return errors.New("--type is required")
@@ -115,9 +105,6 @@ func metadataGet(a *app.App, rest []string, stdout io.Writer, mode headless.Writ
 	return headless.ExitCodeFor(r)
 }
 
-// metadataCreate POSTs a new Tooling-sobject row. Required:
-// --full-name (Tooling's "<parent>.<child>" identifier) + --patch
-// JSON (the Metadata payload). WriteMetadata gate.
 func metadataCreate(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	fs := newFlagSet("metadata create")
 	target := fs.String("org", "", "Alias or username (empty = default)")
@@ -163,10 +150,6 @@ func metadataCreate(a *app.App, rest []string, stdout io.Writer, mode headless.W
 	return headless.ExitCodeFor(r)
 }
 
-// metadataUpdate PATCHes the Metadata of an existing row. The
-// patch is merged on top of the current state by the underlying
-// UpdateToolingMetadata — Tooling rejects partial PATCHes, so the
-// service does GET-merge-PUT.
 func metadataUpdate(a *app.App, rest []string, stdout io.Writer, mode headless.WriteMode) int {
 	fs := newFlagSet("metadata update")
 	target := fs.String("org", "", "Alias or username (empty = default)")
@@ -263,9 +246,6 @@ func writeMetadataOperationErr(command, requestedTarget, ref string, target orgw
 	return writeMetadataErr(command, orgUser, ref, err, stdout, mode)
 }
 
-// resolvePatch parses --patch / --patch-file into a map[string]any.
-// Returns (nil, nil) when both are empty so the caller decides
-// whether that's an error.
 func resolvePatch(raw, path string) (map[string]any, error) {
 	if raw != "" && path != "" {
 		return nil, errors.New("--patch and --patch-file are mutually exclusive")

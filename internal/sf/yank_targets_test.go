@@ -23,12 +23,10 @@ func TestSObjectYankTargets(t *testing.T) {
 	if got, ok := yankByID(ts, "prefix"); !ok || got.Value != "001" {
 		t.Errorf("prefix target = %+v, ok=%v", got, ok)
 	}
-	// Label equal to Name is omitted (no redundant entry).
 	plain := SObject{Name: "Account", Label: "Account"}
 	if _, ok := yankByID(plain.YankTargets(), "label"); ok {
 		t.Error("label should be omitted when equal to Name")
 	}
-	// A distinct label is included.
 	custom := SObject{Name: "Application__c", Label: "Application"}
 	if got, ok := yankByID(custom.YankTargets(), "label"); !ok || got.Value != "Application" {
 		t.Errorf("distinct label target = %+v, ok=%v", got, ok)
@@ -63,8 +61,6 @@ func TestRecordRefYankTargets(t *testing.T) {
 		t.Errorf("soql = %+v", got)
 	}
 
-	// A record with no Name field omits the Name target rather than
-	// yielding an empty one.
 	noName := RecordRef{Record: map[string]any{
 		"attributes": map[string]any{"type": "Case"},
 		"Id":         "500AAA",
@@ -89,7 +85,6 @@ func TestFlowYankTargets(t *testing.T) {
 	if got, ok := yankByID(ts, "verid"); !ok || got.Value != "300AAA" {
 		t.Errorf("active verid = %+v", got)
 	}
-	// Falls back to latest version when there's no active one.
 	inactive := Flow{DefinitionID: "301B", DeveloperName: "F2", LatestVersionID: "300B"}
 	if got, ok := yankByID(inactive.YankTargets(), "verid"); !ok || got.Value != "300B" {
 		t.Errorf("latest verid = %+v", got)

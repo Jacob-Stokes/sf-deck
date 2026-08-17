@@ -6,11 +6,6 @@ package ui
 // dead-end "can't open in demo" message OR shell out to the real
 // `sf org login web`, we render a small self-contained HTML page to a
 // temp file and open THAT in the browser.
-//
-// The result: a demo user pressing `o` actually sees a browser tab
-// pop up — the gesture feels real and is discoverable — but nothing
-// external is touched. The page explains what would have happened
-// against a real org.
 
 import (
 	"fmt"
@@ -103,16 +98,10 @@ func writeAndOpenDemoPage(pattern, title, bodyHTML, browser string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	// file:// URL. openURL rejects non-http(s), so open the path
-	// directly via openPath (which handles the OS default browser for
-	// .html). Best-effort — a launch failure isn't fatal to the demo.
 	_ = openPath(f.Name())
 	return nil
 }
 
-// demoPageShell wraps a body fragment in a minimal dark-themed HTML
-// document matching sf-deck's aesthetic. Self-contained (inline CSS,
-// no external assets) so it renders identically offline.
 func demoPageShell(title, bodyHTML string) string {
 	return `<!DOCTYPE html>
 <html lang="en">

@@ -26,7 +26,6 @@ type PackageDir struct {
 	VersionNumber string `json:"versionNumber,omitempty"`
 }
 
-// projectJSON matches the on-disk sfdx-project.json shape.
 type projectJSON struct {
 	Namespace        string            `json:"namespace"`
 	SourceAPIVersion string            `json:"sourceApiVersion"`

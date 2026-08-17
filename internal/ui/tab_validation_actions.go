@@ -1,11 +1,5 @@
 package ui
 
-// Validation-rule action menu — uses the generic Action[Ctx] core
-// plus the ToolingEntity write surface for all PATCH/delete calls.
-// Declaration-only: no per-entity save/load helpers, those live in
-// actions.go as generic ToolingMetaKeyHelpers / ToolingBoolSaver /
-// ToolingDelete.
-
 import (
 	tea "charm.land/bubbletea/v2"
 
@@ -57,7 +51,6 @@ func buildValidationCtx(m Model) (validationCtx, bool, string) {
 	if len(rules) == 0 {
 		return validationCtx{}, false, ""
 	}
-	// Prefer drilled-id lookup; fall back to cursored row.
 	var rule sf.ValidationRuleRow
 	found := false
 	if d.ValidationRules.DrillID != "" {
@@ -87,14 +80,9 @@ func buildValidationCtx(m Model) (validationCtx, bool, string) {
 	}, true, ""
 }
 
-// validationEntity adapts validationCtx.Entity for the generic
-// helpers; a func (not a method reference) so generics can infer.
 func validationEntity(c validationCtx) sf.ToolingEntity       { return c.Entity() }
 func validationMetadata(c validationCtx) *metadataops.Service { return c.Metadata }
 
-// vrText is a tiny helper wrapping textKey → (LoadCurrent, Save)
-// for validation rules. Saves repeating the closure types at every
-// NewTextAction call.
 func vrText(key string) (
 	func(validationCtx) func() (string, error),
 	func(validationCtx, string, any) error,
@@ -173,9 +161,6 @@ func validationActionsFor(ctx validationCtx) []Action[validationCtx] {
 	}
 }
 
-// validationDeletedCmd fires after a rule delete: list refresh +
-// pop-back msg. Pulled out of the inline spec so future entities
-// can mirror the shape without duplicating the closure.
 func validationDeletedCmd(c validationCtx) tea.Cmd {
 	if c.RulesRes == nil {
 		return nil
@@ -192,17 +177,12 @@ func validationDeletedCmd(c validationCtx) tea.Cmd {
 	}
 }
 
-// validationRulePoppedMsg signals that a rule was deleted and we
-// should pop back from TabValidationDetail to TabObjectDetail +
-// Validation subtab, then fire the carried refresh cmd.
 type validationRulePoppedMsg struct {
 	alias    string
 	ruleID   string
 	innerCmd tea.Cmd
 }
 
-// refreshValidationFor is the shared OnSuccess: list + drilled
-// detail via SObjectChildren.RefreshSObject.
 func refreshValidationFor(c validationCtx) tea.Cmd {
 	if c.OrgData == nil {
 		return nil

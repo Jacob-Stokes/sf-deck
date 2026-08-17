@@ -22,7 +22,6 @@ type installedPackagesResult struct {
 func InstalledPackages(target string) ([]InstalledPackage, error) {
 	out, err := runSF("package", "installed", "list", "-o", target, "--json")
 	if err != nil {
-		// Some orgs (free dev/scratch) error — return empty rather than fail.
 		return nil, nil
 	}
 	var parsed installedPackagesResult

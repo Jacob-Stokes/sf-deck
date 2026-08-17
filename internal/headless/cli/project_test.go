@@ -45,7 +45,6 @@ func runProjectCLI(t *testing.T, a *app.App, argv ...string) (int, map[string]an
 	return code, got
 }
 
-// projectIDFromCreate pulls data.project.id from a create response.
 func projectIDFromCreate(t *testing.T, resp map[string]any) string {
 	t.Helper()
 	data, _ := resp["data"].(map[string]any)
@@ -97,7 +96,6 @@ func TestProjectUpdate_PartialAndIdempotent(t *testing.T) {
 	_, created := runProjectCLI(t, a, "--json", "project", "create", "--name", "Old")
 	id := projectIDFromCreate(t, created)
 
-	// First update — Changed=true.
 	code, got := runProjectCLI(t, a, "--json", "project", "update",
 		"--id", id, "--name", "New")
 	if code != headless.ExitOK {
@@ -107,7 +105,6 @@ func TestProjectUpdate_PartialAndIdempotent(t *testing.T) {
 		t.Errorf("changed = %v", got["changed"])
 	}
 
-	// Same name — Changed=false.
 	code, got = runProjectCLI(t, a, "--json", "project", "update",
 		"--id", id, "--name", "New")
 	if code != headless.ExitOK {
@@ -123,11 +120,9 @@ func TestProjectDelete_NotEmptyMapsInvalidArgWithDetails(t *testing.T) {
 	_, created := runProjectCLI(t, a, "--json", "project", "create", "--name", "X")
 	id := projectIDFromCreate(t, created)
 
-	// Add an item.
 	_, _ = runProjectCLI(t, a, "--json", "project", "add-item",
 		"--project-id", id, "--kind", "record", "--ref", "001A")
 
-	// Delete without --force.
 	code, got := runProjectCLI(t, a, "--json", "project", "delete", "--id", id)
 	if code != headless.ExitInvalidArg {
 		t.Errorf("exit = %d, want %d", code, headless.ExitInvalidArg)
@@ -144,7 +139,6 @@ func TestProjectDelete_NotEmptyMapsInvalidArgWithDetails(t *testing.T) {
 		t.Errorf("details.force_flag = %v", details["force_flag"])
 	}
 
-	// With --force succeeds.
 	code, got = runProjectCLI(t, a, "--json", "project", "delete",
 		"--id", id, "--force")
 	if code != headless.ExitOK {
@@ -157,7 +151,6 @@ func TestProjectAddItem_Roundtrip(t *testing.T) {
 	_, created := runProjectCLI(t, a, "--json", "project", "create", "--name", "X")
 	id := projectIDFromCreate(t, created)
 
-	// Add.
 	code, got := runProjectCLI(t, a, "--json", "project", "add-item",
 		"--project-id", id, "--kind", "field", "--ref", "Account.X__c",
 		"--org-user", "dev@x", "--name", "X Field")
@@ -179,7 +172,6 @@ func TestProjectAddItem_Roundtrip(t *testing.T) {
 		t.Errorf("re-add changed = %v", changed)
 	}
 
-	// Items list reflects.
 	code, got = runProjectCLI(t, a, "--json", "project", "items", "--id", id)
 	if code != headless.ExitOK {
 		t.Fatalf("items exit = %d", code)
@@ -189,7 +181,6 @@ func TestProjectAddItem_Roundtrip(t *testing.T) {
 		t.Errorf("count = %v, want 1", data["count"])
 	}
 
-	// Remove.
 	code, got = runProjectCLI(t, a, "--json", "project", "remove-item",
 		"--project-id", id, "--kind", "field", "--ref", "Account.X__c",
 		"--org-user", "dev@x")
@@ -200,7 +191,6 @@ func TestProjectAddItem_Roundtrip(t *testing.T) {
 		t.Errorf("remove changed = %v", got["changed"])
 	}
 
-	// Remove-again — Changed=false.
 	code, got = runProjectCLI(t, a, "--json", "project", "remove-item",
 		"--project-id", id, "--kind", "field", "--ref", "Account.X__c",
 		"--org-user", "dev@x")

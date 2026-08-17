@@ -96,7 +96,6 @@ func TestNotificationMarkRead_SafetyBlockedOnProd(t *testing.T) {
 }
 
 func TestNotificationMarkRead_SafetyBlockedAllVariant(t *testing.T) {
-	// --all on prod should also be blocked.
 	a := newNotificationTestApp()
 	code, got := runNotifCLI(t, a, "--json", "notification", "mark-read",
 		"--org", "prod", "--all")

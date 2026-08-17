@@ -3,18 +3,6 @@ package ui
 // FLS grid write path. Toggling Read or Edit on the cursored field
 // fires a single FieldPermissions POST or PATCH (no modal; we
 // optimize for rapid admin-tweaking).
-//
-// Invariants:
-//   - Edit=true implies Read=true. When the user toggles Edit on,
-//     Read goes on too. When they toggle Read off, Edit goes off
-//     too.
-//   - When BOTH land false, we DELETE the FieldPermissions row
-//     (Salesforce convention — absent rows are the same as all-off,
-//     and keeping empty rows clutters the org).
-//
-// Writes run as a tea.Cmd so the UI doesn't block. On return the
-// resource is refreshed so the grid reflects the server's authoritative
-// state (including any side-effects we didn't predict).
 
 import (
 	tea "charm.land/bubbletea/v2"
@@ -56,10 +44,6 @@ func (m Model) inFLSGridContext() bool {
 	return false
 }
 
-// flsToggleCell fires a single-cell write for whichever cell the
-// user's toggle key landed on. `which` is "read" or "edit".
-// Returns the updated Model + a tea.Cmd that performs the write
-// and refreshes the FLS list on success.
 func (m Model) flsToggleCell(which string) (Model, tea.Cmd) {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -67,7 +51,6 @@ func (m Model) flsToggleCell(which string) (Model, tea.Cmd) {
 	}
 	d := m.ensureOrgData(o.Username)
 
-	// Resolve sobj + parentID based on which tab/subtab context we're in.
 	var sobj, parentID string
 	if m.tab() == TabPermParentDetail {
 		sobj = d.PermFieldsSObject
@@ -98,13 +81,10 @@ func (m Model) flsToggleCell(which string) (Model, tea.Cmd) {
 	idx := d.Cursors.Get(cursorKindFLS, len(fields), sobj, parentID)
 	field := fields[idx]
 	if !field.Permissionable {
-		// FLS doesn't exist for system/compound fields — the API
-		// would reject the upsert with a confusing error anyway.
 		m.flash(field.Name + " isn't permissionable (always visible)")
 		return m, nil
 	}
 
-	// Look up existing row (if any) for this field + parent.
 	flsRes, ok := d.FLS[key]
 	if !ok || flsRes == nil || flsRes.FetchedAt().IsZero() {
 		m.flash("FLS not loaded yet")
@@ -180,7 +160,6 @@ func (m Model) flsToggleCell(which string) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Fire the write as a cmd + refresh on return.
 	cmd := func() tea.Msg {
 		result, err := service.SetField(context.Background(), permissionops.FieldInput{
 			Target: alias, ID: existingID, SObject: sobj, Field: fullField,
@@ -191,16 +170,12 @@ func (m Model) flsToggleCell(which string) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// flsWriteDoneMsg is the result of a single-cell FLS toggle.
-// update.go handles it: flashes the error (if any) + fires the
-// Resource refresh so the grid resynchronizes.
 type flsWriteDoneMsg struct {
 	ok   bool
 	noop bool
 	err  error
 }
 
-// applyFLSWriteDone is the Update.go handler for flsWriteDoneMsg.
 func (m Model) applyFLSWriteDone(msg flsWriteDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		if typed := sf.AsSFError(msg.err); typed != nil {
@@ -213,7 +188,6 @@ func (m Model) applyFLSWriteDone(msg flsWriteDoneMsg) (Model, tea.Cmd) {
 	if msg.noop {
 		return m, nil
 	}
-	// Refresh the FLS Resource so the grid sees the new state.
 	if len(m.orgs) == 0 {
 		return m, nil
 	}
@@ -221,7 +195,6 @@ func (m Model) applyFLSWriteDone(msg flsWriteDoneMsg) (Model, tea.Cmd) {
 	if d == nil {
 		return m, nil
 	}
-	// Resolve the right (sobj, parentID) for the refresh key.
 	var sobj, parentID string
 	if m.tab() == TabPermParentDetail {
 		sobj = d.PermFieldsSObject

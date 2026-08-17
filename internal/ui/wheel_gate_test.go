@@ -15,7 +15,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// gateModel is a minimal Model carrying just what the gate touches.
 func gateModel() *Model {
 	m := &Model{}
 	m.wheel = &wheelRuntime{}
@@ -25,11 +24,6 @@ func gateModel() *Model {
 
 const gateQuiet = 80 * time.Millisecond
 
-// feed pushes one event through the gate and returns (swallowed,
-// releaseReason). Mirrors the call-site mutation order: the gate
-// itself maintains lastSeen for swallowed events; accepted events
-// normally get lastSeen/lastButton updated by the state machine, so
-// the helper does that for accepted ones.
 func feed(m *Model, at time.Time, button tea.MouseButton) (bool, string) {
 	swallowed, release := m.wheelStreamGate(at, gateQuiet, button)
 	if !swallowed {
@@ -42,16 +36,11 @@ func feed(m *Model, at time.Time, button tea.MouseButton) (bool, string) {
 func TestWheelGate_CoastSwallowedAfterSurfaceChange(t *testing.T) {
 	m := gateModel()
 	t0 := time.Unix(1000, 0)
-	// Establish a stream on surface A (key is computed from the
-	// zero-Model — stable; we simulate the switch by mutating the
-	// stored streamKey instead of building two full surfaces).
 	feed(m, t0, tea.MouseWheelDown)
 	if m.wheel.streamKey == "" {
 		t.Fatal("first event should adopt a stream key")
 	}
-	// Surface changes mid-coast.
 	m.wheel.streamKey = "elsewhere"
-	// Violent coast: 3ms gaps, same direction → swallowed.
 	at := t0
 	for i := 0; i < 20; i++ {
 		at = at.Add(3 * time.Millisecond)
@@ -87,7 +76,6 @@ func TestWheelGate_ReaccelReleasesDuringCoastTail(t *testing.T) {
 	t0 := time.Unix(1000, 0)
 	feed(m, t0, tea.MouseWheelDown)
 	m.wheel.streamKey = "elsewhere"
-	// Coast tail: widening gaps (25..50ms) — swallowed, median rises.
 	at := t0
 	for _, gapMS := range []int{25, 30, 35, 40, 45, 50} {
 		at = at.Add(time.Duration(gapMS) * time.Millisecond)
@@ -95,7 +83,6 @@ func TestWheelGate_ReaccelReleasesDuringCoastTail(t *testing.T) {
 			t.Fatalf("tail event (gap %dms) not swallowed", gapMS)
 		}
 	}
-	// Fresh flick: 3ms gap against a ~35ms median → release.
 	at = at.Add(3 * time.Millisecond)
 	swallowed, release := feed(m, at, tea.MouseWheelDown)
 	if swallowed || release != "released_reaccel" {

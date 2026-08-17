@@ -27,22 +27,10 @@ type Resource[T any] struct {
 	Key   string
 	TTL   time.Duration
 
-	// NoCache disables the SQLite round-trip entirely. The resource
-	// only holds data in-memory for the current session. Use for data
-	// where persisting to disk is inappropriate (records — stale data
-	// misleads, PII persistence is a privacy concern) or where
-	// persisting is worthless (session-ephemeral).
 	NoCache bool
 
-	// Fetch is called by refresh commands to talk to sf. It returns the
-	// fresh value. The caller (Resource.refreshCmd) takes care of writing
-	// to cache afterwards.
 	Fetch func() (T, error)
 
-	// FetchWithExisting is like Fetch, but receives a snapshot of the
-	// current in-memory value captured before the command goroutine
-	// starts. Use it for delta fetches that need to merge against the
-	// existing rows without reading Resource state off the update loop.
 	FetchWithExisting func(existing T) (T, error)
 
 	data      T
@@ -124,7 +112,6 @@ func (r *Resource[T]) Stale() bool {
 	return r.fetchedAt.IsZero() || time.Since(r.fetchedAt) > r.TTL
 }
 
-// noCacheEffective is NoCache with the demo override applied.
 func (r *Resource[T]) noCacheEffective() bool {
 	if DemoMode {
 		return false
@@ -158,7 +145,6 @@ type UpdatedMsg struct {
 // refresh. That way a freshly-cached payload short-circuits the
 // network call instead of racing it.
 func (r *Resource[T]) Ensure(c *cache.Cache) tea.Cmd {
-	// NoCache: nothing to load, just fetch when stale.
 	if r.noCacheEffective() {
 		if r.Stale() && !r.busy && r.canFetch() {
 			r.busy = true
@@ -166,13 +152,10 @@ func (r *Resource[T]) Ensure(c *cache.Cache) tea.Cmd {
 		}
 		return nil
 	}
-	// Cacheable + cold: read cache first; the load result decides
-	// whether to refresh.
 	if r.fetchedAt.IsZero() && !r.busy {
 		r.busy = true
 		return r.loadCmd(c)
 	}
-	// Already loaded: refresh only if stale.
 	if r.Stale() && !r.busy && r.canFetch() {
 		r.busy = true
 		return r.refreshCmd(c)
@@ -187,9 +170,6 @@ func (r *Resource[T]) Refresh(c *cache.Cache) tea.Cmd {
 		return nil
 	}
 	if DemoMode {
-		// The seed is the source of truth — a forced refresh
-		// re-serves it (or re-loads from the demo cache when cold)
-		// instead of touching the network.
 		if r.fetchedAt.IsZero() {
 			r.busy = true
 			return r.loadCmd(c)
@@ -208,8 +188,6 @@ func (r *Resource[T]) Apply(msg UpdatedMsg) bool {
 	}
 	if msg.FromCache {
 		r.busy = false
-		// Cache load: populate if we haven't gotten a fresh payload
-		// in the meantime (fetch may have raced cache-load and won).
 		if r.fetchedAt.IsZero() && msg.Err == nil && msg.Payload != nil {
 			if p, ok := msg.Payload.(*T); ok && p != nil {
 				r.data = *p
@@ -218,12 +196,8 @@ func (r *Resource[T]) Apply(msg UpdatedMsg) bool {
 		}
 		return true
 	}
-	// Fresh fetch:
 	r.busy = false
 	if benign(msg.Err) {
-		// A demo org's fetch short-circuited (no live backend). Keep the
-		// seeded data already loaded from cache; don't record it as an
-		// error, and mark loaded so the resource stops trying to refetch.
 		r.err = nil
 		if r.fetchedAt.IsZero() {
 			r.fetchedAt = time.Now()

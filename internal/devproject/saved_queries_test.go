@@ -50,7 +50,6 @@ func TestSavedQueries_GetMissing(t *testing.T) {
 func TestSavedQueries_Update(t *testing.T) {
 	s := openTestStore(t)
 	q, _ := s.CreateSavedQuery("v1", "", "SELECT Id FROM Account")
-	// nudge updated_at apart so order is unambiguous
 	time.Sleep(1100 * time.Millisecond)
 	if err := s.UpdateSavedQuery(q.ID, "v2", "now with more rows", "SELECT Id, Name FROM Account"); err != nil {
 		t.Fatalf("UpdateSavedQuery: %v", err)
@@ -95,7 +94,6 @@ func TestSavedQueries_DeleteCascadesTagsAndPins(t *testing.T) {
 	if err := s.ApplyTag(tag.ID, KindSOQLQuery, q.ID, ""); err != nil {
 		t.Fatalf("ApplyTag: %v", err)
 	}
-	// pin to a project
 	dp := DevProject{ID: "dp_x", Name: "X", CreatedAt: time.Now(), TouchedAt: time.Now()}
 	if err := s.CreateDevProject(dp); err != nil {
 		t.Fatalf("CreateDevProject: %v", err)
@@ -110,7 +108,6 @@ func TestSavedQueries_DeleteCascadesTagsAndPins(t *testing.T) {
 	if err := s.DeleteSavedQuery(q.ID); err != nil {
 		t.Fatalf("DeleteSavedQuery: %v", err)
 	}
-	// Verify cascades.
 	tagged, _ := s.TagsFor(KindSOQLQuery, q.ID, "")
 	if len(tagged) != 0 {
 		t.Errorf("tag binding survived delete: %v", tagged)
@@ -159,7 +156,6 @@ func TestSOQLHistory_LogAndList(t *testing.T) {
 	if len(rows) != 2 {
 		t.Errorf("want 2 rows for u@org.test, got %d", len(rows))
 	}
-	// Newest first.
 	if !strings.Contains(rows[0].Body, "Contact") {
 		t.Errorf("ordering wrong: %v", rows[0])
 	}

@@ -16,10 +16,6 @@ func TestLoadedResourcesCoversTopLevel(t *testing.T) {
 	if len(declared) == 0 {
 		t.Fatal("found no `d.X = Resource[` assignments — regex stale?")
 	}
-	// A resource is covered for global refresh EITHER by an explicit
-	// &d.<Name> in loadedResources(), OR by a listResourceSpec
-	// registration (loadedResources iterates the registry). Scan both
-	// sources so registered resources count as covered.
 	src := ""
 	for _, f := range []string{"orgdata_refresh.go", "list_resource_registrations.go"} {
 		b, err := os.ReadFile(f)
@@ -49,13 +45,10 @@ func TestLoadedResourcesCoversTopLevel(t *testing.T) {
 func TestLoadedResourcesOnlyReturnsLoaded(t *testing.T) {
 	d := &orgData{}
 
-	// A bare orgData has loaded nothing.
 	if got := d.loadedResources(); len(got) != 0 {
 		t.Fatalf("fresh orgData has %d loaded resources, want 0", len(got))
 	}
 
-	// Loading one resource (Resource.Set stamps FetchedAt → Loaded) makes
-	// exactly that one appear.
 	d.SObjects.Set(nil)
 	if got := d.loadedResources(); len(got) != 1 {
 		t.Fatalf("after loading SObjects, loadedResources() = %d, want 1", len(got))

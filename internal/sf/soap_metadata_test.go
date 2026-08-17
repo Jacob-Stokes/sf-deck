@@ -96,7 +96,6 @@ func TestParseListMetadataResult(t *testing.T) {
 	if apps[0].LastModifiedDate != "2026-01-02T03:04:05.000Z" {
 		t.Errorf("lastModifiedDate = %q", apps[0].LastModifiedDate)
 	}
-	// Managed component is present with its namespace (callers filter it).
 	if apps[1].NamespacePrefix != "pkg" {
 		t.Errorf("managed app namespace = %q, want pkg", apps[1].NamespacePrefix)
 	}

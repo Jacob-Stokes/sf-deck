@@ -1,10 +1,5 @@
 package ui
 
-// /deploy drill — one DeployRequest's component failures, test
-// failures, and coverage warnings, fetched lazily via the
-// metadata/deployRequest REST endpoint (same payload `sf project
-// deploy report` reads). Enter on /deploys lands here; Esc returns.
-
 import (
 	"fmt"
 
@@ -45,7 +40,6 @@ func (d *orgData) deployDetailRes(alias, id string) *Resource[sf.DeployDetail] {
 	return r
 }
 
-// drillIntoDeploy is the Enter handler on /deploys rows.
 func (m *Model) drillIntoDeploy() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -78,8 +72,6 @@ func (m *Model) moveDeployDetailCursor(delta int) {
 	}
 }
 
-// deployRowByID resolves the cached list row for the drilled deploy
-// (for the header + sidebar); zero row when the window scrolled past it.
 func (m Model) deployRowByID(id string) (sf.DeployRow, bool) {
 	d := m.activeOrgData()
 	if d == nil || id == "" {
@@ -131,7 +123,6 @@ func (m Model) renderDeployDetail(w, innerH int) string {
 	det := res.Value()
 	body := deployDetailLines(det, haveRow, row, inner)
 
-	// Scroll window: header stays pinned, body scrolls under it.
 	budget := innerH - len(lines)
 	if budget < 1 {
 		budget = 1
@@ -152,9 +143,6 @@ func (m Model) renderDeployDetail(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// deployDetailLines renders the scrollable body: failures first
-// (that's what you drilled in for), then test failures, coverage
-// warnings, and a success summary.
 func deployDetailLines(det sf.DeployDetail, haveRow bool, row sf.DeployRow, inner int) []string {
 	var out []string
 	errStyle := lipgloss.NewStyle().Foreground(theme.Red)
@@ -208,9 +196,6 @@ func deployDetailLines(det sf.DeployDetail, haveRow bool, row sf.DeployRow, inne
 		out = append(out, "")
 	}
 
-	// Success summary — counts up front, the component list after, so
-	// a clean deploy still shows something useful without burying the
-	// failures above on broken ones.
 	summary := fmt.Sprintf("  %d component(s) succeeded", len(det.Successes))
 	if det.TestsRun > 0 {
 		summary += fmt.Sprintf(" · %d test(s) run", det.TestsRun)
@@ -238,8 +223,6 @@ func deployDetailLines(det sf.DeployDetail, haveRow bool, row sf.DeployRow, inne
 	return out
 }
 
-// ensureDeployDetailData / refreshDeployDetailData are the /deploy
-// drill's registry hooks (extracted in the registry-purity pass).
 func (m *Model) ensureDeployDetailData(d *orgData, o sf.Org) tea.Cmd {
 	if d.DeployCur == "" {
 		return nil

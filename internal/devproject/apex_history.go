@@ -1,16 +1,5 @@
 package devproject
 
-// Anonymous-Apex execution history. Every run from /exec lands here
-// scoped to (org_user, executed_at). Same shape + invariants as
-// soql_history with execute-anonymous-specific result columns
-// (compiled / success / compile_problem / exception_message / line /
-// column / log body).
-//
-// History rows are NOT linked to saved_apex by ID — a saved snippet
-// and a typed-by-hand one produce equivalent history rows. The Body
-// is the source of truth; re-saving from history pulls the body
-// into the editor and CreateSavedApex from there.
-
 import (
 	"fmt"
 	"time"

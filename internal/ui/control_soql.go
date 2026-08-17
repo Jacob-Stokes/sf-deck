@@ -10,8 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// IPC verb handlers for SOQL: run + saved-query CRUD + history + seed. Split out of control_backend.go.
-
 // SOQLSeed forwards a seed-the-SOQL-editor request. Runs only
 // when args.Open==true OR args.Run==true (a bare seed doesn't
 // require nav). The Tea update path is responsible for the

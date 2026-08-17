@@ -1,25 +1,6 @@
 package ui
 
 // Field-Level Security (FLS) subtab of TabObjectDetail.
-//
-// One 2D grid: rows = fields on the current sobject, columns = Read
-// + Edit for the selected scope (a Profile or PermissionSet). A
-// chip strip at the top picks the scope; ← / → cycles it. r toggles
-// Read on the cursored field; e toggles Edit. Edit=true implies
-// Read=true (Salesforce invariant — enforced in the sf layer,
-// reflected live in the UI on save).
-//
-// NOTE: r is "toggle Read" on this grid, which shadows the global
-// r=refresh. Use ctrl+r to refresh the FLS data here.
-//
-// FieldPermissions rows are sparse: when a field has never had its
-// FLS explicitly set, there's no row. We render those as R=off /
-// E=off because that's the effective permission anyway.
-//
-// Writes are POST+PATCH through FieldPermissions. Both operations
-// are fast (single sobject write, no deploy cycle) so the grid
-// reacts instantly on toggle — no "saving…" modal needed for a
-// single cell, we just flash on error.
 
 import (
 	"strings"
@@ -32,7 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderObjectFLS is the main-pane renderer for the FLS subtab.
 func (m Model) renderObjectFLS(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -55,11 +35,6 @@ func (m Model) renderObjectFLS(w, innerH int) string {
 	if len(permsets) == 0 {
 		return theme.Subtle.Render("  no permission sets / profiles visible to this user")
 	}
-	// Default-parent selection happens in applyResourceMsg's "permsets"
-	// branch — the moment the org-wide list lands, we pin the first
-	// permset and fire the FLS ensure. Render here is read-only; if
-	// FLSParentID is still empty we just show a hint while the data
-	// loads (rare; only briefly visible after a permsets cache miss).
 	parent := d.FLSParentID
 	if parent == "" {
 		parent = permsets[0].ID
@@ -68,7 +43,6 @@ func (m Model) renderObjectFLS(w, innerH int) string {
 	return m.renderFLSGrid(w, inner, innerH, o, sobj, parent, true)
 }
 
-// renderFLSRow is one field's row in the grid.
 func renderFLSRow(f sf.Field, byField map[string]sf.FieldPermissionRow, selected, mainFocused bool, nameW, labelW, inner int) string {
 	fp, hasRow := byField[f.Name]
 	read := false
@@ -90,9 +64,6 @@ func renderFLSRow(f sf.Field, byField map[string]sf.FieldPermissionRow, selected
 	r := flsCell("R", read)
 	e := flsCell("E", edit)
 	if !permissionable {
-		// FLS doesn't apply (Id, audit stamps, compound fields) —
-		// a [·] here reads as "denied", which is wrong: these are
-		// always visible. Dim dashes, same cell width.
 		dash := lipgloss.NewStyle().Foreground(theme.FgDim).Render(" — ")
 		r, e = dash, dash
 	}
@@ -108,7 +79,6 @@ func renderFLSRow(f sf.Field, byField map[string]sf.FieldPermissionRow, selected
 	return ansi.Truncate(prefix+name+"  "+label+"  "+r+" "+e, inner, "…")
 }
 
-// flsCell renders one on/off indicator.
 func flsCell(letter string, on bool) string {
 	if on {
 		return lipgloss.NewStyle().Foreground(theme.Green).Bold(true).Render("[" + letter + "]")
@@ -116,9 +86,6 @@ func flsCell(letter string, on bool) string {
 	return lipgloss.NewStyle().Foreground(theme.FgDim).Render("[·]")
 }
 
-// sidebarFLS renders the FLS subtab's right-side sidebar: current
-// scope label, cursored field's metadata, and the keyboard hints
-// for toggling Read/Edit. Complements the grid in the main pane.
 func (m Model) sidebarFLS(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -139,7 +106,6 @@ func (m Model) sidebarFLS(inner int) string {
 	idx := d.Cursors.Get(cursorKindFLS, len(fields), d.DescribeCur, d.FLSParentID)
 	f := fields[idx]
 
-	// Resolve scope label.
 	scopeLabel := "—"
 	for _, p := range d.PermissionSets.Value() {
 		if p.ID == d.FLSParentID {
@@ -151,7 +117,6 @@ func (m Model) sidebarFLS(inner int) string {
 		}
 	}
 
-	// Current row R/E state.
 	read, edit := false, false
 	flsKey := d.DescribeCur + ":" + d.FLSParentID
 	if flsRes, ok := d.FLS[flsKey]; ok && flsRes != nil {
@@ -189,7 +154,6 @@ func (m Model) sidebarFLS(inner int) string {
 	return renderKVPanel(inner, f.Name, rows, extra...)
 }
 
-// renderFLSScopeStrip draws the chip strip of profiles + permsets.
 func renderFLSScopeStrip(perms []sf.FLSPickerEntry, selectedID string, width int) string {
 	selStyle := lipgloss.NewStyle().Foreground(theme.Cyan).Bold(true).Underline(true)
 	normStyle := lipgloss.NewStyle().Foreground(theme.Muted)
@@ -198,7 +162,6 @@ func renderFLSScopeStrip(perms []sf.FLSPickerEntry, selectedID string, width int
 	hint := lipgloss.NewStyle().Foreground(theme.FgDim).Render("  ← / → cycle scope")
 	ell := lipgloss.NewStyle().Foreground(theme.Border).Render("…")
 
-	// Render each scope label + find the selected index.
 	labels := make([]string, len(perms))
 	selectedIdx := 0
 	for i, p := range perms {
@@ -214,20 +177,12 @@ func renderFLSScopeStrip(perms []sf.FLSPickerEntry, selectedID string, width int
 		}
 	}
 
-	// Budget for the scope pills (leave room for the hint).
 	budget := width - lipgloss.Width(hint)
 	if budget < 12 {
 		budget = width // too narrow for the hint — drop it
 		hint = ""
 	}
 
-	// Window the pills around the SELECTED index so the current scope is
-	// always visible, with a "…" marker on whichever side has hidden
-	// scopes. The old code joined ALL scopes then ansi.Truncate'd to
-	// width, so a selection past the right edge (common with many
-	// permsets) scrolled off entirely — you couldn't tell which scope you
-	// were editing. Grow outward from the selection until the budget runs
-	// out, alternating right then left so context appears on both sides.
 	lo, hi := selectedIdx, selectedIdx // [lo, hi] inclusive kept window
 	used := lipgloss.Width(labels[selectedIdx])
 	for {

@@ -2,8 +2,6 @@ package ui
 
 import tea "charm.land/bubbletea/v2"
 
-// handleInputModeKey routes keys to active text/editing modes before
-// the default shortcut switch sees them.
 func (m Model) handleInputModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.soqlEditing {
 		next, cmd := m.handleSOQLKey(msg)
@@ -22,10 +20,6 @@ func (m Model) handleInputModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			next, cmd := m.handleSearchInput(msg, s)
 			return next, cmd, true
 		}
-		// In-code find bar (code viewers). Routed HERE — before the
-		// q-chord leader in update_keys — so typing "q" into a code
-		// search stays a literal character. Unconsumed keys (arrows,
-		// ctrl combos) fall through so left/right hscroll still works.
 		if m.codeFindInputActive() {
 			if next, cmd, ok := m.handleCodeFindInput(msg); ok {
 				return next, cmd, true
@@ -35,8 +29,6 @@ func (m Model) handleInputModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handlePreGlobalTabKey lets narrow tab surfaces consume a few keys
-// before the global shortcut switch runs.
 func (m Model) handlePreGlobalTabKey(key string) (tea.Model, tea.Cmd, bool) {
 	if m.focus != focusMain {
 		return m, nil, false

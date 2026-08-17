@@ -1,10 +1,6 @@
 // Command themegen reads ghostty-format theme files from
 // iTerm2-Color-Schemes and emits a Go source file with one
 // theme.Palette per file. Run from the repo root:
-//
-//	go run ./cmd/themegen <ghostty-dir> > internal/theme/generated.go
-//
-// Re-run when the upstream catalogue updates. Output is committed.
 package main
 
 import (

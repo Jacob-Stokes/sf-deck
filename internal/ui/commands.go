@@ -38,17 +38,8 @@ func (m Model) runSOQLCmd(o sf.Org, soql string, tooling, bulk bool, ctx context
 			err error
 		)
 		if bulk {
-			// Bulk supports proper server-side cancel via context —
-			// the caller's cancel func aborts the polling loop AND
-			// sends a delete-job to SF so the server stops chewing
-			// CPU on a query the user doesn't want.
 			res, err = sf.BulkQueryRecords(ctx, alias, soql, nil)
 		} else {
-			// REST path: ctx aborts the in-flight HTTP request +
-			// any nextRecordsUrl follow-on pages.  Server doesn't
-			// know we cancelled — the query may keep running for a
-			// few hundred ms — but the modal returns to idle
-			// immediately.
 			res, err = sf.QueryCtx(ctx, alias, soql, tooling)
 		}
 		took := int(time.Since(t0) / time.Millisecond)

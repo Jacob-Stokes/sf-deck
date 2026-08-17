@@ -1,12 +1,5 @@
 package ui
 
-// /apex — list view of every ApexClass in the active org. Drill in to
-// /apex-class-detail to read the body.
-//
-// Mirrors the shape of /flows + /packages: top header with count +
-// search pill, table of rows, footer hint. Cursor + filter come from
-// the shared ListView wrapper on orgData.
-
 import (
 	"fmt"
 	"strings"
@@ -19,8 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/highlight"
 )
 
-// renderApex draws the Apex tab — dispatches between Classes (default
-// list-table) and a flat cross-sObject Triggers subtab.
 func (m Model) renderApex(w, innerH int) string {
 	if len(m.orgs) == 0 {
 		return noOrgPlaceholder()
@@ -28,10 +19,6 @@ func (m Model) renderApex(w, innerH int) string {
 	if m.activeOrgData() == nil {
 		return theme.Subtle.Render("  org data not loaded")
 	}
-	// VF Pages / VF Components subtab stubs were cut 2026-06-13 —
-	// /meta Browse lists both types (names + modified) and a
-	// dedicated subtab would add nothing but two columns. Same
-	// rationale as the /meta stub cut.
 	return m.dispatchSubtab(w, innerH, apexSubtabs(), m.apexSubtab(),
 		map[Subtab]subtabBranch{
 			SubtabApexTriggers: {Render: m.renderApexTriggers},
@@ -40,10 +27,6 @@ func (m Model) renderApex(w, innerH int) string {
 	)
 }
 
-// renderApexClasses is the default Apex subtab body — chip strip
-// over the classes ListView, busy/loading states above the table.
-// dispatchSubtab handles the subtab strip; this function only
-// owns the chip dashboard + table.
 func (m Model) renderApexClasses(w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -85,11 +68,6 @@ func (m Model) renderApexClasses(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// apexListRowFor returns the cached ApexClassRow for the drilled-in
-// class, or (zero, false) when the list hasn't been fetched yet
-// (rare — drill-in is gated on having seen the row in the list).
-// Used by renderApexDetail to render mark pills against the same
-// row data the list-view used.
 func apexListRowFor(d *orgData, classID string) (sf.ApexClassRow, bool) {
 	for _, a := range d.ApexClassList.Items() {
 		if a.ID == classID {
@@ -99,12 +77,6 @@ func apexListRowFor(d *orgData, classID string) (sf.ApexClassRow, bool) {
 	return sf.ApexClassRow{}, false
 }
 
-// renderApexTriggers is the Triggers subtab — flat list across every
-// sObject in the org. Mirrors the Classes layout minus the chip strip
-// Triggers shares the chipSurface registry — the chip strip drives
-// managed/unmanaged + active/inactive filtering. Drill-in routes
-// through the parent sObject's per-sObject Triggers detail tab so
-// writes go through the existing trigger update path.
 func (m Model) renderApexTriggers(w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -146,7 +118,6 @@ func (m Model) renderApexTriggers(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderApexDetail draws one apex class — name + meta + body.
 func (m Model) renderApexDetail(w, innerH int) string {
 	inner := w - 4
 	if len(m.orgs) == 0 {
@@ -167,10 +138,6 @@ func (m Model) renderApexDetail(w, innerH int) string {
 		title = d.ApexCur
 	}
 	lines = append(lines, sectionTitle(title))
-	// Pills row: managed-package badge + invalid badge if applicable.
-	// Built from the cached list-view ApexClassRow (val is a richer
-	// detail struct without NamespacePrefix); fall back gracefully
-	// when not in the list cache.
 	if cur, ok := apexListRowFor(d, d.ApexCur); ok {
 		if pills := renderMarkPills(markPillsForApexClass(cur)); pills != "" {
 			lines = append(lines, "  "+pills)
@@ -232,9 +199,6 @@ func apexBodyID(classID string) string {
 	return "apex:" + classID
 }
 
-// moveApexDetailCursor steers the body cursor on TabApexDetail.
-// Wired in via TabSpec.MoveCursor; called by the global j / k / G
-// dispatcher in update_nav.go.
 func (m *Model) moveApexDetailCursor(delta int) {
 	d := m.activeOrgData()
 	if d == nil || d.ApexCur == "" {
@@ -251,9 +215,6 @@ func (m *Model) moveApexDetailCursor(delta int) {
 	m.codeViewMoveCursor(d, apexBodyID(d.ApexCur), lineCount(body), delta)
 }
 
-// triggerOpenApexClass moves the cursor onto a specific class and
-// switches to TabApexDetail. Mirrors openFieldCmd / openFlowCmd from
-// search_global.go; used by Enter on /apex.
 func (m *Model) triggerOpenApexClass(id string) tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -310,29 +271,21 @@ func (d *orgData) apexClassDetailRes(alias, id string) *Resource[sf.ApexClassDet
 	return r
 }
 
-// bulkTagsForApexClasses pre-fetches tag bindings for a class list.
-// Memoised on *orgData via the gutter cache; nil-returns when the
-// gutter is hidden / store unavailable / org missing / list empty.
 func (m Model) bulkTagsForApexClasses(items []sf.ApexClassRow) map[string][]devproject.Tag {
 	return bulkTagsForItems(m, items, gutterDomainApexClass, devproject.KindApexClass,
 		func(a sf.ApexClassRow) string { return a.ID })
 }
 
-// bulkTagsForApexTriggers — same pattern for the cross-sObject
-// triggers list.
 func (m Model) bulkTagsForApexTriggers(items []sf.TriggerRow) map[string][]devproject.Tag {
 	return bulkTagsForItems(m, items, gutterDomainApexTrigger, devproject.KindApexTrigger,
 		func(t sf.TriggerRow) string { return t.ID })
 }
 
-// bulkProjectsForApexClasses mirrors bulkTagsForApexClasses for the
-// project gutter.
 func (m Model) bulkProjectsForApexClasses(items []sf.ApexClassRow) map[string][]devproject.DevProject {
 	return bulkProjectsForItems(m, items, gutterDomainApexClass, devproject.KindApexClass,
 		func(a sf.ApexClassRow) string { return a.ID })
 }
 
-// bulkProjectsForApexTriggers mirrors bulkTagsForApexTriggers.
 func (m Model) bulkProjectsForApexTriggers(items []sf.TriggerRow) map[string][]devproject.DevProject {
 	return bulkProjectsForItems(m, items, gutterDomainApexTrigger, devproject.KindApexTrigger,
 		func(t sf.TriggerRow) string { return t.ID })

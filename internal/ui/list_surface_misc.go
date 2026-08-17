@@ -2,15 +2,6 @@ package ui
 
 // Misc list surfaces — /apex-logs, /deploys, /packages, /recent
 // (mode-toggled), /home subtabs, and /system subtabs.
-//
-// The simple ones (apex logs, deploys, packages, home limits/
-// licenses) use ListViewTableSpec[T]. Recent stays bespoke
-// because the active ListView is picked dynamically by
-// d.HomeRecentMode (sf-deck local log vs. Salesforce
-// RecentlyViewed) — the spec builder assumes one ListView per
-// surface. The home/system "shell" surfaces (no BuildRenderModel)
-// stay as listSurface literals because they're driven by the
-// renderer's bespoke composer, not the generic render-model path.
 
 import (
 	"fmt"
@@ -25,32 +16,17 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// titleStater is the slice of a Resource[T] a list-surface title needs:
-// when it was fetched, whether it's mid-fetch, and its last error. Every
-// *resource.Resource[T] satisfies it structurally regardless of T, so
-// standardListTitle can format any surface's header without generics.
 type titleStater interface {
 	FetchedAt() time.Time
 	Busy() bool
 	Err() error
 }
 
-// standardListTitle formats the canonical list-surface header line —
-// "LABEL · N · <age><state-suffix>" — shared by ~20 ListViewTableSpec
-// Title closures that all built this exact string by hand. count is the
-// row count (usually d.SomeList.Len()); res carries the fetch/busy/err
-// state.
 func standardListTitle(label string, count int, res titleStater) string {
 	return label + " · " + fmt.Sprintf("%d", count) + " · " +
 		humanAge(res.FetchedAt()) + stateSuffix(res.Busy(), res.Err())
 }
 
-// singleColumnRecolor builds a ListViewTableSpec Recolor closure that
-// tints exactly one column by a per-row colour. colorOf maps a row to
-// its foreground colour (usually a small status→colour switch). Every
-// other column, and any out-of-range row, renders with the base style
-// untouched. Replaces the hand-written "if colName != X return base;
-// return base.Foreground(f(items[row].Field))" closures.
 func singleColumnRecolor[T any](targetCol string, colorOf func(T) color.Color) func([]T, int, int, string, lipgloss.Style) lipgloss.Style {
 	return func(items []T, row, col int, colName string, base lipgloss.Style) lipgloss.Style {
 		if colName != targetCol || row < 0 || row >= len(items) {
@@ -127,8 +103,6 @@ var scheduledJobsTableSpec = ListViewTableSpec[sf.CronTriggerRow]{
 
 var scheduledJobsListSurface = listSurfaceFromSpec(scheduledJobsTableSpec)
 
-// asyncJobStatusColor tints the AsyncApexJob Status column: green when
-// done, yellow while queued/running, red on failure/abort.
 func asyncJobStatusColor(status string) color.Color {
 	switch status {
 	case "Completed":
@@ -141,8 +115,6 @@ func asyncJobStatusColor(status string) color.Color {
 	return theme.Fg
 }
 
-// cronStateColor tints the CronTrigger State column: green when
-// waiting/executing normally, red for error/deleted states.
 func cronStateColor(state string) color.Color {
 	switch state {
 	case "WAITING", "ACQUIRED", "EXECUTING", "COMPLETE":
@@ -301,9 +273,6 @@ var recentListSurface = listSurface{
 		if d == nil {
 			return listRenderModel{}, false
 		}
-		// Lazy-sync the SF list before render so toggling into
-		// Salesforce mode doesn't render an empty list while the
-		// converter catches up.
 		if d.HomeRecentMode == ChipModeSalesforce {
 			m.syncRecentSFList(d.username)
 		}
@@ -365,9 +334,6 @@ var recentListSurface = listSurface{
 	},
 }
 
-// emptyRecentMessage returns the empty-state copy for /home Recent
-// scoped to the active mode — the action the user should take
-// differs by source.
 func emptyRecentMessage(mode ChipMode) string {
 	if mode == ChipModeSalesforce {
 		return "  no recent activity from Salesforce — open something in Lightning to populate this list"
@@ -375,11 +341,6 @@ func emptyRecentMessage(mode ChipMode) string {
 	return "  nothing visited yet in sf-deck — drill into anything to start tracking"
 }
 
-// ---- /home subtabs --------------------------------------------------
-
-// homeRecentListSurface — the /home → Recent subtab's listSurface.
-// Same shape as recentListSurface; falls back to the shared
-// BuildRenderModel when the registry needs one.
 var homeRecentListSurface = listSurface{
 	State: func(d *orgData) *uilayout.ListTableState { return &d.RecentTableState },
 	Cols:  recentCols,
@@ -495,5 +456,3 @@ var homeLicensesTableSpec = ListViewTableSpec[homeLicenseRow]{
 }
 
 var homeLicensesListSurface = listSurfaceFromSpec(homeLicensesTableSpec)
-
-// ---- /system subtabs (Logs / Deploys; API has no list-table) -------

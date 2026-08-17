@@ -1,29 +1,6 @@
 package ui
 
 // "Find the same resource in another org."
-//
-// The gesture lives inside the open (o / ctrl+o) menu as a synthetic
-// "Find in another org…" row (see menu.go). Picking it swaps the menu
-// for an org sub-picker; picking an org there looks up the SAME
-// resource in that org and, ONLY if it exists there, switches to that
-// org and drills into it. If the resource isn't in the target org, the
-// user stays put and gets a "not in <org>" flash — we never strand
-// them in another org just to report the miss.
-//
-// Why this is more than "switch org + keep the tab": tab/subtab state
-// is already per-org (orgData), so a bare switch lands the user on
-// whatever they last looked at in that org. This carries the cursored
-// resource across, re-resolves it by its STABLE name in the target org
-// (record Ids and metadata Ids are org-local and don't map across
-// orgs), and drills into its detail view.
-//
-// Cross-org matching key: for API-name-keyed kinds (sObject, field)
-// the identity Ref is already stable and used directly. For Id-keyed
-// kinds (flow, apex, LWC/Aura, permset, …) we match on the developer/
-// API name and read the TARGET org's org-local Id back out of its
-// loaded list. That list may still be fetching at switch time, so the
-// resolve is deferred: a pendingMove rides on the model until the
-// relevant resource lands (applyResourceMsg calls resolvePendingMove).
 
 import (
 	"fmt"
@@ -35,8 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// orgMoveLabel is the user-visible name for an org in move flashes and
-// the picker — the configured label/alias, falling back to username.
 func orgMoveLabel(o sf.Org) string {
 	if l := o.Display(); l != "" {
 		return l
@@ -44,10 +19,6 @@ func orgMoveLabel(o sf.Org) string {
 	return o.Username
 }
 
-// pendingMove is a Move-to-org request awaiting the target org's data.
-//
-// Set when the user picks a destination org; cleared once we either
-// drill into the matched resource or give up (list loaded, no match).
 type pendingMove struct {
 	kind     devproject.ItemKind
 	name     string // stable match key (developer/API name, or sobj.field)
@@ -86,10 +57,6 @@ func movableKind(k devproject.ItemKind) bool {
 	return false
 }
 
-// moveEnsureCmd fires the fetch for the target org's list that a move
-// of this kind will re-resolve against, independent of which tab/subtab
-// is active. Returns nil for kinds whose Ref needs no re-resolution
-// (sObject / field), or when there's nothing to fetch.
 func (m *Model) moveEnsureCmd(d *orgData, k devproject.ItemKind) tea.Cmd {
 	switch k {
 	case devproject.KindSObject, devproject.KindField:
@@ -104,26 +71,16 @@ func (m *Model) moveEnsureCmd(d *orgData, k devproject.ItemKind) tea.Cmd {
 	return nil
 }
 
-// moveNameOf returns the stable cross-org match key for an identity,
-// plus a type hint (secondary key) where the kind needs one.
-//
-// For sObjects and fields the Ref is already the API name, so it's
-// returned verbatim. For Id-keyed kinds the Label carries the
-// developer/API name (that's how the identity resolvers populate it).
 func moveNameOf(it ItemIdentity) (name, typeHint string) {
 	switch it.Kind {
 	case devproject.KindSObject:
 		return it.Ref, ""
 	case devproject.KindField:
-		// Ref is "<sobj>.<field>"; typeHint carries the parent sObject
-		// so the target-org resolver can jump straight to the describe.
 		if i := indexOfRune(it.Ref, '.'); i >= 0 {
 			return it.Ref, it.Ref[:i]
 		}
 		return it.Ref, ""
 	default:
-		// Id-keyed kinds: Label is the developer/API name captured by
-		// the identity resolver.
 		return it.Label, ""
 	}
 }
@@ -166,25 +123,18 @@ func (m *Model) beginFindInOrg(targetUser string) tea.Cmd {
 	}
 	m.flash("finding " + it.Label + " in " + orgMoveLabel(m.orgs[mustOrgIndex(m, targetUser)]) + "…")
 
-	// Fetch the target org's list in the background. The fetch closure
-	// carries its own alias, so this loads the RIGHT org's data even
-	// though that org isn't selected. applyResourceMsg routes the
-	// result by scope → resolvePendingMove picks it up.
 	cmds := []tea.Cmd{}
 	if td := m.orgDataFor(targetUser); td != nil {
 		if c := m.moveEnsureCmd(td, it.Kind); c != nil {
 			cmds = append(cmds, c)
 		}
 	}
-	// Immediate resolve when the target list is already in memory
-	// (common when the user has visited that org this session).
 	if navCmd := m.resolvePendingMove(); navCmd != nil {
 		cmds = append(cmds, navCmd)
 	}
 	return tea.Batch(cmds...)
 }
 
-// orgIndexByUser returns the index of the org with the given username.
 func (m Model) orgIndexByUser(username string) (int, bool) {
 	for i, o := range m.orgs {
 		if o.Username == username {
@@ -194,16 +144,11 @@ func (m Model) orgIndexByUser(username string) (int, bool) {
 	return 0, false
 }
 
-// mustOrgIndex is orgIndexByUser for call sites that have already
-// validated the username exists (returns 0 on miss — the caller
-// guarantees a hit).
 func mustOrgIndex(m *Model, username string) int {
 	i, _ := m.orgIndexByUser(username)
 	return i
 }
 
-// orgDataFor returns the orgData for a username, allocating it if
-// needed — so a background fetch can populate a not-yet-visited org.
 func (m *Model) orgDataFor(username string) *orgData {
 	if username == "" {
 		return nil
@@ -211,19 +156,11 @@ func (m *Model) orgDataFor(username string) *orgData {
 	return m.ensureOrgData(username)
 }
 
-// --- open-menu integration -------------------------------------------
-//
-// Find-in-org lives as a synthetic row in the open (o) menu. Picking
-// it swaps the menu for an org sub-picker (same openMenuStack push the
-// browser picker uses); picking an org there fires beginFindInOrg.
-
 // moveOrgPickerTargetID is the sentinel on the "Find in another org…"
 // row that requestOpenMenu injects. fireMenuTarget intercepts it to
 // open the org sub-picker rather than opening a URL.
 const moveOrgPickerTargetID = "__find_in_org_picker__"
 
-// moveOrgChoiceIDPrefix marks a synthetic sub-picker row that, when
-// fired, searches that org for the cursored resource (username follows).
 const moveOrgChoiceIDPrefix = "__find_in_org__:"
 
 func moveOrgChoiceID(username string) string { return moveOrgChoiceIDPrefix + username }
@@ -235,9 +172,6 @@ func parseMoveOrgChoiceID(id string) (string, bool) {
 	return strings.TrimPrefix(id, moveOrgChoiceIDPrefix), true
 }
 
-// moveOrgTargets returns the other connected orgs the cursored resource
-// could move to (excludes the active org and any unusable/disconnected
-// one). Empty when there's nowhere to move.
 func (m Model) moveOrgTargets() []sf.Org {
 	var out []sf.Org
 	cur := ""
@@ -253,10 +187,6 @@ func (m Model) moveOrgTargets() []sf.Org {
 	return out
 }
 
-// moveOrgOpenTarget returns the synthetic "Move to org…" row for the
-// open menu, or nil when the cursored resource isn't movable or there's
-// no other org to move it to. Injected by requestOpenMenu (open mode
-// only — moving is not a yank).
 func (m Model) moveOrgOpenTarget() *sf.OpenTarget {
 	it, ok := m.resolveItemIdentity()
 	if !ok || !movableKind(it.Kind) {
@@ -273,10 +203,6 @@ func (m Model) moveOrgOpenTarget() *sf.OpenTarget {
 	}
 }
 
-// openMoveOrgSubPicker swaps the active open menu for an org chooser.
-// Pushes the current menu so esc pops back to it (mirrors the browser
-// sub-picker). Rows are the other connected orgs; firing one moves the
-// cursored resource there.
 func (m *Model) openMoveOrgSubPicker() tea.Cmd {
 	if m.openMenu == nil {
 		return nil
@@ -314,8 +240,6 @@ func (m *Model) openMoveOrgSubPicker() tea.Cmd {
 	return nil
 }
 
-// fireMoveOrgChoice completes a move to the org encoded in the selected
-// sub-picker row. Unwinds the whole open-menu stack, then arms the move.
 func (m Model) fireMoveOrgChoice(idx int) (Model, tea.Cmd) {
 	if m.openMenu == nil || idx < 0 || idx >= len(m.openMenu.targets) {
 		return m, nil
@@ -331,9 +255,6 @@ func (m Model) fireMoveOrgChoice(idx int) (Model, tea.Cmd) {
 	return mm, cmd
 }
 
-// moveListTabFor maps a movable kind to the list Tab that hosts it, so
-// the target org lands on the right surface (and fires the right
-// EnsureData) before the resolve completes.
 func moveListTabFor(k devproject.ItemKind) Tab {
 	switch k {
 	case devproject.KindSObject, devproject.KindField:
@@ -381,23 +302,15 @@ func (m *Model) resolvePendingMove() tea.Cmd {
 		return nil // target list still fetching; try again next msg
 	}
 	if !found {
-		// Resource genuinely absent in the target org. Stay in the
-		// current org — do NOT switch — and tell the user.
 		m.move = nil
 		m.flash(fmt.Sprintf("%q not in %s", mv.label, orgMoveLabel(m.orgs[targetIdx])))
 		return nil
 	}
-	// Confirmed present — NOW switch to the target org and drill into
-	// the resource's detail. drillByKind operates on the selected org,
-	// so select first.
 	m.move = nil
 	m.setSelectedOrg(targetIdx)
 	m.flash("opening " + mv.label + " in " + orgMoveLabel(m.orgs[targetIdx]))
 	cmd, ok := drillByKind(m, string(mv.kind), ref, mv.typeHint, mv.label, mv.fromTab)
 	if !ok {
-		// Kind has no detail surface (shouldn't happen for movable
-		// kinds) — fall back to its list so the user at least lands
-		// on the right surface in the target org.
 		m.setTab(moveListTabFor(mv.kind))
 		return m.onTabChanged()
 	}

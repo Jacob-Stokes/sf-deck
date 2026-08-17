@@ -2,25 +2,6 @@ package ui
 
 // Command palette — global fuzzy-find modal over every Tab + every
 // command in the keymap registry. Bound to `;` by default.
-//
-// The palette is the answer to the "we ran out of number keys"
-// problem: instead of binding more digits to more tabs, every
-// destination is reachable through one universal modal that
-// searches by name. New tabs and commands appear automatically
-// because the entry list is built from the existing registries
-// (tabSpecs() and keymap.Commands).
-//
-// Two entry kinds:
-//
-//   1. Tab navigations — every Tab + every Subtab from tabSpecs().
-//      Selecting one calls m.setTab(...).
-//   2. Action commands — registered via paletteCommands. Each has
-//      a Run closure that fires whatever the command does (open a
-//      sub-modal, refresh, etc.).
-//
-// Fuzzy matching is subsequence-aware: typing "soqlsv" matches
-// "/soql Saved" because the letters appear in that order. Ranks
-// exact > prefix > subsequence > substring > fall-through.
 
 import (
 	"fmt"
@@ -35,15 +16,12 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/keymap"
 )
 
-// paletteEntry is one row in the palette. Either Tab navigation OR
-// a custom Run command — exactly one of TabTarget / Run is set.
 type paletteEntry struct {
 	Label       string // primary display text — what fuzzy-matches
 	Hint        string // right-aligned dim text (key binding, kind)
 	Description string // optional second-line description (unused in v1)
 	Category    string // grouping for empty-input view
 
-	// Discriminator: exactly one of these is set.
 	TabTarget Tab
 	SubtabIdx int  // when targeting a subtab within TabTarget
 	HasSubtab bool // distinguishes "tab only" from "tab+subtab 0"
@@ -78,23 +56,7 @@ type paletteCommand struct {
 	KeyHint           string
 }
 
-// paletteCommands is the static command registry. Tabs come from
-// the TabSpec registry; this slice is for actions that don't
-// correspond to a tab navigation.
-//
-// Categories drive grouping in the empty-input view and in
-// alphabetical order: Navigation, Org, SOQL, Records, Tags,
-// Project, Bundle, Chip, View, System. Adding a new category =
-// just use a new string here.
-//
-// Available is consulted at modal open. Entries that return false
-// are hidden by default; they re-surface (grayed with the
-// UnavailableReason) when the user's query exactly matches the
-// label, so power users can discover what state would unlock the
-// action.
 var paletteCommands = []paletteCommand{
-
-	// --- Help / onboarding ---
 
 	{ID: "walkthrough_start", Label: "Start guided walkthrough", Category: "Help",
 		Description: "Re-run the hands-on tour of sf-deck's core features",
@@ -116,8 +78,6 @@ var paletteCommands = []paletteCommand{
 			m.removeDemoOrg()
 			return nil
 		}},
-
-	// --- Org ---
 
 	{ID: "org_add", Label: "Add org", Category: "Org",
 		Description: "Authenticate a new Salesforce org via web or sfdx-url",
@@ -142,8 +102,6 @@ var paletteCommands = []paletteCommand{
 			*m = mm
 			return cmd
 		}},
-
-	// --- View ---
 
 	{ID: "view_manage", Label: "Open view (chip) manager", Category: "View",
 		Description: "Manage saved filters for the current surface",
@@ -187,8 +145,6 @@ var paletteCommands = []paletteCommand{
 			return nil
 		}},
 
-	// --- Project ---
-
 	{ID: "project_new", Label: "New dev project", Category: "Project",
 		Description: "Create a named working set of items across orgs",
 		Run:         func(m *Model) tea.Cmd { return m.openNewDevProjectModal() }},
@@ -198,8 +154,6 @@ var paletteCommands = []paletteCommand{
 			m.setTab(TabDevProjects)
 			return nil
 		}},
-
-	// --- System ---
 
 	{ID: "open_settings", Label: "Open settings", Category: "System",
 		KeyHint: firstPretty(Keys.OpenSettings),
@@ -235,28 +189,18 @@ var paletteCommands = []paletteCommand{
 			return nil
 		}},
 
-	// --- Help ---
-
 	{ID: "help_keymap", Label: "Show all keybindings", Category: "Help",
 		KeyHint: firstPretty(Keys.Help),
 		Run:     func(m *Model) tea.Cmd { return m.openKeybindingsModal() }},
 }
 
-// commandPaletteState is the modal's live state.
 type commandPaletteState struct {
-	// Query is the user's current search input.
 	Query string
 
-	// Entries is the full unfiltered list, computed once at modal
-	// open. Doesn't change while the modal is alive — tabs don't
-	// appear/disappear mid-input.
 	Entries []paletteEntry
 
-	// Filtered is the post-rank, post-filter view. Recomputed
-	// every keystroke (cheap — typically <500 entries).
 	Filtered []paletteEntry
 
-	// Cursor is the highlighted row index in Filtered.
 	Cursor int
 }
 
@@ -273,21 +217,13 @@ func (m *Model) openCommandPalette() tea.Cmd {
 	return nil
 }
 
-// closeCommandPalette dismisses the modal without firing anything.
 func (m *Model) closeCommandPalette() {
 	m.commandPalette = nil
 }
 
-// buildPaletteEntries walks tabSpecs() and paletteCommands to
-// produce the full entry list. Called once at modal open.
-//
-// Tab entries take TabsForNumbers() ordering for the top tabs (so
-// the palette presents them in the same order as the number row),
-// then everything else alphabetically.
 func buildPaletteEntries(m Model) []paletteEntry {
 	out := []paletteEntry{}
 
-	// Tabs from the TabsForNumbers list (top-row destinations).
 	numbered := TabsForNumbers()
 	numberedSet := map[Tab]bool{}
 	for i, t := range numbered {
@@ -300,9 +236,6 @@ func buildPaletteEntries(m Model) []paletteEntry {
 		})
 	}
 
-	// Subtabs from the registry. Each Tab with declared Subtabs
-	// produces one entry per subtab (so users can jump straight
-	// to e.g. "/soql Saved" without a tab+subtab dance).
 	for tab, spec := range tabSpecs() {
 		for i, sub := range spec.Subtabs {
 			out = append(out, paletteEntry{
@@ -316,8 +249,6 @@ func buildPaletteEntries(m Model) []paletteEntry {
 		}
 	}
 
-	// Other tabs (not in TabsForNumbers, not via subtabs above).
-	// E.g. /tags, /setup, /dev-projects when not on the number row.
 	allTabs := []Tab{
 		TabHome, TabSOQL, TabObjects, TabFlows, TabApex, TabLWC, TabPerms,
 		TabReports, TabMeta, TabRecords,
@@ -364,9 +295,6 @@ func buildPaletteEntries(m Model) []paletteEntry {
 		})
 	}
 
-	// Look up the command-palette key itself for a tip line — not
-	// used here directly, but the registry-driven dispatch means
-	// the help label is always in sync with the binding.
 	_ = keymap.First(Keys.CommandPalette)
 
 	return out
@@ -395,8 +323,6 @@ func (cp *commandPaletteState) applyPaletteFilter() {
 			out = append(out, scored{e, s})
 		}
 	}
-	// Stable sort by score desc, then by label asc for ties so the
-	// list doesn't shuffle on equal-score keystrokes.
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].score != out[j].score {
 			return out[i].score > out[j].score
@@ -435,9 +361,6 @@ func palettematchScore(label, q string) int {
 	if strings.Contains(label, q) {
 		return 600
 	}
-	// Subsequence match: every char of q appears in label in order,
-	// not necessarily contiguous. Score by tightness — closer the
-	// chars cluster, the better.
 	li, qi := 0, 0
 	first, last := -1, -1
 	for li < len(label) && qi < len(q) {
@@ -453,7 +376,6 @@ func palettematchScore(label, q string) int {
 	if qi < len(q) {
 		return 0 // not all chars found
 	}
-	// Tighter clustering = higher score within [400, 599].
 	span := last - first + 1
 	tightness := 0
 	if span > 0 {
@@ -465,8 +387,6 @@ func palettematchScore(label, q string) int {
 	return 400 + tightness
 }
 
-// activatePaletteEntry fires whatever the cursored entry does and
-// closes the modal.
 func (m *Model) activatePaletteEntry() tea.Cmd {
 	cp := m.commandPalette
 	if cp == nil || cp.Cursor < 0 || cp.Cursor >= len(cp.Filtered) {
@@ -478,10 +398,8 @@ func (m *Model) activatePaletteEntry() tea.Cmd {
 	if e.Run != nil {
 		return e.Run(m)
 	}
-	// Tab navigation.
 	m.setTab(e.TabTarget)
 	if e.HasSubtab {
-		// Set subtab via the spec's SetSubtabIdx if registered.
 		if spec := lookupTabSpec(e.TabTarget); spec != nil && spec.SetSubtabIdx != nil {
 			spec.SetSubtabIdx(m, e.SubtabIdx)
 		}
@@ -489,7 +407,6 @@ func (m *Model) activatePaletteEntry() tea.Cmd {
 	return m.onTabChanged()
 }
 
-// renderCommandPalette draws the modal; "" when not active.
 func (m Model) renderCommandPalette() string {
 	cp := m.commandPalette
 	if cp == nil {
@@ -504,13 +421,11 @@ func (m Model) renderCommandPalette() string {
 	lines = append(lines, titleStyle.Render("Command menu"))
 	lines = append(lines, strings.Repeat("─", inner))
 
-	// Input row with caret.
 	caret := lipgloss.NewStyle().Foreground(theme.BorderHi).Render("│")
 	prompt := lipgloss.NewStyle().Foreground(theme.FgDim).Render("> ")
 	queryLine := prompt + cp.Query + caret
 	lines = append(lines, queryLine, "")
 
-	// Filtered results, capped to the modal's vertical budget.
 	maxRows := m.settings.LayoutCommandPaletteRows()
 	if len(cp.Filtered) < maxRows {
 		maxRows = len(cp.Filtered)
@@ -524,7 +439,6 @@ func (m Model) renderCommandPalette() string {
 			cp.Cursor = 0
 		}
 	}
-	// Window the visible slice around the cursor so it stays in view.
 	start := 0
 	if cp.Cursor >= maxRows {
 		start = cp.Cursor - maxRows + 1
@@ -546,8 +460,6 @@ func (m Model) renderCommandPalette() string {
 		if e.Hint != "" {
 			hint = lipgloss.NewStyle().Foreground(theme.FgDim).Render(e.Hint)
 		}
-		// Label fills the rest of the row; right-pad so the hint
-		// right-aligns visually.
 		labelW := inner - lipglossWidth(hint) - 4
 		if labelW < 8 {
 			labelW = 8
@@ -572,13 +484,6 @@ func (m Model) renderCommandPalette() string {
 	return modalBox(body, w)
 }
 
-// handleCommandPaletteKey processes input while the palette is
-// active. Returns (handled, cmd). The Update loop consults this
-// before any other dispatch when commandPalette != nil.
-//
-// Receives tea.KeyMsg (the interface) to match the other modal
-// handlers' signatures; we type-assert to KeyPressMsg internally
-// since key-press is the only event shape that mutates palette state.
 func (m *Model) handleCommandPaletteKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if m.commandPalette == nil {
 		return false, nil
@@ -613,7 +518,6 @@ func (m *Model) handleCommandPaletteKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, nil
 	}
 
-	// Printable character: append to query.
 	r := keypressRune(press)
 	if r != 0 {
 		cp.Query += string(r)
@@ -623,9 +527,6 @@ func (m *Model) handleCommandPaletteKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	return true, nil
 }
 
-// keypressRune extracts a single printable rune from a tea key
-// event. Returns 0 for non-character keys (modifiers alone, F-keys,
-// etc.).
 func keypressRune(msg tea.KeyPressMsg) rune {
 	if len(msg.Text) == 1 {
 		r := []rune(msg.Text)[0]
@@ -636,8 +537,6 @@ func keypressRune(msg tea.KeyPressMsg) rune {
 	return 0
 }
 
-// max returns the larger of a, b. Used by palettematchScore for the
-// tightness denominator.
 func max(a, b int) int {
 	if a > b {
 		return a

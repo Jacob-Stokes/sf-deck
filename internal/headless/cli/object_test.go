@@ -125,13 +125,8 @@ func TestObject_UnknownVerb(t *testing.T) {
 }
 
 func TestObject_DefaultsToListVerb(t *testing.T) {
-	// "object" with no verb routes to list — verb default. List will
-	// fail at the network boundary in tests, but we can confirm the
-	// command label is correct.
 	a := newObjectTestApp()
 	code, got := runObjectCLI(t, a, "--json", "object", "--org", "missing")
-	// missing org makes this not_found; we just want the command
-	// label to be object.list, confirming the default-verb route.
 	_ = code
 	if got["command"] != "object.list" {
 		t.Errorf("command = %v, want object.list", got["command"])
@@ -166,6 +161,3 @@ func TestWriteDescribeErr_NotFoundMapping(t *testing.T) {
 		})
 	}
 }
-
-// errSimple is a tiny error helper. Already defined in soql_test.go;
-// re-use it here.

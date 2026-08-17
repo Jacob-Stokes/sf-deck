@@ -9,13 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 )
 
-// ImportBundle parses a package.xml off disk + inserts each
-// referenced metadata member as a project item. Tests use a real
-// (in-temp-dir) devproject Store and temp manifest files. No org
-// contact.
-
-// ----- happy path ------------------------------------------------
-
 func TestImportBundle_HappyPath(t *testing.T) {
 	s := newTestStore(t)
 	res, err := Create(s, CreateInput{Name: "Import target"})
@@ -73,7 +66,6 @@ func TestImportBundle_HappyPath(t *testing.T) {
 		t.Errorf("Unknown = %v, want [SomeFutureMetadataType]", out.Unknown)
 	}
 
-	// Verify the items actually landed.
 	items, err := ListItems(s, projectID, "")
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +74,6 @@ func TestImportBundle_HappyPath(t *testing.T) {
 		t.Errorf("ListItems len = %d, want 5", len(items))
 	}
 
-	// Field name + type extraction (Account.Phone → Name=Phone, Type=Account)
 	var found bool
 	for _, it := range items {
 		if devproject.ItemKind(it.Kind) == devproject.KindField && it.Ref == "Account.Phone" {
@@ -99,8 +90,6 @@ func TestImportBundle_HappyPath(t *testing.T) {
 		t.Error("Account.Phone item not found")
 	}
 }
-
-// ----- idempotency ------------------------------------------------
 
 func TestImportBundle_IdempotentSecondRun(t *testing.T) {
 	s := newTestStore(t)
@@ -132,8 +121,6 @@ func TestImportBundle_IdempotentSecondRun(t *testing.T) {
 	}
 }
 
-// ----- directory-path resolution ----------------------------------
-
 func TestImportBundle_DirectoryPath(t *testing.T) {
 	s := newTestStore(t)
 	res, _ := Create(s, CreateInput{Name: "X"})
@@ -148,7 +135,6 @@ func TestImportBundle_DirectoryPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Pass the DIR, not the file.
 	out, err := ImportBundle(s, ImportBundleInput{ProjectID: projectID, Path: dir})
 	if err != nil {
 		t.Fatalf("ImportBundle from dir: %v", err)
@@ -157,8 +143,6 @@ func TestImportBundle_DirectoryPath(t *testing.T) {
 		t.Errorf("Added = %d, want 1", out.Added)
 	}
 }
-
-// ----- wildcard members are skipped -------------------------------
 
 func TestImportBundle_WildcardMemberSkipped(t *testing.T) {
 	s := newTestStore(t)
@@ -179,8 +163,6 @@ func TestImportBundle_WildcardMemberSkipped(t *testing.T) {
 		t.Errorf("Added = %d, want 1 (wildcard ignored)", out.Added)
 	}
 }
-
-// ----- error paths -----------------------------------------------
 
 func TestImportBundle_NilStore(t *testing.T) {
 	_, err := ImportBundle(nil, ImportBundleInput{ProjectID: "p", Path: "/x"})
@@ -250,13 +232,10 @@ func TestImportBundle_MalformedXMLFails(t *testing.T) {
 	}
 }
 
-// ----- deriveName / deriveType (pure functions) -------------------
-
 func TestDeriveName_CustomFieldStripsParent(t *testing.T) {
 	if got := deriveName(devproject.KindField, "Account.Phone"); got != "Phone" {
 		t.Errorf("got %q, want Phone", got)
 	}
-	// No dot → bare ref echoed
 	if got := deriveName(devproject.KindField, "Phone"); got != "Phone" {
 		t.Errorf("got %q, want Phone", got)
 	}
@@ -298,8 +277,6 @@ func TestDeriveType_OtherKindsEmpty(t *testing.T) {
 	}
 }
 
-// ----- metadataTypeToKind ----------------------------------------
-
 func TestMetadataTypeToKind_Coverage(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -340,15 +317,11 @@ func TestMetadataTypeToKind_Unknown(t *testing.T) {
 	}
 }
 
-// ----- itemKey ----------------------------------------------------
-
 func TestItemKey_StableShape(t *testing.T) {
 	if itemKey(devproject.KindFlow, "MyFlow") != "flow|MyFlow" {
 		t.Errorf("got %q", itemKey(devproject.KindFlow, "MyFlow"))
 	}
 }
-
-// ----- helpers ----------------------------------------------------
 
 func writeTempManifest(t *testing.T, body string) string {
 	t.Helper()

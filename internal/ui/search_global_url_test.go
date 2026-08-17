@@ -43,15 +43,12 @@ func TestRecognizeURL_Garbage(t *testing.T) {
 }
 
 func TestRecognizeURL_UnsupportedSetupSection_ReturnsNil(t *testing.T) {
-	// Setup pages we don't model fail Parse; recognizeURL should
-	// return nil so the modal stays in fuzzy-search mode.
 	if r := recognizeURL("https://acme.lightning.force.com/lightning/setup/SharingRules/home"); r != nil {
 		t.Fatalf("expected nil for unsupported setup page, got Label=%q", r.Label)
 	}
 }
 
 func TestNavigateFromParsed_NilWhenIDMissing(t *testing.T) {
-	// Flow URL with no embedded id should not produce a navigator.
 	p := sfurl.Parsed{
 		Kind:  devproject.KindFlow,
 		Extra: map[string]string{},

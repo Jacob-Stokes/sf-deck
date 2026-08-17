@@ -2,21 +2,6 @@ package sf
 
 // Metadata API (REST) — the deploy surface for entities Tooling can't
 // PATCH. See README_API_ROUTING.md for the routing cheatsheet.
-//
-// Shape:
-//   1. Build a set of MetadataFile entries (XML body + relative path
-//      under the deploy "src" root).
-//   2. Build a package.xml manifest describing those files.
-//   3. ZIP it all together with the right directory layout.
-//   4. POST multipart to /services/data/vNN/metadata/deployRequest
-//      with {"deployOptions": {...}} and the ZIP bytes.
-//   5. Poll /services/data/vNN/metadata/deployRequest/<id>?includeDetails=true
-//      every ~1s until status is Succeeded / Failed / Canceled.
-//   6. Return a DeployResult so callers can surface success or the
-//      first failure message.
-//
-// Async, typical completion 2-5s. Count against API limits like any
-// other REST call.
 
 import (
 	"archive/zip"
@@ -31,12 +16,6 @@ import (
 	"time"
 )
 
-// dlogf writes a per-step line to ~/.sf-deck/deploy.log when the
-// env var SFDECK_DEBUG_DEPLOY=1 is set. Off by default — deploys
-// are chatty and a normal session shouldn't grow the log file.
-// Entry/exit logs around DeployMetadata make this the right tool
-// for diagnosing "deploy hung" reports; just `SFDECK_DEBUG_DEPLOY=1
-// go run ...` to capture a trace.
 func dlogf(format string, args ...any) {
 	if os.Getenv("SFDECK_DEBUG_DEPLOY") != "1" {
 		return
@@ -73,19 +52,11 @@ type PackageMember struct {
 // Defaults are conservative: no test run, no check-only, no purge on
 // delete. Callers can override per-deploy if needed.
 type DeployOptions struct {
-	// CheckOnly when true validates without committing. Great for a
-	// dry-run but we default to false.
-	CheckOnly bool `json:"checkOnly"`
-	// RollbackOnError: if any component fails, roll back the whole
-	// deploy. Always on — partial deploys are a debugging nightmare.
+	CheckOnly       bool `json:"checkOnly"`
 	RollbackOnError bool `json:"rollbackOnError"`
-	// SinglePackage: we always ship a single package. Setting this
-	// true lets Salesforce skip a level of zip nesting.
-	SinglePackage bool `json:"singlePackage"`
+	SinglePackage   bool `json:"singlePackage"`
 }
 
-// defaultDeployOptions is the shape we use for every in-app edit.
-// The caller builds the ZIP; we just need to tell SF how to apply it.
 func defaultDeployOptions() DeployOptions {
 	return DeployOptions{
 		CheckOnly:       false,
@@ -150,15 +121,10 @@ func DeployMetadata(target, version string, members []PackageMember, files []Met
 	return res, err
 }
 
-// buildDeployZip assembles the package.xml manifest + caller files
-// into a single ZIP whose layout Salesforce expects for a REST
-// metadata deploy (singlePackage=true form: files sit directly at
-// the ZIP root, no leading "unpackaged/" prefix).
 func buildDeployZip(version string, members []PackageMember, files []MetadataFile) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
-	// package.xml at the root.
 	manifest := buildPackageXML(version, members)
 	f, err := w.Create("package.xml")
 	if err != nil {
@@ -168,7 +134,6 @@ func buildDeployZip(version string, members []PackageMember, files []MetadataFil
 		return nil, err
 	}
 
-	// Each caller-supplied file at its declared path.
 	for _, mf := range files {
 		f, err := w.Create(mf.Path)
 		if err != nil {
@@ -184,8 +149,6 @@ func buildDeployZip(version string, members []PackageMember, files []MetadataFil
 	return buf.Bytes(), nil
 }
 
-// buildPackageXML emits the manifest for the deploy. Conservative
-// shape — <version> only, no <fullName> or extras.
 func buildPackageXML(version string, members []PackageMember) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
@@ -211,9 +174,6 @@ func buildPackageXML(version string, members []PackageMember) string {
 	return b.String()
 }
 
-// submitDeploy POSTs the ZIP + deployOptions to the Metadata REST
-// endpoint. Returns the deploy job Id. Submission errors (4xx/5xx)
-// come back as SFErrors.
 func submitDeploy(c *Client, version string, zipBytes []byte) (string, error) {
 	opts := struct {
 		DeployOptions DeployOptions `json:"deployOptions"`
@@ -226,7 +186,6 @@ func submitDeploy(c *Client, version string, zipBytes []byte) (string, error) {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 
-	// Part 1: entity_content — JSON DeployOptions.
 	optsHeader := textproto.MIMEHeader{}
 	optsHeader.Set("Content-Disposition", `form-data; name="entity_content"`)
 	optsHeader.Set("Content-Type", "application/json")
@@ -238,7 +197,6 @@ func submitDeploy(c *Client, version string, zipBytes []byte) (string, error) {
 		return "", err
 	}
 
-	// Part 2: file — the ZIP bytes.
 	fileHeader := textproto.MIMEHeader{}
 	fileHeader.Set("Content-Disposition", `form-data; name="file"; filename="deploy.zip"`)
 	fileHeader.Set("Content-Type", "application/zip")
@@ -265,7 +223,6 @@ func submitDeploy(c *Client, version string, zipBytes []byte) (string, error) {
 	}
 	dlogf("submit: response body: %s", string(raw))
 
-	// Successful submit returns {id, state, done, …}.
 	var resp struct {
 		ID           string         `json:"id"`
 		DeployResult map[string]any `json:"deployResult"`
@@ -275,7 +232,6 @@ func submitDeploy(c *Client, version string, zipBytes []byte) (string, error) {
 			err, string(raw))
 	}
 	if resp.ID == "" {
-		// Some versions nest the id under deployResult.id only.
 		if nested, ok := resp.DeployResult["id"].(string); ok && nested != "" {
 			dlogf("submit: id from nested deployResult.id: %s", nested)
 			return nested, nil
@@ -286,18 +242,10 @@ func submitDeploy(c *Client, version string, zipBytes []byte) (string, error) {
 	return resp.ID, nil
 }
 
-// pollDeploy polls the deploy job until it reaches a terminal state
-// (Succeeded / Failed / Canceled). Returns a DeployResult summarizing
-// the outcome. Intervals: 500ms for the first few polls (most deploys
-// land sub-second when they have no big package), then the configured
-// steady interval (deploy_poll_ms, default 5s) until the deploy
-// deadline.
 func pollDeploy(c *Client, version, id string) (*DeployResult, error) {
 	path := "/services/data/v" + version + "/metadata/deployRequest/" + id + "?includeDetails=true"
 	maxWait := cfgDeployDeadline()
 	deadline := time.Now().Add(maxWait)
-	// Fast-start: 500ms for the first few polls (most deploys land
-	// sub-second), then settle to the configured steady-state interval.
 	interval := 500 * time.Millisecond
 	steady := cfgDeployPoll()
 	for attempts := 0; ; attempts++ {
@@ -353,7 +301,6 @@ func pollDeploy(c *Client, version, id string) (*DeployResult, error) {
 			return nil, fmt.Errorf("deploy %s timed out after %s (last status: %s)",
 				id, maxWait, dr.Status)
 		}
-		// Back off: after the first 3 polls, stretch to the steady interval.
 		time.Sleep(interval)
 		if attempts >= 2 {
 			interval = steady

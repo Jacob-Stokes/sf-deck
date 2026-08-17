@@ -15,7 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderPermParentUsers is the main-pane renderer for the Users subtab.
 func (m Model) renderPermParentUsers(w, inner, innerH int, o sf.Org) string {
 	d := m.ensureOrgDataRef(o.Username)
 
@@ -50,7 +49,6 @@ func (m Model) renderPermParentUsers(w, inner, innerH int, o sf.Org) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Column widths.
 	nameW := inner * 30 / 100
 	if nameW < 18 {
 		nameW = 18

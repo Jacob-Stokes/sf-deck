@@ -1,11 +1,5 @@
 package ui
 
-// List-wide yank chords: q-y copies the whole visible list as a table,
-// q-i copies the Id column as a comma-separated IN-list. Both read the
-// active surface's rendered cells via activeListTableContext (populated
-// from BuildRenderModel), so they only work — and only show — on list
-// surfaces that expose their cells.
-
 import (
 	"strings"
 
@@ -26,9 +20,6 @@ func (m *Model) activeListYankContext() (cell func(row, col int) string, rows in
 	return ctx.Cell, ctx.RowCount, ctx.RenderCols, true
 }
 
-// yankableListColumns filters out non-data columns (the gutter/flags
-// "Marks" column, blank-named) so the yanked table/ids only carry real
-// content.
 func yankableListColumns(cols []uilayout.ListColumn) []int {
 	var idx []int
 	for i, c := range cols {
@@ -40,9 +31,6 @@ func yankableListColumns(cols []uilayout.ListColumn) []int {
 	return idx
 }
 
-// yankListTableChord copies every visible row as a tab-separated table
-// (header + rows), skipping the flags/gutter column. Available on any
-// list surface that exposes its cells.
 func yankListTableChord() chordSpec {
 	return chordSpec{
 		Letter:    "y",
@@ -60,7 +48,6 @@ func yankListTableChord() chordSpec {
 				return m, nil
 			}
 			var b strings.Builder
-			// Header.
 			for j, ci := range colIdx {
 				if j > 0 {
 					b.WriteByte('\t')
@@ -68,7 +55,6 @@ func yankListTableChord() chordSpec {
 				b.WriteString(strings.TrimSpace(ansi.Strip(cols[ci].Header)))
 			}
 			b.WriteByte('\n')
-			// Rows.
 			for r := 0; r < rows; r++ {
 				for j, ci := range colIdx {
 					if j > 0 {
@@ -84,9 +70,6 @@ func yankListTableChord() chordSpec {
 	}
 }
 
-// yankIDListChord copies the Id column of every visible row as a
-// comma-separated list — paste-ready for a SOQL IN-clause. Available
-// only when the active list has an "Id" column with content.
 func yankIDListChord() chordSpec {
 	idCol := func(m *Model) (func(row, col int) string, int, int, bool) {
 		cell, rows, cols, ok := m.activeListYankContext()

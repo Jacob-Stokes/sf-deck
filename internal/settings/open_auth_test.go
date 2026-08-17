@@ -11,7 +11,6 @@ func TestOpenAuthDefaultsToDirect(t *testing.T) {
 	if got := (&Settings{}).OpenAuth(); got != "direct" {
 		t.Fatalf("OpenAuth() default = %q, want \"direct\"", got)
 	}
-	// nil receiver takes the same default (used on the nil-settings path).
 	var s *Settings
 	if got := s.OpenAuth(); got != "direct" {
 		t.Fatalf("nil OpenAuth() = %q, want \"direct\"", got)

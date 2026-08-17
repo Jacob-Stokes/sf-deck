@@ -8,8 +8,6 @@ import "testing"
 // empty theme picker.
 func TestPaletteCount(t *testing.T) {
 	ids := PaletteIDs()
-	// We ship 5 curated + ~400 generated. Floor at 200 in case
-	// upstream prunes.
 	if len(ids) < 200 {
 		t.Errorf("expected >= 200 palettes, got %d", len(ids))
 	}
@@ -61,11 +59,7 @@ func TestPopularTierLeadsCatalogue(t *testing.T) {
 			t.Errorf("popular id %q at position %d, expected within the leading %d", id, pos[id], lead)
 		}
 	}
-	// github-dark should beat a random alphabetical theme like "nord"...
-	// actually assert a headline: github-dark-default comes before the
-	// first purely-alphabetical entry.
 	if pos["github-dark-default"] > pos["nord"] {
-		// both popular — fine; just ensure both lead a deep alpha id.
 	}
 	if deep, ok := pos["zenburn"]; ok && pos["github-dark-default"] > deep {
 		t.Error("github-dark-default should lead a deep-alphabetical theme")

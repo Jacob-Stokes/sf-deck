@@ -1,10 +1,5 @@
 package ui
 
-// Fixture catalogs for `sf-deck --demo` — see demo_seed.go for the
-// seeder. Everything here is fictional and index-generated: name
-// pools crossed with small arithmetic so lists fill full pages and
-// scroll, without a single value copied from a real org.
-
 import (
 	"fmt"
 	"strings"
@@ -15,8 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// demoPeople is the admin/dev cast that shows up as LastModifiedBy /
-// CreatedBy across every surface.
 var demoPeople = []string{
 	"Mara Chen", "Priya Patel", "Jonah Okafor",
 	"Elif Demir", "Tomas Silva", "Ingrid Larsen",
@@ -24,23 +17,15 @@ var demoPeople = []string{
 
 func demoPerson(i int) string { return demoPeople[i%len(demoPeople)] }
 
-// demoStamp returns a plausible LastModifiedDate, spread over the
-// ~90 days before launch so date columns look lived-in.
 func demoStamp(i int) string {
 	return time.Now().UTC().
 		Add(-time.Duration(3+(i*37)%2160) * time.Hour).
 		Format("2006-01-02T15:04:05.000+0000")
 }
 
-// keyPrefixFor synthesizes custom-object key prefixes a0A, a0B …
-// a0Z, a1A … the way real orgs hand them out in creation order.
 func keyPrefixFor(i int) string {
 	return fmt.Sprintf("a%d%c", i/26, 'A'+rune(i%26))
 }
-
-// ---------------------------------------------------------------
-// sObject catalog
-// ---------------------------------------------------------------
 
 var demoStdObjects = []struct{ n, l, kp string }{
 	{"Account", "Account", "001"},
@@ -146,10 +131,6 @@ func demoSObjects() []sf.SObject {
 	}
 	return out
 }
-
-// ---------------------------------------------------------------
-// Describes
-// ---------------------------------------------------------------
 
 func demoField(name, label, typ string, length int, custom bool) sf.Field {
 	return sf.Field{Name: name, Label: label, Type: typ, Length: length,
@@ -283,9 +264,6 @@ var demoCuratedFields = map[string][]sf.Field{
 	},
 }
 
-// demoCustomFieldPool feeds generated describes for the custom
-// objects without a curated set; demoStdFieldPool does the same for
-// the long tail of standard objects.
 var demoCustomFieldPool = []struct {
 	name, label, typ string
 }{
@@ -318,10 +296,6 @@ var demoStdFieldPool = []struct {
 	{"Body", "Body", "textarea"},
 }
 
-// demoDescribeFor builds a describe for any catalog object: system
-// fields first (the part every object shares), then a curated set
-// for the flagship objects or a deterministic slice of the filler
-// pool for the rest.
 func demoDescribeFor(o sf.SObject) sf.SObjectDescribe {
 	custom := o.DeploymentStatus != "" // only custom objects carry it in the catalog
 	fields := []sf.Field{
@@ -337,10 +311,6 @@ func demoDescribeFor(o sf.SObject) sf.SObjectDescribe {
 	if curated, ok := demoCuratedFields[o.Name]; ok {
 		fields = append(fields, curated...)
 	} else {
-		// Deterministic per-object slice of the filler pool: the
-		// name hash picks where to start and how many to take, so
-		// every object's fields list looks different but re-seeds
-		// identically.
 		h := 0
 		for _, c := range o.Name {
 			h += int(c)
@@ -371,9 +341,6 @@ func demoDescribeFor(o sf.SObject) sf.SObjectDescribe {
 	}
 }
 
-// demoBaselineFor backs the object-action sidebar's feature-toggle
-// state (object_baseline:<obj>) so a drill doesn't flash a demo-mode
-// fetch error while "loading current toggle state".
 func demoBaselineFor(o sf.SObject) *sf.CustomObjectBaseline {
 	yes, no := true, false
 	b := &sf.CustomObjectBaseline{
@@ -408,12 +375,6 @@ func demoPermsetPicker() []sf.FLSPickerEntry {
 	}
 }
 
-// demoFLSRows builds one (sobject, parent) FLS payload from the
-// object's describe. Admin sees everything R+E, the read-only
-// reporting set sees R only, and the middle of the ladder gets a
-// deterministic mix — a row is omitted entirely when the parent has
-// no access (matching the live API, where no FieldPermissions row
-// means no access).
 func demoFLSRows(sobject string, fields []sf.Field, parentIdx, parentCount int, parentID string) []sf.FieldPermissionRow {
 	var out []sf.FieldPermissionRow
 	n := 0
@@ -445,10 +406,6 @@ func demoFLSRows(sobject string, fields []sf.Field, parentIdx, parentCount int, 
 	return out
 }
 
-// ---------------------------------------------------------------
-// Flows
-// ---------------------------------------------------------------
-
 func demoFlows() []sf.Flow {
 	type row struct {
 		dev, label, ptype, status string
@@ -466,8 +423,6 @@ func demoFlows() []sf.Flow {
 		{"Customer_Onboarding", "Customer Onboarding", "Flow", "Active", 9},
 		{"Rate_Card_Approval", "Rate Card Approval", "Flow", "Active", 6},
 	}
-	// Two record-triggered/autolaunched flows per domain — the bulk
-	// that makes the flows tab scroll like a real org's.
 	domains := []struct{ dev, label string }{
 		{"Shipment", "Shipment"}, {"Shipment_Line", "Shipment Line"},
 		{"Warehouse", "Warehouse"}, {"Carrier", "Carrier"},
@@ -513,9 +468,6 @@ func demoFlows() []sf.Flow {
 			DefinitionID: defID, DeveloperName: r.dev,
 			MasterLabel: r.label, ProcessType: r.ptype, Status: r.status,
 			ActiveVersionNum: active, LatestVersionNum: ver, APIVersion: 62,
-			// Version-record IDs so `o` can offer the "Flow Builder
-			// (active version)" target, not just the Setup page. Latest
-			// is always the top version; active is 0 for draft flows.
 			ActiveVersionID:  demoFlowVersionID(i, active),
 			LatestVersionID:  demoFlowVersionID(i, ver),
 			LastModifiedDate: demoStamp(i * 2), LastModifiedBy: demoPerson(i),
@@ -524,17 +476,10 @@ func demoFlows() []sf.Flow {
 	return out
 }
 
-// demoFlowDefID is the stable fake FlowDefinition Id for the i-th
-// demo flow (0-based). Shared by demoFlows + demoFlowVersionsByDef so
-// the flow struct and its version list agree on the key.
 func demoFlowDefID(i int) string {
 	return fmt.Sprintf("300DM00000DM%03dAAA", i+1)
 }
 
-// demoFlowVersionID is the fake FlowVersion (301 prefix) Id for
-// version n of the i-th demo flow. Returns "" for n==0 (a draft flow
-// with no active version), so an empty ActiveVersionID reads as "no
-// active version" the same way a real org would.
 func demoFlowVersionID(i, n int) string {
 	if n <= 0 {
 		return ""
@@ -542,25 +487,18 @@ func demoFlowVersionID(i, n int) string {
 	return fmt.Sprintf("301DM%03d%05dAAA", i+1, n)
 }
 
-// demoFlowVersionsByDef builds the per-FlowDefinition version list the
-// flow-detail drill reads (cache key "flowversions:<defID>"). Each
-// flow gets its full 1..latest version history so drilling into a
-// flow shows a populated versions table instead of a demo-mode
-// network error. Keyed by DefinitionID to match EnsureFlowVersions.
 func demoFlowVersionsByDef() map[string][]sf.FlowVersion {
 	flows := demoFlows()
 	out := make(map[string][]sf.FlowVersion, len(flows))
 	for i, f := range flows {
 		latest := f.LatestVersionNum
 		versions := make([]sf.FlowVersion, 0, latest)
-		// Newest first, matching how the real versions list renders.
 		for n := latest; n >= 1; n-- {
 			status := "Obsolete"
 			switch {
 			case n == f.ActiveVersionNum:
 				status = "Active"
 			case n == latest && f.ActiveVersionNum != latest:
-				// Top version that isn't active = the working draft.
 				status = "Draft"
 			}
 			versions = append(versions, sf.FlowVersion{
@@ -582,10 +520,6 @@ func demoFlowVersionsByDef() map[string][]sf.FlowVersion {
 	return out
 }
 
-// ---------------------------------------------------------------
-// Apex classes
-// ---------------------------------------------------------------
-
 func demoApexClasses() []sf.ApexClassRow {
 	domains := []string{
 		"Shipment", "Carrier", "Route", "Customs", "FreightInvoice",
@@ -605,10 +539,6 @@ func demoApexClasses() []sf.ApexClassRow {
 			})
 		}
 	}
-	// Async workers (batch + queueable), appended AFTER the domain grid
-	// so the grid's index-derived Ids stay stable. The async-job and
-	// scheduled-job fixtures reference these by Id, so the Jobs surfaces
-	// drill onto real seeded classes.
 	for _, n := range demoAsyncApexNames {
 		i++
 		out = append(out, sf.ApexClassRow{
@@ -620,17 +550,10 @@ func demoApexClasses() []sf.ApexClassRow {
 	return out
 }
 
-// demoAsyncApexNames is the batch/queueable roster shared by
-// demoApexClasses (the rows), demoAsyncJobs (the executions), and
-// demoScheduledJobs (the crons).
 var demoAsyncApexNames = []string{
 	"SupplierScorecardBatch", "ShipmentEtaRecalcBatch", "NightlyKpiSnapshotBatch",
 	"DemurrageAccrualBatch", "RateCardSyncQueueable", "ColdChainAlertQueueable",
 }
-
-// ---------------------------------------------------------------
-// Deploys
-// ---------------------------------------------------------------
 
 func demoDeploys() []sf.DeployRow {
 	now := time.Now()
@@ -638,9 +561,6 @@ func demoDeploys() []sf.DeployRow {
 		return now.Add(-time.Duration(minsAgo) * time.Minute).UTC().Format("2006-01-02T15:04:05.000+0000")
 	}
 	rows := []sf.DeployRow{
-		// StartDate = seed time (not minutes ago) — the watch flip
-		// fires 12s after StartDate, and the tape needs to catch the
-		// InProgress state on screen before it completes.
 		{ID: "0AfDM00000DEMO01", Status: "InProgress", CreatedByName: "Mara Chen", CreatedDate: ts(0),
 			StartDate: ts(0), Type: "Api", TestLevel: "RunLocalTests",
 			ComponentsDeployed: 14, ComponentsTotal: 23, TestsTotal: 41, TestsCompleted: 12},
@@ -660,9 +580,6 @@ func demoDeploys() []sf.DeployRow {
 			StartDate: ts(2880), CompletedDate: ts(2879), CanceledByName: "Priya Patel", Type: "Api",
 			ComponentsDeployed: 0, ComponentsTotal: 19},
 	}
-	// Fill the rest of the 25-row deploys window with history spread
-	// over the prior two weeks: mostly green, the occasional failure
-	// and validation-only run.
 	for i := 0; i < 19; i++ {
 		minsAgo := 3000 + i*960 + (i*131)%240
 		comps := 2 + (i*11)%34
@@ -687,20 +604,11 @@ func demoDeploys() []sf.DeployRow {
 	return rows
 }
 
-// ---------------------------------------------------------------
-// Records
-// ---------------------------------------------------------------
-
-// demoRecordObjects fixes the iteration order for demoRecordHits
-// (maps don't have one).
 var demoRecordObjects = []string{
 	"Account", "Contact", "Opportunity", "Case",
 	"Shipment__c", "Carrier__c", "Warehouse__c",
 }
 
-// demoRecordLists builds every seeded records payload, memoized —
-// the seeder reads it once per org and demoRecordHits scans it per
-// ctrl+k keystroke.
 var demoRecordLists = sync.OnceValue(func() map[string]sf.RecordsList {
 	lists := map[string]sf.RecordsList{
 		"Account":      demoAccountRecords(),
@@ -711,19 +619,11 @@ var demoRecordLists = sync.OnceValue(func() map[string]sf.RecordsList {
 		"Carrier__c":   demoCarrierRecords(),
 		"Warehouse__c": demoWarehouseRecords(),
 	}
-	// Backfill CreatedDate on every row + column set so the "Recently
-	// created" chip has a populated, sortable date column in demo mode.
-	// Created is derived to sit a little BEFORE LastModifiedDate (a
-	// record is modified after it's created), keeping the two columns
-	// visually distinct.
 	for name, rl := range lists {
 		for i, rec := range rl.Records {
 			if _, has := rec["CreatedDate"]; !has {
 				rec["CreatedDate"] = demoCreatedFromModified(rec["LastModifiedDate"])
 			}
-			// Audit person columns render from nested JSON
-			// (rec["CreatedBy"]["Name"]); seed both so the columns
-			// aren't em-dashes in demo mode.
 			if _, has := rec["CreatedBy"]; !has {
 				rec["CreatedBy"] = map[string]any{"Name": demoPerson(i)}
 			}
@@ -737,9 +637,6 @@ var demoRecordLists = sync.OnceValue(func() map[string]sf.RecordsList {
 	return lists
 })
 
-// demoCreatedFromModified returns a CreatedDate string a few days
-// before the given LastModifiedDate value. Falls back to a generic
-// old stamp when the input isn't a parseable timestamp.
 func demoCreatedFromModified(modified any) string {
 	s, _ := modified.(string)
 	if t, err := time.Parse("2006-01-02T15:04:05.000-0700", s); err == nil {
@@ -749,11 +646,6 @@ func demoCreatedFromModified(modified any) string {
 	return demoStamp(60)
 }
 
-// withAuditColumns ensures the demo record column set carries the
-// standard audit columns in the same order the live path projects
-// them: CreatedDate · CreatedBy.Name before LastModifiedDate, and
-// LastModifiedBy.Name after it. Existing non-audit columns keep their
-// positions; already-present audit columns aren't duplicated.
 func withAuditColumns(cols []string) []string {
 	have := map[string]bool{}
 	for _, c := range cols {
@@ -779,8 +671,6 @@ func withAuditColumns(cols []string) []string {
 		}
 		out = append(out, c)
 	}
-	// Object with no LastModifiedDate column: append the created pair
-	// at the end so "Recently created" still has its sort axis.
 	if !have["CreatedDate"] {
 		out = append(out, "CreatedDate")
 	}
@@ -790,24 +680,11 @@ func withAuditColumns(cols []string) []string {
 	return out
 }
 
-// ---------------------------------------------------------------
-// Visit log + recently-viewed
-// ---------------------------------------------------------------
-
-// demoVisitedAccountIdx / demoVisitedShipmentIdx pin which seeded
-// records the demo user has "visited". The visit log, the visited
-// chip-records seeds, and the SF recently-viewed payload all derive
-// from these so the three views of recency agree.
 var (
 	demoVisitedAccountIdx  = []int{1, 4, 7}
 	demoVisitedShipmentIdx = []int{0, 3}
 )
 
-// demoRecentVisits is the local visit log persisted into the
-// (ephemeral) demo settings. Every "Recently viewed" chip — objects,
-// flows, apex, per-sObject records — reads from this, so without it
-// each surface lands on an empty default chip and the demo looks
-// dead on arrival.
 func demoRecentVisits() []settings.RecentConfig {
 	now := time.Now()
 	at := func(minsAgo int) time.Time { return now.Add(-time.Duration(minsAgo) * time.Minute) }
@@ -834,10 +711,6 @@ func demoRecentVisits() []settings.RecentConfig {
 	return out
 }
 
-// demoVisitedChipRecords builds the per-sObject Visited chip
-// payloads (chiprecords:<obj>:__visited__) — the records the visit
-// log says were opened, served through the same chip-records
-// resource the live path uses (SOQL `Id IN (visited)`).
 func demoVisitedChipRecords() map[string]sf.RecordsList {
 	pick := func(list sf.RecordsList, idx []int) sf.RecordsList {
 		out := list
@@ -854,9 +727,6 @@ func demoVisitedChipRecords() map[string]sf.RecordsList {
 	}
 }
 
-// demoRecentlyViewed mirrors the record entries of the visit log as
-// the org-side RecentlyViewed payload, so the SF-mode recent chips
-// agree with the local log.
 func demoRecentlyViewed() []sf.RecentlyViewedRow {
 	var out []sf.RecentlyViewedRow
 	for _, v := range demoRecentVisits() {
@@ -883,10 +753,6 @@ func demoListViews(sobject string, ord int) []sf.ListView {
 		{ID: id(3), Name: "Recently Modified", DeveloperName: "RecentlyModified" + strings.ReplaceAll(label, " ", ""), SobjectType: sobject, IsSoqlCompatible: true},
 	}
 }
-
-// ---------------------------------------------------------------
-// Triggers + notifications
-// ---------------------------------------------------------------
 
 func demoTriggers() []sf.TriggerRow {
 	rows := []struct{ name, table, events string }{
@@ -922,8 +788,6 @@ func demoTriggers() []sf.TriggerRow {
 	return out
 }
 
-// demoApexLogs fills the System tab's Logs subtab (its default
-// landing) so arriving on `7` doesn't flash a demo-mode fetch error.
 func demoApexLogs() []sf.ApexLogRow {
 	ops := []struct{ op, status string }{
 		{"/services/data/v62.0/sobjects/Shipment__c", "Success"},

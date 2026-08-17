@@ -1,7 +1,5 @@
 package ui
 
-// /flows list surface — see list_surface.go for the listSurface type.
-
 import (
 	"charm.land/lipgloss/v2"
 
@@ -90,8 +88,6 @@ var flowsListSurface = listSurface{
 					return base
 				}
 				f := items[row]
-				// Name col tracks active status; Status col gets the
-				// per-state palette. Other cols keep the declared style.
 				if col < 0 || col >= len(cols) {
 					return base
 				}

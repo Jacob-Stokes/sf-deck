@@ -1,14 +1,5 @@
 package ui
 
-// Demo-mode devproject store fixtures. Companion to demo_seed.go
-// (which seeds the cache.db) — this file owns everything that lives
-// in devprojects.db: DevProjects, items, bundles, tags, saved
-// queries, apex snippets.
-//
-// Wired from cmd/sf-deck/main.go after SeedDemoCache: same throwaway
-// tmpdir, same fictional Northwind universe, same demo-only-pure-
-// fiction guarantee.
-
 import (
 	"fmt"
 	"os"
@@ -32,7 +23,6 @@ func SeedDemoDevProjects(s *devproject.Store, demoDir string) error {
 		return fmt.Errorf("seed bundle root: %w", err)
 	}
 
-	// ----- DevProjects -----
 	now := time.Now()
 	projects := demoDevProjects(now)
 	for _, p := range projects {
@@ -41,14 +31,12 @@ func SeedDemoDevProjects(s *devproject.Store, demoDir string) error {
 		}
 	}
 
-	// ----- Items per project -----
 	for _, it := range demoDevProjectItems() {
 		if _, err := s.AddItem(it); err != nil {
 			return fmt.Errorf("seed item %s/%s: %w", it.DevProjectID, it.Ref, err)
 		}
 	}
 
-	// ----- Bundles + on-disk skeletons -----
 	for _, b := range demoDevBundles(bundleRoot) {
 		if err := writeDemoBundleSkeleton(b.Path, b.DevProjectID); err != nil {
 			return fmt.Errorf("seed bundle skeleton %s: %w", b.Path, err)
@@ -65,7 +53,6 @@ func SeedDemoDevProjects(s *devproject.Store, demoDir string) error {
 		}
 	}
 
-	// ----- Tags + bindings -----
 	tagIDs := map[string]int64{}
 	for _, t := range demoTagSeeds() {
 		tag, err := s.CreateTag(t.Name, t.Color, t.Icon)
@@ -84,21 +71,18 @@ func SeedDemoDevProjects(s *devproject.Store, demoDir string) error {
 		}
 	}
 
-	// ----- Saved SOQL queries -----
 	for _, q := range demoSavedQueries() {
 		if _, err := s.CreateSavedQuery(q.Name, q.Description, q.Body); err != nil {
 			return fmt.Errorf("seed saved query %s: %w", q.Name, err)
 		}
 	}
 
-	// ----- Saved Apex snippets -----
 	for _, ap := range demoSavedApex() {
 		if _, err := s.CreateSavedApex(ap.Name, ap.Description, ap.Body); err != nil {
 			return fmt.Errorf("seed saved apex %s: %w", ap.Name, err)
 		}
 	}
 
-	// ----- A little SOQL history so /soql history isn't empty -----
 	for _, h := range demoSOQLHistory(now) {
 		if _, err := s.LogSOQLHistory(h.OrgUser, h.Body, h.DurationMs, h.RowCount, h.Error); err != nil {
 			return fmt.Errorf("seed soql history: %w", err)
@@ -108,11 +92,6 @@ func SeedDemoDevProjects(s *devproject.Store, demoDir string) error {
 	return nil
 }
 
-// writeDemoBundleSkeleton drops a minimal sfdx-project.json +
-// package.xml into the bundle directory. Bundle.Stale() looks for
-// sfdx-project.json — without it, the detail view shows the
-// "directory is missing or no longer a sfdx project" warning and
-// hides everything else.
 func writeDemoBundleSkeleton(path, projectID string) error {
 	if err := os.MkdirAll(filepath.Join(path, "force-app", "main", "default"), 0o755); err != nil {
 		return err

@@ -13,13 +13,11 @@ func TestAdoptNewerModified(t *testing.T) {
 		latestDate = "2026-07-07T11:36:08.000+0000" // draft v4 (newest)
 	)
 
-	// Seed from the definition (as listFlowDefinitions now does).
 	f := &Flow{LastModifiedDate: defDate, LastModifiedBy: "Demo Author"}
 
 	active := FlowVersion{ID: "301A", LastModifiedDate: activeDate, LastModifiedBy: "Someone Else"}
 	latest := FlowVersion{ID: "301B", LastModifiedDate: latestDate, LastModifiedBy: "Demo Author"}
 
-	// Same order ListFlows applies them: active then latest.
 	adoptNewerModified(f, active) // older than seed → no change
 	if f.LastModifiedDate != defDate {
 		t.Fatalf("active (older) overwrote seed: got %q", f.LastModifiedDate)

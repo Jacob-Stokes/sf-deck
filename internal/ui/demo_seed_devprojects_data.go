@@ -1,14 +1,5 @@
 package ui
 
-// Fictional Northwind DevProject / bundle / tag / saved-query
-// fixtures. Companion to demo_seed_data.go (which holds cache.db
-// fixtures); this file owns devprojects.db payloads.
-//
-// Three projects, two bundles, six tags, five saved queries, four
-// apex snippets, and a small SOQL history log. Everything keys off
-// the same Northwind universe (demoDev / demoUAT / demoProd) so
-// org-hopping in the TUI stays consistent across DBs.
-
 import (
 	"path/filepath"
 	"time"
@@ -16,9 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 )
 
-// demoDevProjects is the project list. IDs are short, deterministic
-// strings so the demo replays identically across runs — same row
-// order, same tag bindings, same bundle linkage.
 func demoDevProjects(now time.Time) []devproject.DevProject {
 	return []devproject.DevProject{
 		{
@@ -45,15 +33,11 @@ func demoDevProjects(now time.Time) []devproject.DevProject {
 	}
 }
 
-// demoDevProjectItems is the flat list of (project, item) rows. Each
-// project gets a mix of kinds so the kind-filter chip strip on the
-// detail view has multiple buckets to filter.
 func demoDevProjectItems() []devproject.Item {
 	devUser := demoDev
 	now := time.Now()
 	t := func(daysAgo int) time.Time { return now.AddDate(0, 0, -daysAgo) }
 	return []devproject.Item{
-		// dp_shipment_revamp: 1 sObject + 4 fields + 2 flows + 1 validation rule + 1 apex
 		{DevProjectID: "dp_shipment_revamp", OrgUser: devUser, Kind: devproject.KindSObject,
 			Ref: "Shipment__c", Name: "Shipment", AddedAt: t(12)},
 		{DevProjectID: "dp_shipment_revamp", OrgUser: devUser, Kind: devproject.KindField,
@@ -73,7 +57,6 @@ func demoDevProjectItems() []devproject.Item {
 		{DevProjectID: "dp_shipment_revamp", OrgUser: devUser, Kind: devproject.KindApexClass,
 			Ref: "ShipmentStatusHelper", Name: "ShipmentStatusHelper", AddedAt: t(4)},
 
-		// dp_carrier_consolidation: heavier — Carrier sObject + fields + 3 flows + 2 apex + 1 LWC + 1 trigger
 		{DevProjectID: "dp_carrier_consolidation", OrgUser: devUser, Kind: devproject.KindSObject,
 			Ref: "Carrier__c", Name: "Carrier", AddedAt: t(28)},
 		{DevProjectID: "dp_carrier_consolidation", OrgUser: devUser, Kind: devproject.KindField,
@@ -95,7 +78,6 @@ func demoDevProjectItems() []devproject.Item {
 		{DevProjectID: "dp_carrier_consolidation", OrgUser: devUser, Kind: devproject.KindApexTrigger,
 			Ref: "CarrierBeforeUpdate", Type: "Carrier__c", Name: "CarrierBeforeUpdate", AddedAt: t(8)},
 
-		// dp_q3_cleanup: mixed bag — a flow, a perm set, a couple of fields, a saved query (org-agnostic)
 		{DevProjectID: "dp_q3_cleanup", OrgUser: devUser, Kind: devproject.KindFlow,
 			Ref: "Legacy_Order_Approval", Name: "Legacy Order Approval", AddedAt: t(5)},
 		{DevProjectID: "dp_q3_cleanup", OrgUser: devUser, Kind: devproject.KindPermissionSet,
@@ -118,10 +100,6 @@ type demoBundleSeed struct {
 	LastDeployedAt  time.Time
 }
 
-// demoDevBundles is two bundles: one fresh + retrieved, one
-// deployed-yesterday. Both link to dp_shipment_revamp and
-// dp_carrier_consolidation respectively. Paths sit under the
-// supplied demo bundle root.
 func demoDevBundles(root string) []demoBundleSeed {
 	now := time.Now()
 	return []demoBundleSeed{
@@ -141,9 +119,6 @@ func demoDevBundles(root string) []demoBundleSeed {
 	}
 }
 
-// demoBundleManifestFor returns a one-line package.xml whose Flow
-// member matches one of the project's items, so a user drilling
-// into the bundle sees something familiar in the Components view.
 func demoBundleManifestFor(projectID string) string {
 	prelude := `<?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
@@ -198,9 +173,6 @@ func demoBundleManifestFor(projectID string) string {
 	return prelude + closer
 }
 
-// demoTagSeed and demoTagBindingSeed are thin shapes for the
-// fixture spec — the seeder applies them through the real Store
-// methods so any constraint changes propagate naturally.
 type demoTagSeed struct {
 	Name, Color, Icon string
 }
@@ -212,8 +184,6 @@ type demoTagBindingSeed struct {
 	OrgUser string
 }
 
-// demoTagSeeds: small, named-by-purpose so the demo tag picker has
-// meaningful choices instead of "tag1/tag2/tag3".
 func demoTagSeeds() []demoTagSeed {
 	return []demoTagSeed{
 		{Name: "to-review", Color: "yellow", Icon: "○"},
@@ -225,9 +195,6 @@ func demoTagSeeds() []demoTagSeed {
 	}
 }
 
-// demoTagBindings applies tags across the seeded project items so
-// the /tags surface has data and the bulk-tag picker on the items
-// list shows familiar groups.
 func demoTagBindings() []demoTagBindingSeed {
 	return []demoTagBindingSeed{
 		{TagName: "in-progress", Kind: devproject.KindFlow, Ref: "Shipment_Status_Change", OrgUser: demoDev},
@@ -240,7 +207,6 @@ func demoTagBindings() []demoTagBindingSeed {
 	}
 }
 
-// demoSavedQuerySeed is a thin spec shape.
 type demoSavedQuerySeed struct {
 	Name, Description, Body string
 }
@@ -275,7 +241,6 @@ func demoSavedQueries() []demoSavedQuerySeed {
 	}
 }
 
-// demoSavedApexSeed is a thin spec shape for apex snippets.
 type demoSavedApexSeed struct {
 	Name, Description, Body string
 }
@@ -313,8 +278,6 @@ for (UserLicense l : ls) { System.debug(l.Name + ': ' + l.UsedLicenses + '/' + l
 	}
 }
 
-// demoSOQLHistorySeed pre-populates the /soql History subtab so it
-// isn't empty on a fresh demo launch.
 type demoSOQLHistorySeed struct {
 	OrgUser    string
 	Body       string

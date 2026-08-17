@@ -8,9 +8,6 @@ import "time"
 type UsageTracker interface {
 	Today() int
 	TodayForOrg(alias string) int
-	// TodayForOrgKeys sums an org's calls across its several keys (short
-	// alias AND username) so the count reconciles regardless of which the
-	// recording code path used.
 	TodayForOrgKeys(aliases ...string) int
 	Recent() []UsageCall
 }

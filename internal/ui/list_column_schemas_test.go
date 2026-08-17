@@ -35,7 +35,6 @@ func TestApexClassColumnSchemaDefaultsAndCells(t *testing.T) {
 	if got := resolved.Defs[4].Cell(row); got != "42" {
 		t.Fatalf("Size cell = %q, want 42", got)
 	}
-	// Large character counts compact — a ~990k-character class renders "992.5K".
 	if got := resolved.Defs[4].Cell(sf.ApexClassRow{LengthNoComments: 992501}); got != "992.5K" {
 		t.Fatalf("Size cell (large) = %q, want 992.5K", got)
 	}
@@ -78,7 +77,6 @@ func TestNumericColumnsSortByRawValue(t *testing.T) {
 	if !(v2 < v10) {
 		t.Fatalf("flow Version sort: v2 (%q) should sort below v10 (%q)", v2, v10)
 	}
-	// No active version → falls back to latest for sorting.
 	vLatest := sortCellForRow(t, flow, "Version", sf.Flow{LatestVersionNum: 5})
 	vNone := sortCellForRow(t, flow, "Version", sf.Flow{})
 	if !(vNone < vLatest) {
@@ -86,7 +84,6 @@ func TestNumericColumnsSortByRawValue(t *testing.T) {
 	}
 }
 
-// sortCellForRow resolves the named column's SortCell for one row.
 func sortCellForRow[T any](t *testing.T, resolved tablemodel.Resolved[T], name string, row T) string {
 	t.Helper()
 	for _, def := range resolved.Defs {

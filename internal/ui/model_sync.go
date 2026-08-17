@@ -1,22 +1,6 @@
 package ui
 
 // orgData ↔ ListView synchronization.
-//
-// ListViews wrap each Resource[T] payload with cursor + search +
-// filter state. When a resource lands (cache load, refresh complete,
-// list-view fetch), the wrapping ListView needs its items refreshed.
-//
-// Two flavours of sync helper live here:
-//
-//   - SyncListViews — the bulk path. Fans out to every per-resource
-//     helper. Used at bootstrap; safe but resets every cursor.
-//   - SyncXxxList — per-resource targeted helpers. Used by the
-//     update-loop's resource dispatcher so an apex_classes refresh
-//     doesn't wipe the /objects cursor (or vice versa).
-//
-// Each helper is a one-line `lv.Set(resource.Value())` — kept
-// separate so the dispatcher in update.go can reach for the right
-// one without touching unrelated state.
 
 // SyncListViews copies the latest Resource payloads into their wrapping
 // ListView items. Keep this for bulk/bootstrap syncs only; resource
@@ -24,10 +8,6 @@ package ui
 // that actually landed so unrelated cursors/searches survive background
 // refreshes.
 func (d *orgData) SyncListViews() {
-	// Registered list resources sync generically (see
-	// list_resource_registrations.go). Only surfaces NOT on the registry
-	// — those with a bespoke apply or a non-[]T shape — keep an explicit
-	// line below.
 	syncRegisteredLists(d)
 	d.SyncSObjectsList()
 	d.SyncDeploysList()
@@ -128,17 +108,7 @@ func (d *orgData) SyncNotificationsList() {
 }
 
 func (d *orgData) SyncHomeLists() {
-	// Home subtab list wrappers — each gets its own search buffer +
-	// cursor on top of the existing Home / Packages / Notifications
-	// resources. The license list merges UserLicense + PermSetLicense
-	// into a unified row type.
 	h := d.Home.Value()
-	// Sort limits by (group, name) so the default rendering clusters
-	// rows under each natural group (API / Storage / Email / …). User
-	// can re-sort by any column via the list-table sort gesture; the
-	// pre-sort is just the initial order. groupOrder gives a stable
-	// non-alpha ordering of groups so "API" lands first regardless of
-	// the alphabet.
 	limits := append([]KeyLimit(nil), h.KeyLimits...)
 	sortLimitsByGroup(limits)
 	d.HomeLimitList.Set(limits)

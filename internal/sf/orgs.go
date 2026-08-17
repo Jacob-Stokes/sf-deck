@@ -8,22 +8,18 @@ import (
 )
 
 type Org struct {
-	Alias       string `json:"alias"`
-	Username    string `json:"username"`
-	InstanceURL string `json:"instanceUrl"`
-	OrgID       string `json:"orgId"`
-	IsSandbox   bool   `json:"isSandbox"`
-	IsScratch   bool   `json:"isScratch"`
-	IsDevHub    bool   `json:"isDevHub"`
-	Status      string `json:"connectedStatus"`
-	LastUsed    string `json:"lastUsed"`
-	// ExpirationDate is set for scratch orgs only ("2006-01-02").
-	ExpirationDate string `json:"expirationDate"`
-	// IsDefault / IsDefaultDevHub mirror the sf CLI's global
-	// target-org / target-dev-hub config — which org a bare `sf`
-	// command outside the deck will hit.
-	IsDefault       bool `json:"isDefaultUsername"`
-	IsDefaultDevHub bool `json:"isDefaultDevHubUsername"`
+	Alias           string `json:"alias"`
+	Username        string `json:"username"`
+	InstanceURL     string `json:"instanceUrl"`
+	OrgID           string `json:"orgId"`
+	IsSandbox       bool   `json:"isSandbox"`
+	IsScratch       bool   `json:"isScratch"`
+	IsDevHub        bool   `json:"isDevHub"`
+	Status          string `json:"connectedStatus"`
+	LastUsed        string `json:"lastUsed"`
+	ExpirationDate  string `json:"expirationDate"`
+	IsDefault       bool   `json:"isDefaultUsername"`
+	IsDefaultDevHub bool   `json:"isDefaultDevHubUsername"`
 }
 
 // ScratchDaysLeft returns whole days until the scratch org expires
@@ -37,8 +33,6 @@ func (o Org) ScratchDaysLeft() (int, bool) {
 	if err != nil {
 		return 0, false
 	}
-	// Expiry is date-granular; compare against the start of today so
-	// "expires 2026-06-13" reads as 1 day left throughout 2026-06-12.
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	return int(exp.Sub(today).Hours() / 24), true
@@ -117,10 +111,6 @@ func listOrgsViaSF() ([]Org, error) {
 	return all, nil
 }
 
-// orgSortKey returns the display-name used for stable alphabetical
-// sorting: alias if set (the friendly name shown in the rail), else
-// username. Case-insensitive so "ACME-PROD" sorts next to "acme-test"
-// rather than capital letters bunching to the top.
 func orgSortKey(o Org) string {
 	if o.Alias != "" {
 		return strings.ToLower(o.Alias)

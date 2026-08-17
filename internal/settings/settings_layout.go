@@ -1,8 +1,5 @@
 package settings
 
-// Layout dimension accessors (autocomplete rows, resize step, modal
-// row caps, pinned subtabs). Split out of settings.go.
-
 func (s *Settings) LayoutObjectPinnedSubtabs() int {
 	if s == nil {
 		return LayoutObjectPinnedSubtabsFallback

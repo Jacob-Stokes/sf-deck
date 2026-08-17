@@ -10,12 +10,7 @@ type RecordsList struct {
 	HasModDate bool             // true if it has LastModifiedDate
 	Records    []map[string]any // raw rows from the SOQL response
 	Query      string           // the SOQL we actually ran (for display)
-	// TotalSize is the row count Salesforce reports for the WHERE
-	// clause — distinct from len(Records) when a LIMIT capped the
-	// fetch. Renderers compare them to surface a "showing X of Y"
-	// truncation hint so users know the chip is a slice, not a
-	// complete view.
-	TotalSize int
+	TotalSize  int
 	// Done reports whether the SOQL cursor walked to completion. False
 	// means the fetch was cut short either by the chip's LIMIT clause
 	// or by the requested row cap — there are more rows on the server
@@ -27,13 +22,7 @@ type RecordsList struct {
 	// everything" from "your LIMIT happened to be the right number"
 	// without a second query, so the false-positive-but-cheap case is
 	// to trust SF's Done flag.
-	Done bool
-	// Columns is the projected field list, in SOQL SELECT order. The
-	// renderer uses it to know which fields to render and in what
-	// order — without it, the records table only ever showed Id +
-	// Name + LastModifiedDate regardless of what the chip projected.
-	// Always at least ["Id"]; "Name" / "LastModifiedDate" appended
-	// when the sObject has them and the caller asked for defaults.
+	Done    bool
 	Columns []string
 }
 
@@ -51,8 +40,6 @@ func (r Record) Field(name string) (any, bool) {
 	if v, ok := r[name]; ok {
 		return v, true
 	}
-	// Dotted path: walk through nested map[string]any until we hit
-	// the leaf or a non-map.
 	parts := splitDotted(name)
 	if len(parts) <= 1 {
 		return nil, false
@@ -94,11 +81,6 @@ func RecentRecords(orgAlias, sobjectName string, limit int) (RecordsList, error)
 	if limit <= 0 {
 		limit = 50
 	}
-	// Strategy: probe the describe to decide which fields are available.
-	// In practice we already have the describe cached for every sobject
-	// the user has opened, but asking again here keeps this function
-	// self-contained. Callers that already have the describe can skip
-	// the round-trip via RecentRecordsWithDescribe below.
 	desc, err := Describe(orgAlias, sobjectName)
 	if err != nil {
 		return RecordsList{}, err
@@ -115,9 +97,6 @@ func RecentRecordsWithDescribe(orgAlias string, desc SObjectDescribe, limit int)
 	}
 	out := RecordsList{SObject: desc.Name}
 
-	// Some metadata-ish sObjects aren't queryable from the REST API at
-	// all (AggregateResult, ActivityHistory, etc.). Fail fast with a
-	// useful message.
 	if !desc.Queryable {
 		return out, fmt.Errorf("%s is not queryable via SOQL", desc.Name)
 	}
@@ -140,18 +119,10 @@ func RecentRecordsWithDescribe(orgAlias string, desc SObjectDescribe, limit int)
 			fields = append(fields, name)
 		}
 	}
-	// The human label column: standard objects use Name; CustomMetadata
-	// (and a few others) use DeveloperName / MasterLabel / Label. Take
-	// the first that exists so every shape shows something readable.
 	for _, nameField := range []string{"Name", "MasterLabel", "Label", "DeveloperName"} {
 		if present[nameField] {
 			fields = append(fields, nameField)
 			out.HasName = true
-			// MasterLabel/Label shapes (CustomMetadata __mdt and kin)
-			// also carry DeveloperName — the API identity a developer
-			// actually keys on. Project it alongside the label so CMDT
-			// rows aren't label-only. (Name-shaped standard objects
-			// skip this — Name IS their identity.)
 			if nameField != "Name" && nameField != "DeveloperName" && present["DeveloperName"] {
 				fields = append(fields, "DeveloperName")
 			}
@@ -163,25 +134,16 @@ func RecentRecordsWithDescribe(orgAlias string, desc SObjectDescribe, limit int)
 	}
 	add("CreatedDate")
 	add("LastModifiedDate")
-	// Audit user names are relationship fields: the describe exposes the
-	// *Id* column (CreatedById), so gate the CreatedBy.Name projection on
-	// that. Objects without the audit relationship (rare) just skip it.
 	if present["CreatedById"] {
 		fields = append(fields, "CreatedBy.Name")
 	}
 	if present["LastModifiedById"] {
 		fields = append(fields, "LastModifiedBy.Name")
 	}
-	// CustomMetadata (__mdt) has none of the date/audit fields above but
-	// DOES expose SystemModstamp — show it so a __mdt record isn't a bare
-	// Id + label.
 	if !present["LastModifiedDate"] && present["SystemModstamp"] {
 		fields = append(fields, "SystemModstamp")
 	}
 
-	// Order by the most-recent activity, but only when the ordering
-	// column is actually sortable (CMDT rejects ORDER BY LastModifiedDate;
-	// CreatedDate is accepted as a fallback).
 	var sortField string
 	switch {
 	case sortable["LastModifiedDate"]:
@@ -239,8 +201,6 @@ func GetRecordWithDescribe(orgAlias string, desc SObjectDescribe, recordID strin
 	if !desc.Queryable {
 		return nil, fmt.Errorf("%s is not queryable via SOQL", desc.Name)
 	}
-	// Project every Name we know about. SF caps a SELECT at 100 fields
-	// per query — chunk if necessary and merge the results client-side.
 	const chunkSize = 100
 	names := make([]string, 0, len(desc.Fields)+1)
 	names = append(names, "Id")
@@ -248,9 +208,6 @@ func GetRecordWithDescribe(orgAlias string, desc SObjectDescribe, recordID strin
 		if f.Name == "Id" {
 			continue
 		}
-		// Skip compound fields (e.g. ShippingAddress) — SOQL rejects
-		// them on the projection. The discrete child fields
-		// (ShippingStreet, ShippingCity, …) come back individually.
 		if f.Type == "address" || f.Type == "location" {
 			continue
 		}
@@ -280,8 +237,6 @@ func GetRecordWithDescribe(orgAlias string, desc SObjectDescribe, recordID strin
 			out[k] = v
 		}
 	}
-	// Make sure the attributes block carries the sObject type — the
-	// UI's openable code reads it for URL generation.
 	if _, ok := out["attributes"]; !ok {
 		out["attributes"] = map[string]any{"type": desc.Name}
 	}
@@ -307,10 +262,6 @@ func RecordsForSOQL(orgAlias, sobject, soql string, columns []string, hasName, h
 		return out, err
 	}
 	out.Records = q.Records
-	// TotalSize comes from SF's first response page — it reports the
-	// true matching-row count regardless of how many pages the
-	// cursor follow walked. Renderers compare this to len(Records)
-	// to surface a "showing X of Y · capped" hint.
 	out.TotalSize = q.TotalSize
 	out.Done = q.Done
 	return out, nil

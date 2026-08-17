@@ -3,22 +3,6 @@ package theme
 // Theme system. A Palette is a flat struct of semantic colors (Bg,
 // Fg, Blue, BorderHi, etc). Known palettes live in the registry
 // below; ApplyPalette swaps the active one at runtime.
-//
-// Palette catalogue:
-//   - 4 hand-tuned palettes shipped in code (curatedPalettes)
-//   - ~497 palettes generated from github.com/mbadolato/iTerm2-Color-Schemes
-//     (MIT licensed) via cmd/themegen → internal/theme/generated.go.
-//
-// Re-generate the catalogue with:
-//   curl -sL https://github.com/mbadolato/iTerm2-Color-Schemes/archive/master.tar.gz | tar xz -C /tmp
-//   go run ./cmd/themegen /tmp/iTerm2-Color-Schemes-master/ghostty/ > internal/theme/generated.go
-//
-// The rest of the UI reads package-level vars (theme.Fg, theme.Blue,
-// etc.) rather than a *Palette handle, so callers need no changes
-// when a new palette lands or the user switches theme — the vars
-// are rebound by ApplyPalette. The named styles (Title, Panelled,
-// StatusBar, …) are rebuilt at the same time because Lipgloss styles
-// capture color values at build time.
 
 import (
 	"image/color"
@@ -34,7 +18,6 @@ type Palette struct {
 	Name string // display name shown in the theme picker
 	ID   string // stable kebab-case id used in settings.toml
 
-	// Surface colors
 	Bg       color.Color
 	BgAlt    color.Color
 	Panel    color.Color
@@ -44,8 +27,6 @@ type Palette struct {
 	FgDim    color.Color
 	Muted    color.Color
 
-	// Accent colors — named by hue not role so palettes stay
-	// one-to-one with themes rather than forking per-view.
 	Blue    color.Color
 	Cyan    color.Color
 	Green   color.Color
@@ -102,9 +83,6 @@ var (
 	KeyDesc          lipgloss.Style
 )
 
-// curatedIDs are the hand-tuned palettes that ship at the top of the
-// picker. Order is the display order. Other entries from the
-// generated catalogue follow alphabetically.
 var curatedIDs = []string{
 	"tokyo-night",
 	"catppuccin",
@@ -140,8 +118,6 @@ var popularIDs = []string{
 	"tokyonight-storm",
 }
 
-// curatedPalettes are the hand-tuned ones (overrides the generated
-// catalogue when ids collide).
 func curatedPalettes() map[string]Palette {
 	return map[string]Palette{
 		"tokyo-night":        tokyoNight(),
@@ -162,11 +138,7 @@ func Palettes() map[string]Palette {
 		}
 		out[p.ID] = p
 	}
-	// Curated overrides whatever the generated catalogue had.
 	for id, p := range curatedPalettes() {
-		// Make sure the curated palette has its ID populated so
-		// callers reading by ID (settings.toml round-trip) get the
-		// right value.
 		p.ID = id
 		out[id] = p
 	}
@@ -178,8 +150,6 @@ func Palettes() map[string]Palette {
 // rest of the generated catalogue alphabetically. So the common choices
 // lead; the ~400 alphabetical browse follows.
 func PaletteIDs() []string {
-	// Valid catalogue ids, so a stale entry in popularIDs is skipped
-	// rather than surfacing a dead row.
 	valid := make(map[string]bool, len(generatedPalettes))
 	for _, p := range generatedPalettes {
 		if p.ID != "" {
@@ -196,18 +166,14 @@ func PaletteIDs() []string {
 		placed[id] = true
 		out = append(out, id)
 	}
-	// Tier 1: curated (hand-tuned; always valid — they override the
-	// catalogue).
 	for _, id := range curatedIDs {
 		add(id)
 	}
-	// Tier 2: popular (skip any not in the catalogue or already curated).
 	for _, id := range popularIDs {
 		if valid[id] {
 			add(id)
 		}
 	}
-	// Tier 3: everything else, alphabetically.
 	rest := make([]string, 0, len(generatedPalettes))
 	for _, p := range generatedPalettes {
 		if p.ID == "" || placed[p.ID] {
@@ -215,8 +181,6 @@ func PaletteIDs() []string {
 		}
 		rest = append(rest, p.ID)
 	}
-	// Stable alpha sort so additions to the catalogue don't reshuffle
-	// the picker between releases.
 	sortIDs(rest)
 	return append(out, rest...)
 }
@@ -275,12 +239,6 @@ func ApplyPalette(id string) {
 		BorderForeground(Yellow).
 		Padding(0, 1)
 
-	// PanelledDrill is the border treatment for the record-detail
-	// surface — distinct color AND weight so users always know
-	// "I'm drilled into a specific record" at a glance. Magenta
-	// picks a hue not used by focus (BorderHi) or filter (Yellow)
-	// or the modal frames (Cyan); ThickBorder doubles the visual
-	// weight so the cue lands even on monochrome terminals.
 	PanelledDrill = lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(Magenta).
@@ -299,13 +257,7 @@ func ApplyPalette(id string) {
 		Foreground(Muted)
 }
 
-// Initialise with the default so imports see non-zero colors even
-// before main() calls ApplyPalette.
 func init() { ApplyPalette("tokyo-night") }
-
-// ----------------------------------------------------------------------
-// Palettes
-// ----------------------------------------------------------------------
 
 func tokyoNight() Palette {
 	return Palette{
@@ -370,22 +322,6 @@ func dracula() Palette {
 	}
 }
 
-// terminalAppLight is tuned for macOS Terminal.app's default "Basic"
-// profile: a pure-white background and a 256-color (non-truecolor)
-// renderer. Two things drive the choices:
-//
-//   - Bg is true white (#ffffff) so the TUI blends into the default
-//     profile instead of painting a cream/grey rectangle over it.
-//     Panels sit one shade down (#f2f2f2) so cards read as faint grey
-//     on white rather than needing a heavy border.
-//   - Accents are darkened well past the usual light-theme mid-tones.
-//     On white, a mid blue like Solarized's #268bd2 is fine but green/
-//     yellow wash out; these are pushed darker (#1a7f37 green, #9a6700
-//     amber) so every accent clears a readable contrast ratio AND
-//     survives xterm-256 quantization without collapsing into its
-//     neighbour. FgDim/Muted stay at real mid-greys (#6a6a6a / #57606a)
-//     so "dim" text doesn't disappear on white — the classic light-
-//     theme legibility trap.
 func terminalAppLight() Palette {
 	return Palette{
 		Name:     "Terminal.app Light",
@@ -439,9 +375,6 @@ func darken(c color.Color, factor float64) color.Color {
 	return rgbaColor{R: nr, G: ng, B: nb, A: na}
 }
 
-// rgbaColor is a tiny color.Color impl so darken's result satisfies
-// the same interface lipgloss expects without importing image/color
-// constructors that aren't available.
 type rgbaColor struct{ R, G, B, A uint8 }
 
 func (c rgbaColor) RGBA() (r, g, b, a uint32) {

@@ -1,8 +1,5 @@
 package settings
 
-// Feature-area accessors: /compare tuning, org-group organisation,
-// and /home banner options. Split out of settings.go.
-
 // OrgGroups returns the user's persisted org groups in render order.
 // Returns nil for an unconfigured user (everything renders under
 // the synthetic "Ungrouped" section).

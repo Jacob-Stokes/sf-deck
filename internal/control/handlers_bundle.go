@@ -1,15 +1,5 @@
 package control
 
-// handlers_bundle.go — IPC verb handlers for bundle.* + project.import-bundle.
-//
-// Reads (list / show / report) run inline on the listener goroutine.
-// Writes (create / link / retrieve / validate / deploy / delete /
-// import-bundle) go through the same withWriteLock the existing
-// write verbs use — single-writer per instance.
-//
-// All handlers delegate to Backend, which the UI layer fulfils
-// against the existing services/bundles + services/projects packages.
-
 import (
 	"encoding/json"
 )
@@ -233,11 +223,6 @@ func (s *Server) handleProjectImportBundle(req Request, w *json.Encoder) {
 	_ = w.Encode(resp)
 }
 
-// decodeArgs is the shared json.Unmarshal wrapper that treats empty
-// args as "no fields set" rather than a parse failure — the bundle
-// verbs all have required fields the handler validates explicitly,
-// so we want the validator's error message rather than a generic
-// "unexpected end of JSON input."
 func decodeArgs(raw json.RawMessage, v any) error {
 	if len(raw) == 0 {
 		return nil

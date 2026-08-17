@@ -1,9 +1,5 @@
 package ui
 
-// /reports subtab surfaces: Dashboards + Report Types. Both pure
-// spec-derived list surfaces — chips, sort, columns, widths all come
-// from the shared engines.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"

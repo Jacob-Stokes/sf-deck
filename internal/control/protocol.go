@@ -2,30 +2,6 @@
 // running sf-deck. It exposes a Unix-domain socket that speaks the
 // same JSON envelope as the headless CLI, plus a handful of
 // write/subscribe verbs that drive the running TUI.
-//
-// Default off. Enable with sf-deck --control (or SF_DECK_CONTROL=1).
-// On startup, the listener claims an instance number via package
-// internal/instance, mints a per-instance socket path
-// (~/.sf-deck/control-<N>.sock), and starts accepting line-delimited
-// JSON requests. On clean shutdown, it removes the socket file and
-// releases the instance number.
-//
-// The wire format is one JSON object per line for both requests and
-// responses, matching `internal/headless` conventions so consumers
-// don't learn a new schema:
-//
-//	-> {"command":"state.get"}
-//	<- {"ok":true,"command":"state.get","data":{...}}
-//
-// Errors carry a typed `error.code` (same vocabulary as the CLI),
-// plus IPC-specific codes:
-//   - instance_busy           — another writer holds the channel
-//   - confirmation_required   — destructive op needs a human keypress
-//   - method_not_implemented  — verb is reserved but not yet handled
-//
-// Safety: this layer does NOT widen what's possible. Writes still
-// pass through the existing safety gates; destructive ops still
-// require the same human confirmation flow they always have.
 package control
 
 import "encoding/json"
@@ -75,12 +51,10 @@ const (
 	ErrInternal             = "internal_error"
 )
 
-// success builds an OK response.
 func success(req Request, data any) Response {
 	return Response{ID: req.ID, OK: true, Command: req.Command, Data: data}
 }
 
-// fail builds a failure response with a typed code + message.
 func fail(req Request, code, message string, details map[string]any) Response {
 	return Response{
 		ID: req.ID, OK: false, Command: req.Command,

@@ -3,29 +3,6 @@ package ui
 // codeview_find.go — in-code find + horizontal scroll for the shared
 // code viewer (Apex class / trigger bodies, LWC & Aura file sources,
 // flow-version JSON, exec debug logs).
-//
-// Find-NEXT over the visible body, not a filter:
-//   /            open the find bar (typing live-jumps to the first
-//                match at/after the cursor)
-//   ↵ / shift+↵  cycle forward / back through matches while typing
-//   esc          close the bar, keep the query + highlights (n / N
-//                cycle, C clears — mirrors the record-detail find)
-//   ctrl+u       clear the query while typing
-//
-// The bar shows "x of y" so the user knows where they are. All matched
-// substrings highlight in the body; the current match gets a distinct
-// colour. Matched lines re-render from the RAW source (chroma's ANSI
-// output can't be safely re-backgrounded mid-span), so syntax colour
-// yields to match colour on exactly those lines.
-//
-// ←/→ scroll the body horizontally (gutter stays put) for lines that
-// run off the right edge — the "…" prefix marks a scrolled view.
-//
-// Key routing: while the bar has focus, printables are consumed in
-// handleInputModeKey — BEFORE the q-chord leader — so searching for
-// "query" doesn't open chord mode. Idle-state keys (/ n N C ← →) ride
-// handlePreGlobalTabKey, gated on "the last paint drew a code body on
-// this exact tab+subtab".
 
 import (
 	"fmt"
@@ -38,8 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// codeViewLastPaint identifies the code body the most recent frame
-// rendered. Body is a string reference (no copy).
 type codeViewLastPaint struct {
 	Tab    Tab
 	Sub    Subtab
@@ -47,16 +22,11 @@ type codeViewLastPaint struct {
 	Body   string
 }
 
-// codeMatch is one query occurrence: 0-based line + byte offsets into
-// the raw line.
 type codeMatch struct {
 	Line       int
 	Start, End int
 }
 
-// codeFindState is the per-body find state. The memo fields cache the
-// match scan for the current (query, body) so the per-frame render is
-// a map lookup, not an O(body) rescan.
 type codeFindState struct {
 	Buffer string
 	Active bool // bar has input focus
@@ -75,15 +45,8 @@ type codeFindState struct {
 // scanned prefix).
 const codeFindMaxMatches = 2000
 
-// codeFindHScrollStep is how many display cells one ←/→ press shifts.
 const codeFindHScrollStep = 8
 
-// ----------------------------------------------------------------------
-// State access
-// ----------------------------------------------------------------------
-
-// codeFindStateFor returns the find state for bodyID, creating it when
-// create is set.
 func codeFindStateFor(d *orgData, bodyID string, create bool) *codeFindState {
 	if d == nil || bodyID == "" {
 		return nil
@@ -145,14 +108,6 @@ scan:
 	return matches
 }
 
-// ----------------------------------------------------------------------
-// Key handling
-// ----------------------------------------------------------------------
-
-// codeFindTarget resolves the on-screen code body IF the active
-// tab+subtab is the one the last paint drew. This is the gate that
-// keeps code-view keys from firing on unrelated surfaces after the
-// user navigates away.
 func (m Model) codeFindTarget() (*orgData, codeViewLastPaint, bool) {
 	d := m.activeOrgData()
 	if d == nil || d.CodeViewLast.BodyID == "" {
@@ -165,7 +120,6 @@ func (m Model) codeFindTarget() (*orgData, codeViewLastPaint, bool) {
 	return d, last, true
 }
 
-// codeFindInputActive reports whether the find bar owns typed keys.
 func (m Model) codeFindInputActive() bool {
 	d, last, ok := m.codeFindTarget()
 	if !ok {
@@ -175,10 +129,6 @@ func (m Model) codeFindInputActive() bool {
 	return st != nil && st.Active
 }
 
-// handleCodeFindInput consumes keys while the find bar has focus.
-// Returns handled=false for keys the bar doesn't own (arrows, ctrl
-// combos) so global dispatch — including ←/→ horizontal scroll —
-// still works mid-find.
 func (m Model) handleCodeFindInput(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	d, last, ok := m.codeFindTarget()
 	if !ok {
@@ -191,7 +141,6 @@ func (m Model) handleCodeFindInput(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
 	switch key {
 	case "esc":
-		// Keep the query + highlights; n / N keep cycling. C clears.
 		st.Active = false
 		return m, nil, true
 	case "enter":
@@ -217,9 +166,6 @@ func (m Model) handleCodeFindInput(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		m.codeFindJumpFromCursor(d, last, st)
 		return m, nil, true
 	}
-	// Printable ASCII appends to the query. (Capital letters included —
-	// class names are searched more often than reverse-cycle, which
-	// lives on shift+enter / N-after-esc.)
 	if len(key) == 1 && key[0] >= 0x20 && key[0] < 0x7f {
 		st.Buffer += key
 		m.codeFindJumpFromCursor(d, last, st)
@@ -228,15 +174,11 @@ func (m Model) handleCodeFindInput(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// onCodeViewKey is the idle-state (bar unfocused) key handler, riding
-// handlePreGlobalTabKey. Also owns horizontal scroll in BOTH states
-// (arrows fall through the input handler above).
 func (m Model) onCodeViewKey(key string) (Model, tea.Cmd, bool) {
 	d, last, ok := m.codeFindTarget()
 	if !ok {
 		return m, nil, false
 	}
-	// Horizontal scroll works whether or not the bar has focus.
 	switch key {
 	case "left":
 		m.codeViewHScroll(d, last, -codeFindHScrollStep)
@@ -247,7 +189,6 @@ func (m Model) onCodeViewKey(key string) (Model, tea.Cmd, bool) {
 	}
 	st := codeFindStateFor(d, last.BodyID, false)
 	if st != nil && st.Active {
-		// Typing mode already consumed everything it owns.
 		return m, nil, false
 	}
 	switch key {
@@ -278,9 +219,6 @@ func (m Model) onCodeViewKey(key string) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// codeFindCycle advances the current match by delta (wrapping) and
-// moves the body cursor to its line — the render's cursor-follow
-// scroll brings it into view.
 func (m Model) codeFindCycle(d *orgData, last codeViewLastPaint, st *codeFindState, delta int) {
 	matches := codeFindMatchesFor(st, last.Body)
 	n := len(matches)
@@ -291,10 +229,6 @@ func (m Model) codeFindCycle(d *orgData, last codeViewLastPaint, st *codeFindSta
 	setBodyCursor(d, last.BodyID, matches[st.Idx].Line)
 }
 
-// codeFindJumpFromCursor re-runs the search after a buffer edit and
-// lands on the first match at/after the current cursor line (wrapping
-// to the top) — find-next-from-here semantics, so typing refines
-// without yanking the user back to line 1.
 func (m Model) codeFindJumpFromCursor(d *orgData, last codeViewLastPaint, st *codeFindState) {
 	matches := codeFindMatchesFor(st, last.Body)
 	if len(matches) == 0 {
@@ -365,12 +299,6 @@ func lastRune(s string) (rune, int) {
 	return 0, len(s)
 }
 
-// ----------------------------------------------------------------------
-// Rendering
-// ----------------------------------------------------------------------
-
-// renderCodeFindBar draws the one-line find bar: query (with caret
-// while focused), the "x of y" counter, and mode-appropriate hints.
 func renderCodeFindBar(st *codeFindState, total, inner int) string {
 	counter := ""
 	switch {
@@ -395,10 +323,6 @@ func renderCodeFindBar(st *codeFindState, total, inner int) string {
 	return ansi.Truncate(line, inner, "…")
 }
 
-// renderCodeFindLine rebuilds one matched line from its RAW source
-// with match spans styled — every match in the line highlights, the
-// current one distinctly. hs (horizontal scroll) is applied by the
-// caller after composition.
 func renderCodeFindLine(raw string, matches []codeMatch, idxs []int, currentIdx int) string {
 	var b strings.Builder
 	prev := 0
@@ -419,7 +343,6 @@ func renderCodeFindLine(raw string, matches []codeMatch, idxs []int, currentIdx 
 	return b.String()
 }
 
-// Match styles resolve at call time (theme can change at runtime).
 func codeFindMatchStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Background(theme.Yellow).Foreground(theme.Bg)
 }

@@ -1,20 +1,9 @@
 package ui
 
-// Per-tab / per-subtab Identity resolvers. Each closure returns the
-// (kind, ref, label) of the cursored item on its surface. Wired into
-// TabSpec.Identity / SubtabSpec.Identity in tab_registry.go.
-//
-// Adding a new taggable surface = one closure here + one Identity
-// pointer on the relevant TabSpec/SubtabSpec entry. The dispatchers
-// (openTagPickerForCursored, future collect / open routes) consult
-// resolveItemIdentity instead of carrying a per-tab switch.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
-
-// --- /objects ----------------------------------------------------------
 
 func identityFromObjectsList(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
@@ -32,8 +21,6 @@ func identityFromObjectsList(m Model) (ItemIdentity, bool) {
 		Openable: it,
 	}, true
 }
-
-// --- /flows ------------------------------------------------------------
 
 func identityFromFlowsList(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
@@ -55,8 +42,6 @@ func identityFromFlowsList(m Model) (ItemIdentity, bool) {
 		Openable: f,
 	}, true
 }
-
-// --- /apex (subtab-aware) ---------------------------------------------
 
 func identityFromApexClassesList(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
@@ -85,9 +70,6 @@ func identityFromApexTriggersList(m Model) (ItemIdentity, bool) {
 	if !ok {
 		return ItemIdentity{}, false
 	}
-	// TriggerRow has no Openable — open routes through trigger
-	// detail drill via the existing openSurface entry, which fires
-	// before Identity in cursorOpenable.
 	return ItemIdentity{
 		Kind:      devproject.KindApexTrigger,
 		Ref:       t.ID,
@@ -95,8 +77,6 @@ func identityFromApexTriggersList(m Model) (ItemIdentity, bool) {
 		Namespace: t.NamespacePrefix,
 	}, true
 }
-
-// --- /components LWC + Aura -------------------------------------------
 
 func identityFromLWCList(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
@@ -131,8 +111,6 @@ func identityFromAuraList(m Model) (ItemIdentity, bool) {
 		Openable: b,
 	}, true
 }
-
-// --- /perms (subtab-aware) --------------------------------------------
 
 func identityFromPermSetsList(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
@@ -219,13 +197,6 @@ func identityFromPublicGroupsList(m Model) (ItemIdentity, bool) {
 	}, true
 }
 
-// identityFromObjectDetail dispatches to the right per-subtab
-// resolver based on the current SubtabXX value. ObjectDetail's
-// subtabs aren't declared in TabSpec.Subtabs (they're rendered via
-// a render-time switch instead), so the registry hook lives on the
-// TabSpec.Identity slot and dispatches manually here. Each branch
-// is explicit — no default fallback that could silently tag fields
-// from a non-schema subtab.
 func identityFromObjectDetail(m Model) (ItemIdentity, bool) {
 	switch m.currentSubtab() {
 	case SubtabSchema:
@@ -242,12 +213,6 @@ func identityFromObjectDetail(m Model) (ItemIdentity, bool) {
 	return ItemIdentity{}, false
 }
 
-// identityFromObjectFlow resolves the cursored row on the object
-// drill's Flows subtab. Same Kind/Ref shape as the /flows list so
-// tagging, recents, and o (Flow Builder) behave identically from
-// either entry point. No layouts equivalent — KindLayout doesn't
-// exist yet (see devproject/types.go "Future:"), so o is a no-op
-// on the Layouts subtab.
 func identityFromObjectFlow(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" {
@@ -270,8 +235,6 @@ func identityFromObjectFlow(m Model) (ItemIdentity, bool) {
 		Openable: row,
 	}, true
 }
-
-// --- /object-detail subtabs (Schema / Validation / RecordTypes / Triggers) ---
 
 func identityFromSchemaField(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
@@ -361,8 +324,6 @@ func identityFromTriggersList(m Model) (ItemIdentity, bool) {
 	}, true
 }
 
-// --- /record (drill-in) -----------------------------------------------
-
 func identityFromRecordDetail(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
 	if d == nil || d.RecordDetailCur == "" {
@@ -383,12 +344,6 @@ func identityFromRecordDetail(m Model) (ItemIdentity, bool) {
 	return out, true
 }
 
-// --- /field (drill-in) ------------------------------------------------
-
-// identityFromFieldDetail covers the field-drill tab, where the
-// cursored item is the field itself (regardless of any field-detail
-// subtab cursor). Returns the same FieldRef shape as the schema
-// subtab so o / K / t all behave consistently.
 func identityFromFieldDetail(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
 	if d == nil || d.DescribeCur == "" || d.FieldCur == "" {
@@ -411,5 +366,3 @@ func identityFromFieldDetail(m Model) (ItemIdentity, bool) {
 	}
 	return ItemIdentity{}, false
 }
-
-// --- /recent ----------------------------------------------------------

@@ -1,27 +1,5 @@
 // Package orgproject is the bridge between the persistent dev-project
 // store and the UI's "loaded project" feature.
-//
-// The store (internal/devproject) holds projects + their items.
-// The UI (internal/ui) wants to ask "is this object/flow/record in
-// scope right now?" — without each surface having to read the store
-// or thread items around. Scope is the answer.
-//
-// Lifecycle:
-//   - User loads a DevProject for the active org via `_` on the
-//     dev-projects list. Settings persists "<org-user> → <devproject-id>".
-//   - On startup (and whenever the loaded id changes), the UI
-//     hydrates a Scope from the store: query items filtered to the
-//     active org, bucket by kind, stash on Model. Refreshed lazily
-//     when items are K-collected into the loaded project.
-//   - Surfaces (records / objects / flows / records-subtab / reports)
-//     ask m.activeScope() for the current Scope, build a synthetic
-//     project chip when it's loaded, attach a predicate that defers
-//     to Scope.HasObject / HasFlow / HasReport / HasRecord.
-//
-// The package name is preserved as orgproject for migration ergonomics
-// — every call site already imports it. Conceptually it's now
-// "DevProject-as-seen-by-the-active-org" rather than a free-standing
-// OrgProject row, but the surface area is identical.
 package orgproject
 
 import (
@@ -34,16 +12,9 @@ import (
 // one with empty ProjectID means "nothing loaded" (Loaded() returns
 // false).
 type Scope struct {
-	// ProjectID is the DevProject row id. Empty when nothing's loaded.
-	ProjectID string
-	// ProjectName is the user-visible label, captured at load time so
-	// the UI doesn't need to re-query the store on every render.
-	ProjectName string
-	// OrgUser is the org this Scope was hydrated for. Items in the
-	// project from other orgs are excluded — the per-org filter is
-	// done at hydrate time so render-path lookups stay O(1).
-	OrgUser string
-	// Items by kind. Maps used as sets — value is always true.
+	ProjectID    string
+	ProjectName  string
+	OrgUser      string
 	Objects      map[string]bool // sObject API names (KindSObject)
 	FlowIDs      map[string]bool // FlowDefinition ids (KindFlow)
 	ApexIDs      map[string]bool // ApexClass ids (KindApexClass)
@@ -56,11 +27,7 @@ type Scope struct {
 	Profiles     map[string]bool // Profile ids (KindProfile)
 	Queues       map[string]bool // Queue (Group) ids (KindQueue)
 	PublicGroups map[string]bool // Public Group ids (KindPublicGroup)
-	// Records is keyed by "<sobject>:<id>" so a project containing
-	// "Account/001…" and "Contact/003…" can answer "is this Account
-	// row in scope?" without scanning. Populated from KindRecord
-	// items where Item.Type holds the sObject and Item.Ref holds Id.
-	Records map[string]bool
+	Records      map[string]bool
 }
 
 // Loaded reports whether a non-empty project is currently loaded.
@@ -251,8 +218,6 @@ func Hydrate(store *devproject.Store, devProjectID, orgUser string, opts ScopeOp
 		return out, err
 	}
 	if dp == nil {
-		// Stale id — project was deleted. Caller should clear
-		// settings; we just return an empty Scope.
 		return out, nil
 	}
 	out.ProjectID = dp.ID

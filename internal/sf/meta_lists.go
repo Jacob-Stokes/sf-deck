@@ -1,11 +1,5 @@
 package sf
 
-// /meta rich-subtab list fetches. Each is one SOQL (tooling or
-// regular) over the long-tail metadata sObjects. The generic Browse subtab covers
-// everything else via DescribeMetadataTypes + ListMetadata.
-
-// --- Custom Labels (tooling ExternalString) ------------------------------
-
 type CustomLabelRow struct {
 	ID              string
 	Name            string
@@ -80,8 +74,6 @@ func mapCustomLabelRow(r map[string]any) CustomLabelRow {
 	return row
 }
 
-// --- Custom Metadata types + Custom Settings (EntityDefinition) ----------
-
 // MetaEntityRow is one EntityDefinition row — used for both the
 // Custom Metadata (…__mdt) and Custom Settings subtabs; Kind
 // disambiguates ("cmt" / "setting") and picks the Setup target.
@@ -119,8 +111,6 @@ func (r MetaEntityRow) Targets() []OpenTarget {
 			Path: "/lightning/setup/CustomMetadata/home"},
 	}
 	if r.KeyPrefix != "" {
-		// Classic records-list page wrapped in Lightning chrome —
-		// jumps straight to THIS type's records.
 		t = append([]OpenTarget{{ID: "records", Label: "Records",
 			Path: "/lightning/setup/CustomMetadata/page?address=%2F" + r.KeyPrefix}}, t...)
 	}
@@ -162,8 +152,6 @@ func listEntityDefs(target, where, kind string) ([]MetaEntityRow, error) {
 			}
 		})
 }
-
-// --- Static Resources -----------------------------------------------------
 
 type StaticResourceRow struct {
 	ID                 string
@@ -240,8 +228,6 @@ func mapStaticResourceRow(r map[string]any) StaticResourceRow {
 	}
 }
 
-// --- Named Credentials (tooling) ------------------------------------------
-
 type NamedCredentialRow struct {
 	ID              string
 	DeveloperName   string
@@ -304,8 +290,6 @@ func mapNamedCredentialRow(r map[string]any) NamedCredentialRow {
 	}
 }
 
-// --- Remote Site Settings (tooling RemoteProxy) ----------------------------
-
 type RemoteSiteRow struct {
 	ID          string
 	SiteName    string
@@ -366,8 +350,6 @@ func mapRemoteSiteRow(r map[string]any) RemoteSiteRow {
 	}
 	return row
 }
-
-// --- Browse: per-type component listing -----------------------------------
 
 // ListMetadataComponents lists every component of one metadata type
 // via the SOAP listMetadata op (1 call). Used by the /meta Browse

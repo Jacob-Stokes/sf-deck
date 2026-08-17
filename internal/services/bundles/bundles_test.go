@@ -15,7 +15,6 @@ import (
 func TestDirHasFiles(t *testing.T) {
 	base := t.TempDir()
 
-	// Missing path → not "has files", no error (MkdirAll will create it).
 	missing := filepath.Join(base, "does-not-exist")
 	if got, err := dirHasFiles(missing); err != nil || got {
 		t.Fatalf("missing dir: got (%v, %v), want (false, nil)", got, err)

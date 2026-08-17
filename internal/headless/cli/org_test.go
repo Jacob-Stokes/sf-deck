@@ -11,9 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// newOrgTestApp builds an app with a stubbed org list + a save hook
-// that captures whether (and how often) it was called. No real disk
-// touching.
 func newOrgTestApp() (*app.App, *int) {
 	saveCalls := 0
 	st := &settings.Settings{Orgs: map[string]settings.OrgConfig{}}
@@ -70,7 +67,6 @@ func TestOrgList_ReturnsAllWithResolvedSafety(t *testing.T) {
 			t.Errorf("org missing safety: %+v", m)
 		}
 	}
-	// Prod resolves to read_only by default.
 	prod, _ := orgs[0].(map[string]any)
 	if prod["safety"] != "read_only" {
 		t.Errorf("prod safety = %v, want read_only", prod["safety"])
@@ -125,7 +121,6 @@ func TestOrgSafetyGet_DefaultsToImplicit(t *testing.T) {
 func TestOrgSafetySet_Roundtrip(t *testing.T) {
 	a, saves := newOrgTestApp()
 
-	// Set to records.
 	code, got := runOrgCLI(t, a, "--json", "org", "safety", "set",
 		"--org", "prod", "--level", "records")
 	if code != headless.ExitOK {
@@ -145,7 +140,6 @@ func TestOrgSafetySet_Roundtrip(t *testing.T) {
 		t.Errorf("save calls = %d, want 1", *saves)
 	}
 
-	// Get reflects the change.
 	code, got = runOrgCLI(t, a, "--json", "org", "safety", "get", "--org", "prod")
 	if code != headless.ExitOK {
 		t.Fatalf("get exit = %d", code)
@@ -164,7 +158,6 @@ func TestOrgSafetySet_Roundtrip(t *testing.T) {
 
 func TestOrgSafetySet_Clear(t *testing.T) {
 	a, _ := newOrgTestApp()
-	// Set, then clear.
 	_, _ = runOrgCLI(t, a, "--json", "org", "safety", "set",
 		"--org", "prod", "--level", "records")
 	code, got := runOrgCLI(t, a, "--json", "org", "safety", "set",
@@ -213,7 +206,6 @@ func TestOrgSafetySet_RejectsBogusLevel(t *testing.T) {
 
 func TestOrgSafetySet_IdempotentReportsChangedFalse(t *testing.T) {
 	a, _ := newOrgTestApp()
-	// Sandbox defaults to records; set to records again — no change.
 	code, got := runOrgCLI(t, a, "--json", "org", "safety", "set",
 		"--org", "sand", "--level", "records")
 	if code != headless.ExitOK {
@@ -226,7 +218,6 @@ func TestOrgSafetySet_IdempotentReportsChangedFalse(t *testing.T) {
 
 func TestOrgSafetyGet_DefaultsToGet(t *testing.T) {
 	a, _ := newOrgTestApp()
-	// No subverb — defaults to get.
 	code, got := runOrgCLI(t, a, "--json", "org", "safety", "--org", "prod")
 	if code != headless.ExitOK {
 		t.Fatalf("exit = %d (%+v)", code, got)

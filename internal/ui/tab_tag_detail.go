@@ -4,13 +4,6 @@ package ui
 // drilled tag across every org, with an auto-generated kind chip
 // strip (same shape as /dev-project-detail). Enter on an item drills
 // into that item; esc backs out to /tags.
-//
-// Why this reuses the dev-project plumbing: dev-project items and
-// tag bindings are both shaped like devproject.Item — same
-// (kind, ref, org_user) key plus optional name/type. So the
-// rendering function, the kind chip generator, and the item-open
-// path all work as-is. The only thing tag-detail owns is loading
-// the right items into m.tagItems.
 
 import (
 	"fmt"
@@ -24,9 +17,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// triggerTagDrill is the Activate for /tags. Loads bindings for the
-// cursored tag, maps each binding into a devproject.Item, populates
-// m.tagItems, sets m.tagCur, and switches to TabTagDetail.
 func (m *Model) triggerTagDrill() tea.Cmd {
 	if m.devProjects == nil {
 		return nil
@@ -59,24 +49,13 @@ func (m *Model) triggerTagDrill() tea.Cmd {
 	m.tagKindChip = ""
 	m.tagKindChipCursor = 0
 	m.setTab(TabTagDetail)
-	// Proactively kick off resource fetches for any (kind, org) pair
-	// whose name lookup missed. The renderer re-resolves names per
-	// frame, so as these land the labels light up without needing
-	// the user to re-drill.
 	return m.ensureNamesForTagItems(items)
 }
 
-// ensureNamesForTagItems triggers the per-kind resource fetches
-// needed to resolve display names for the loaded tag items. Best-
-// effort: returns a batched tea.Cmd of all the .Ensure() calls;
-// the renderer's per-frame lookup picks up names as the resources
-// land. Skips org/kind combos already in cache.
 func (m *Model) ensureNamesForTagItems(items []devproject.Item) tea.Cmd {
 	if m.cache == nil {
 		return nil
 	}
-	// Track (orgUser, kind) pairs we've already queued so we don't
-	// fan out duplicate fetches for, say, 50 flows on the same org.
 	seen := map[string]bool{}
 	var cmds []tea.Cmd
 	for _, it := range items {
@@ -123,20 +102,6 @@ func (m *Model) ensureNamesForTagItems(items []devproject.Item) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// bindingsToItems maps tag_bindings rows into the devproject.Item
-// shape the renderer expects. tag_bindings don't persist the
-// human-readable name (only kind + ref + org_user), so we look it
-// up at render time from the org's cached resources where
-// available — flows from d.FlowList, apex classes from
-// d.ApexClassList, etc. When no cache hit is found (org not loaded
-// this session, item not in the cached list), Name stays empty and
-// the renderer's standard fallback shows Ref.
-//
-// Best-effort: if the cache lookup misses, the user sees the id
-// instead of the label. They can navigate to the kind's tab to
-// load the data, then come back. Future v0.2 work: persist the
-// name in tag_bindings at apply time (mirrors how dev-project
-// items capture the name on shift+K) so the lookup isn't needed.
 func bindingsToItems(m Model, bs []devproject.Binding) []devproject.Item {
 	out := make([]devproject.Item, 0, len(bs))
 	for _, b := range bs {
@@ -153,30 +118,16 @@ func bindingsToItems(m Model, bs []devproject.Binding) []devproject.Item {
 	return out
 }
 
-// lookupItemDisplay returns the human-readable (name, parent) pair
-// for an item by walking the org's cached resource lists. orgUser
-// scopes the lookup — for cross-org tags this means we only find
-// names for items belonging to orgs loaded this session.
-//
-// Returns ("", "") when nothing matches; the renderer falls back to
-// Ref in that case.
 func lookupItemDisplay(m Model, kind devproject.ItemKind, ref, orgUser string) (string, string) {
 	if orgUser == "" {
 		return "", ""
 	}
-	// Read-only lookup: prefer the existing orgData when present;
-	// don't ensure (that mutates). The drill-time ensure took care
-	// of allocating + kicking off the fetch.
 	d, ok := m.data[orgUser]
 	if !ok || d == nil {
 		return "", ""
 	}
 	switch kind {
 	case devproject.KindFlow:
-		// Pull from the raw Resource not the ListView — the ListView
-		// is a sync'd view that may not have fired yet on first
-		// load, but the Resource holds the data the moment the
-		// fetch lands.
 		for _, f := range d.Flows.Value() {
 			if f.DefinitionID == ref {
 				if f.MasterLabel != "" {
@@ -207,25 +158,18 @@ func lookupItemDisplay(m Model, kind devproject.ItemKind, ref, orgUser string) (
 			}
 		}
 	case devproject.KindSObject:
-		// Ref is the API name; the SObjects list carries Label.
 		for _, s := range d.SObjects.Value() {
 			if s.Name == ref {
 				return s.Label, ""
 			}
 		}
 	case devproject.KindField:
-		// Ref is "<sobject>.<field>". Parent is the sobject; the
-		// field label needs a describe lookup that may not be
-		// loaded, so we just return the parent.
 		sobj, _ := splitSObjectField(ref)
 		return "", sobj
 	}
 	return "", ""
 }
 
-// matchItemNameOrRef is the ListView.SetMatch comparator. Searches
-// by ref + name (when present) — same logic the dev-project items
-// view uses.
 func matchItemNameOrRef(it devproject.Item, q string) bool {
 	q = strings.ToLower(q)
 	if q == "" {
@@ -240,15 +184,10 @@ func matchItemNameOrRef(it devproject.Item, q string) bool {
 	return false
 }
 
-// moveTagDetailCursor is the MoveCursor registry hook. Delegates to
-// the ListView so cursor + filter remain consistent across renders.
 func (m *Model) moveTagDetailCursor(delta int) {
 	m.tagItems.MoveBy(delta)
 }
 
-// activateTagDetailItem is the Activate hook for TabTagDetail — Enter
-// on a row drills into the item the same way Enter on a dev-project
-// item does (switches org if needed + opens the per-kind detail).
 func (m *Model) activateTagDetailItem() tea.Cmd {
 	rows := m.tagItems.Filtered()
 	if len(rows) == 0 {
@@ -282,9 +221,6 @@ func (m Model) orgDisplayForUsername(username string) string {
 	return username
 }
 
-// tagByID looks up a tag in the store by id. No dedicated DB
-// method exists, so we walk ListTags(). Tag rows are few; this is
-// cheap.
 func (m Model) tagByID(id int64) (devproject.Tag, bool) {
 	if m.devProjects == nil {
 		return devproject.Tag{}, false
@@ -301,9 +237,6 @@ func (m Model) tagByID(id int64) (devproject.Tag, bool) {
 	return devproject.Tag{}, false
 }
 
-// renderTagDetail is the main-pane renderer for TabTagDetail.
-// Composes: heading (tag name + count) → kind chip strip → item
-// table → footer hint.
 func (m Model) renderTagDetail(w, innerH int) string {
 	inner := w - 4
 	if m.devProjects == nil || m.tagCur == 0 {
@@ -334,14 +267,6 @@ func (m Model) renderTagDetail(w, innerH int) string {
 // same affordances on both surfaces.
 func (m Model) renderTagDetailItems(tag devproject.Tag, inner, body int) []string {
 	var lines []string
-
-	// The kind-chip filter is installed on m.tagItems by
-	// applyTagKindFilter on the Update path (cycleTagKindChip /
-	// triggerTagDrill) — NOT here. This renderer is a value receiver,
-	// so any SetExtra it did would mutate a throwaway copy and the
-	// activate / open / yank paths (which read the real ListView)
-	// would act on the unfiltered rows. Render just consumes the
-	// already-filtered view.
 
 	chips, chipSel := m.tagKindChips()
 	if len(chips) > 2 {
@@ -377,10 +302,6 @@ func (m Model) renderTagDetailItems(tag devproject.Tag, inner, body int) []strin
 		cursor = 0
 	}
 
-	// Org column sizes to the widest displayed label (alias when one
-	// exists, username when not) so a couple of long usernames don't
-	// stay truncated when most rows are short aliases. Header acts as
-	// the floor.
 	orgLabels := make([]string, len(rows))
 	orgW := lipgloss.Width("ORG")
 	for i, it := range rows {
@@ -408,11 +329,6 @@ func (m Model) renderTagDetailItems(tag devproject.Tag, inner, body int) []strin
 		func(i int) string {
 			it := rows[i]
 			name := it.Name
-			// Re-resolve from org cache per render — the items were
-			// populated at drill time when not every org's resource
-			// was loaded. Browsing to /flows etc. later loads more,
-			// and the name appears on the next paint without
-			// needing a re-drill.
 			if name == "" {
 				if n, _ := lookupItemDisplay(m, it.Kind, it.Ref, it.OrgUser); n != "" {
 					name = n
@@ -437,9 +353,6 @@ func (m Model) renderTagDetailItems(tag devproject.Tag, inner, body int) []strin
 	return lines
 }
 
-// cycleTagKindChip moves the kind-filter chip cursor on TabTagDetail
-// by delta and applies the resulting kind as the active filter. Wraps
-// at both ends, mirrors cycleDevProjectKindChip exactly.
 func (m Model) cycleTagKindChip(delta int) (Model, tea.Cmd) {
 	chips, cur := m.tagKindChips()
 	if len(chips) == 0 {
@@ -452,9 +365,6 @@ func (m Model) cycleTagKindChip(delta int) (Model, tea.Cmd) {
 	if next == 0 {
 		m.tagKindChip = ""
 	} else if next-1 < len(devProjectKindChipOrder) {
-		// Walk the order, accounting for chips that were skipped due
-		// to zero counts — mirror the dev-project cursor→kind
-		// resolver exactly.
 		items := m.tagItems.Items()
 		counts := map[devproject.ItemKind]int{}
 		for _, it := range items {
@@ -492,10 +402,6 @@ func (m *Model) applyTagKindFilter() {
 	})
 }
 
-// tagKindChips builds the auto-generated kind-filter chip strip.
-// Same shape + ordering as devProjectKindChips so the surfaces feel
-// identical — only chips with non-zero counts appear, plus a
-// leading "All" chip.
 func (m Model) tagKindChips() ([]chipRow, int) {
 	items := m.tagItems.Items()
 	counts := map[devproject.ItemKind]int{}
@@ -526,9 +432,6 @@ func (m Model) tagKindChips() ([]chipRow, int) {
 	return chips, sel
 }
 
-// sidebarTagDetail renders the right-rail info panel for TabTagDetail.
-// Shows the tag's pill, count of items, distinct orgs, and a per-kind
-// breakdown — same shape as the /dev-project sidebar.
 func (m Model) sidebarTagDetail(inner int) string {
 	if m.devProjects == nil || m.tagCur == 0 {
 		return sideEmpty("no tag")

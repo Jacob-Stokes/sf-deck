@@ -1,21 +1,10 @@
 package ui
 
-// qchip registries + transient chip-strip state.
-//
-// Extracted from model.go. modelChips is embedded into Model so
-// existing field access (m.chipRegistry(domainRecords), m.activeTransient, …) keeps
-// working unchanged.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/qchip"
 )
 
-// modelChips owns all qchip registries and transient chip-strip state.
 type modelChips struct {
-	// chipRegistries holds one qchip.Registry per domain, built from
-	// the chipDomainDefs table (chip_domains.go). All domains use the
-	// unified qchip.Chip backed by query.Query — one engine, two
-	// execution modes (server vs client). Access via m.chipRegistry(d).
 	chipRegistries map[chipDomain]*qchip.Registry
 
 	// activeTransient tracks one non-favourite chip per (domain, scope)
@@ -45,17 +34,6 @@ type modelChips struct {
 	chipPreviews map[string][]chipPreview
 }
 
-// chipPreview is one ephemeral session-only entry in chipPreviews. The
-// chip itself is carried by value (not by ID) so we don't have to chase
-// it back through a registry that might not even hold it — the source
-// org's registry isn't loaded in the current session necessarily.
-//
-// Columns / Limit / Clauses live alongside the qchip.Chip (they're
-// settings.toml ChipConfig fields, not parsed-AST fields) so the
-// chip.preview.save promotion path can rebuild a chips.CreateInput
-// without re-parsing anything. Cross-org previews populate them
-// from the source org's registry; IPC-spawned previews populate
-// them from PreviewChipArgs verbatim.
 type chipPreview struct {
 	Domain        chipDomain
 	Scope         string

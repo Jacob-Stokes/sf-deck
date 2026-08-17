@@ -1,15 +1,5 @@
 package ui
 
-// Per-tab BusyLabel + ErrorLabel resolvers. One closure per tab
-// reading that tab's primary resource(s) and surfacing a human
-// label for the header's activity / error zones. Wired into
-// TabSpec.BusyLabel + TabSpec.ErrorLabel.
-//
-// Adding a new tab with a network resource = two closures here +
-// two pointers on its TabSpec entry. The header dispatch
-// (currentTabSyncingLabel, currentTabError) is one resolver call.
-
-// busyHome / errHome — TabHome's Home resource.
 func busyHome(_ Model, d *orgData) string {
 	if d != nil && d.Home.Busy() {
 		return "syncing limits…"
@@ -23,9 +13,6 @@ func errHome(_ Model, d *orgData) string {
 	return ""
 }
 
-// busyObjects + errObjects cover both /objects and the parent
-// SObjects resource on /object-detail. ObjectDetail's describe
-// busy state is layered on by busyObjectDetail below.
 func busyObjects(_ Model, d *orgData) string {
 	if d == nil {
 		return ""
@@ -42,8 +29,6 @@ func errObjects(_ Model, d *orgData) string {
 	return ""
 }
 
-// busyObjectDetail layers describe + listview-fetch states on top
-// of the parent /objects sync.
 func busyObjectDetail(m Model, d *orgData) string {
 	if d == nil {
 		return ""
@@ -52,8 +37,6 @@ func busyObjectDetail(m Model, d *orgData) string {
 		return "syncing sobjects…"
 	}
 	if d.DescribeCur != "" {
-		// Records subtab can still be syncing the chip-resource even
-		// when describe is loaded.
 		if m.currentSubtab() == SubtabRecords && d.RecordsSObjectCur == "" && d.DescribeCur != "" {
 			if activeChipBusy(d, d.DescribeCur) {
 				if currentChipMode(d, d.DescribeCur) == ChipModeSalesforce {
@@ -86,7 +69,6 @@ func errObjectDetail(_ Model, d *orgData) string {
 	return ""
 }
 
-// busyPackages / errPackages — TabPackages.
 func busyPackages(_ Model, d *orgData) string {
 	if d != nil && d.Packages.Busy() {
 		return "syncing packages…"
@@ -100,8 +82,6 @@ func errPackages(_ Model, d *orgData) string {
 	return ""
 }
 
-// busyFlows / errFlows — TabFlows + TabFlowDetail share the parent
-// resource; FlowDetail layers FlowVersions on top.
 func busyFlows(_ Model, d *orgData) string {
 	if d == nil {
 		return ""
@@ -146,7 +126,6 @@ func errFlowDetail(_ Model, d *orgData) string {
 	return ""
 }
 
-// busyReports / errReports — Reports list + ReportDetail's run.
 func busyReports(_ Model, d *orgData) string {
 	if d != nil && d.Reports.Busy() {
 		return "syncing reports…"
@@ -188,7 +167,6 @@ func errReportDetail(_ Model, d *orgData) string {
 	return ""
 }
 
-// busyRecordDetail / errRecordDetail — single-record drill-in.
 func busyRecordDetail(_ Model, d *orgData) string {
 	if d == nil || d.RecordDetailCur == "" {
 		return ""
@@ -208,7 +186,6 @@ func errRecordDetail(_ Model, d *orgData) string {
 	return ""
 }
 
-// busy/errSystemLogs / busy/errSystemDeploys — per-subtab on TabSystem.
 func busySystemLogs(_ Model, d *orgData) string {
 	if d != nil && d.ApexLogs.Busy() {
 		return "syncing logs…"
@@ -234,7 +211,6 @@ func errSystemDeploys(_ Model, d *orgData) string {
 	return ""
 }
 
-// busySOQL / errSOQL — modal-level state, not per-org.
 func busySOQL(m Model, _ *orgData) string {
 	if m.soqlRunning {
 		return "running query…"
@@ -248,8 +224,6 @@ func errSOQL(m Model, _ *orgData) string {
 	return ""
 }
 
-// busyRecords — TabRecords' chip resource (records-mode) or
-// SObjects sync (picker mode).
 func busyRecords(_ Model, d *orgData) string {
 	if d == nil {
 		return ""

@@ -1,26 +1,4 @@
 // Package chips is the service layer for the user's chip catalogue.
-//
-// Chips are saved query views (records / objects / flows) persisted in
-// settings.toml. The TUI's chip strip, chip manager, and the future
-// headless `sf-deck chip ...` commands all funnel through this package
-// so validation, identity rules, and the persistence boundary stay in
-// one place.
-//
-// What lives here:
-//
-//   - Typed Chip view used by callers (CLI / TUI) that doesn't leak
-//     TOML field tags to the renderer.
-//   - List / Show / Create / Update / Delete / Favourite ops.
-//   - Validation that matches the TUI's chip-manager rules (id +
-//     domain are identity; label required; domain is closed set).
-//
-// What does NOT live here:
-//
-//   - Query execution. Chips own a saved query shape (where / order /
-//     limit / columns); running it against Salesforce is the records
-//     service's job (later phase).
-//   - Persistence atomics. settings.Save handles tmp-file rename; we
-//     just call it.
 package chips
 
 import (
@@ -49,8 +27,6 @@ type Chip struct {
 	Clauses   string   `json:"clauses,omitempty"`
 }
 
-// validDomains is the closed set of chip domains. Mirrors the TUI's
-// chip strip — adding a new domain means adding a new tab.
 var validDomains = map[string]bool{
 	"records": true,
 	"objects": true,
@@ -75,9 +51,6 @@ func Domains() []string {
 	return out
 }
 
-// fromConfig is the one-and-only place ChipConfig becomes Chip. Keep
-// it boring — every new field on ChipConfig the headless surface
-// cares about flows through here.
 func fromConfig(c settings.ChipConfig) Chip {
 	q := queryFromConfig(c.Query)
 	return Chip{
@@ -112,8 +85,6 @@ func List(st *settings.Settings, domain string) ([]Chip, error) {
 		}
 		out = append(out, fromConfig(c))
 	}
-	// Stable ordering: domain, then label, then id. The TUI sorts at
-	// display time; consumers of the JSON envelope expect a fixed order.
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Domain != out[j].Domain {
 			return out[i].Domain < out[j].Domain

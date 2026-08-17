@@ -1,10 +1,5 @@
 package ui
 
-// Helpers connecting the UI to the devproject store. Refreshes the
-// in-memory ListView wrappers from disk so the renderers can stay
-// dumb (read whatever's in the wrapper). All work is best-effort —
-// store errors get flashed but don't block UI.
-
 import (
 	"crypto/rand"
 	"encoding/hex"
@@ -16,9 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// reloadDevProjects pulls every dev project off the store and pushes
-// it into the model's ListView. Called on entry to TabDevProjects,
-// after any mutation, and on the left-rail panel render.
 func (m *Model) reloadDevProjects() {
 	if m.devProjects == nil {
 		m.devProjectList.Set(nil)
@@ -58,11 +50,6 @@ func (m Model) devProjectItemsView() []devproject.Item {
 	return d.DevProjectItems.Items()
 }
 
-// reloadDevProjectItems loads the items for the drilled-in dev
-// project (TabDevProjectDetail). orgUser="" returns items from
-// every org; pass an org username to filter to that org's
-// contributions only — the detail view defaults to the active org
-// but offers a toggle to see "all orgs" too.
 func (m *Model) reloadDevProjectItems() {
 	if len(m.orgs) == 0 {
 		return
@@ -103,9 +90,6 @@ func (m *Model) reloadDevProjectItems() {
 	d.DevProjectItems.Set(items)
 }
 
-// devProjectByID looks up a dev project in the cached list. Used by
-// the renderers and by /dev-projects drill to render the header
-// without a per-paint store hit.
 func (m Model) devProjectByID(id string) (devproject.DevProject, bool) {
 	for _, p := range m.devProjectList.Items() {
 		if p.ID == id {
@@ -124,19 +108,10 @@ func newID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// openItemForOrigin routes a devproject.Item to its canonical detail
-// tab. The Kind tells us which tab; Ref + Type carry the (sobject,
-// id) pair where relevant. origin is the tab the user came from so
-// Esc-back lands on the right surface (TabDevProjectDetail for the
-// /dev-projects drill, TabTagDetail for the /tags drill, etc.).
-//
-// If the item came from a different org than the active one, switches
-// the active org first so the detail tab opens in the right context.
 func (m *Model) openItemForOrigin(it devproject.Item, origin Tab) tea.Cmd {
 	if len(m.orgs) == 0 {
 		return nil
 	}
-	// Switch to the item's origin org if we're not already there.
 	if it.OrgUser != "" && it.OrgUser != m.orgs[m.selected].Username {
 		for i, o := range m.orgs {
 			if o.Username == it.OrgUser {
@@ -145,11 +120,6 @@ func (m *Model) openItemForOrigin(it devproject.Item, origin Tab) tea.Cmd {
 			}
 		}
 	}
-	// Try the shared per-kind dispatcher first.  Handles every kind
-	// that has a regular detail tab; falls through to the
-	// devproject-specific SOQL/Apex snippet cases below for the few
-	// kinds that aren't drillable from /home Recent.  See
-	// docs/recent-kinds-drill-audit.md.
 	if cmd, ok := drillByKind(m, string(it.Kind), it.Ref, it.Type, it.Name, origin); ok {
 		return cmd
 	}
@@ -160,8 +130,6 @@ func (m *Model) openItemForOrigin(it devproject.Item, origin Tab) tea.Cmd {
 	// that the dispatcher doesn't want as a dependency.
 	switch it.Kind {
 	case devproject.KindSOQLQuery:
-		// Pinned query: load body into the editor, jump to /soql,
-		// land on the Editor subtab. Touch updates "most recent."
 		if m.devProjects == nil {
 			return nil
 		}
@@ -181,17 +149,10 @@ func (m *Model) openItemForOrigin(it devproject.Item, origin Tab) tea.Cmd {
 		m.setTab(TabSOQL)
 		return m.onTabChanged()
 	}
-	// Unhandled item kind. Flash an explanation rather than silently
-	// no-op so the user knows the keystroke landed but the kind
-	// doesn't have a drill destination yet. Apex snippets are the
-	// known fall-through today.
 	m.flash(notDrillableMessage(it.Kind))
 	return nil
 }
 
-// notDrillableMessage renders the user-facing flash when a drill
-// fires on a kind that has no detail tab. Keep messages short;
-// the status bar truncates long text.
 func notDrillableMessage(kind devproject.ItemKind) string {
 	switch kind {
 	case devproject.KindApexSnippet:
@@ -200,9 +161,6 @@ func notDrillableMessage(kind devproject.ItemKind) string {
 	return "no detail view for " + string(kind) + " yet"
 }
 
-// indexOfRune is a minimal strings.IndexByte for the "<sobject>.<field>"
-// split — kept inline so we don't pull strings into this file just for
-// one call.
 func indexOfRune(s string, r rune) int {
 	for i, c := range s {
 		if c == r {

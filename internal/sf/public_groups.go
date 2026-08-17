@@ -1,10 +1,5 @@
 package sf
 
-// Public Groups — Group records where Type='Regular'. Salesforce
-// reuses the Group sObject for queues, public groups, role groups,
-// and the implicit groups behind a sharing rule. We only surface
-// the user-defined "Regular" public groups here.
-
 type PublicGroupRow struct {
 	ID                 string
 	Name               string

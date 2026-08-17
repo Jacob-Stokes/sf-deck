@@ -11,21 +11,16 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// userActionRow describes one action shown in the sidebar list. ID
-// drives dispatch in handleUserDetailAction; Run is invoked when the
-// user hits Enter on the row.
 type userActionRow struct {
-	ID      string
-	Label   string
-	Hint    string
-	Confirm string // empty → no confirmation; otherwise the question shown in the choice modal
-	Allowed bool
-	Reason  string
-	Mutates bool
-	Kind    settings.WriteKind
-	Run     func(m *Model, alias, userID string) tea.Cmd
-	// Separator marks the row as a visual divider rather than a real
-	// action. Cursor movement skips it; Enter is a no-op.
+	ID        string
+	Label     string
+	Hint      string
+	Confirm   string // empty → no confirmation; otherwise the question shown in the choice modal
+	Allowed   bool
+	Reason    string
+	Mutates   bool
+	Kind      settings.WriteKind
+	Run       func(m *Model, alias, userID string) tea.Cmd
 	Separator bool
 }
 
@@ -219,8 +214,6 @@ func userActionsFor(u sf.UserRow, login sf.UserLoginRow, loginRowKnown bool, org
 	return rows
 }
 
-// activateUserDetail runs the action row currently under the
-// main-pane cursor. Wired as TabUserDetail's Activate closure.
 func (m *Model) activateUserDetail() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil || d.UserCur == "" {
@@ -271,9 +264,6 @@ func (m *Model) activateUserDetail() tea.Cmd {
 	return a.Run(m, alias, userID)
 }
 
-// cursoredUserActions resolves the action menu for the cursored
-// user, threading in the cached UserLogin row + the current admin
-// User Id so freeze + login-as can render correctly.
 func (m Model) cursoredUserActions(d *orgData) []userActionRow {
 	if d == nil || d.UserCur == "" {
 		return nil
@@ -400,9 +390,6 @@ func (m *Model) applyUserActionDone(msg userActionDoneMsg) tea.Cmd {
 	)
 }
 
-// userPasswordResetLinkCmd asks SF for a one-time password-reset URL
-// and yanks it to the clipboard. The URL is short-lived and tied to
-// this user; the admin pastes it directly to the user.
 func userPasswordResetLinkCmd(m *Model, alias, userID string) tea.Cmd {
 	service := userWriteService(m)
 	return func() tea.Msg {
@@ -417,7 +404,6 @@ func userPasswordResetLinkCmd(m *Model, alias, userID string) tea.Cmd {
 	}
 }
 
-// userSetFrozenCmd flips UserLogin.IsFrozen via SF REST.
 func userSetFrozenCmd(m *Model, alias, userID string, frozen bool) tea.Cmd {
 	service := userWriteService(m)
 	return func() tea.Msg {
@@ -430,9 +416,6 @@ func userSetFrozenCmd(m *Model, alias, userID string, frozen bool) tea.Cmd {
 	}
 }
 
-// yankToClipboardCmd writes value to the system clipboard and flashes
-// "yanked <label>". label appears in the success flash so the user
-// knows what landed in their clipboard.
 func yankToClipboardCmd(value, label string) tea.Cmd {
 	return func() tea.Msg {
 		err := writeClipboard(value)
@@ -440,9 +423,6 @@ func yankToClipboardCmd(value, label string) tea.Cmd {
 	}
 }
 
-// openLoginAs opens Salesforce as the target user via the su flow.
-// orgID is the 15-char Org Id; the admin doing the impersonation is
-// inferred server-side from the session cookie.
 func openLoginAs(m *Model, alias, targetUserID, orgID string) tea.Cmd {
 	if m == nil || targetUserID == "" || orgID == "" {
 		return nil

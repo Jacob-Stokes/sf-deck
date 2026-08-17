@@ -1,15 +1,5 @@
 package sf
 
-// Apex trigger helpers — Tooling-API read + update for ApexTrigger
-// records scoped to an sObject. Same shape as validation_rules.go
-// and record_types.go.
-//
-// Tooling's ApexTrigger carries the full body as a column (not via
-// the Metadata envelope), so GET is a light sobject read rather
-// than a Metadata round-trip. Updates use the generic
-// UpdateToolingMetadata path with the Metadata envelope — Salesforce
-// wants {Metadata: {...}, Body} for body changes.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -66,12 +56,6 @@ func (t TriggerRow) Field(name string) (any, bool) {
 // managed-package triggers too — chip filters in the UI handle the
 // "managed vs unmanaged" cut.
 func ListAllTriggers(target string) ([]TriggerRow, error) {
-	// Sort by Name only — Tooling rejects ORDER BY EntityDefinition.<col>
-	// with an internal server error once the result set spans multiple
-	// namespaces (managed packages), which it does now that we don't
-	// filter on NamespacePrefix. EntityDefinition.QualifiedApiName is
-	// still selected for the per-row display; clients can re-sort
-	// in-memory if they want grouping by parent sObject.
 	return queryRows(target,
 		"SELECT Id, Name, NamespacePrefix, Status, ApiVersion, LengthWithoutComments, IsValid, "+
 			"LastModifiedDate, LastModifiedBy.Name, "+
@@ -102,10 +86,6 @@ func ListTriggers(target, sobject string) ([]TriggerRow, error) {
 		true, mapTriggerRow)
 }
 
-// mapTriggerRow maps one ApexTrigger record to a TriggerRow. Table is
-// populated only when the query selected EntityDefinition (the org-wide
-// ListAllTriggers does; the per-sobject ListTriggers doesn't — the
-// nested lookup falls through harmlessly there).
 func mapTriggerRow(r map[string]any) TriggerRow {
 	row := TriggerRow{
 		ID:                 asString(r["Id"]),
@@ -150,8 +130,6 @@ func GetTrigger(target, id string) (TriggerDetail, error) {
 	if err != nil {
 		return TriggerDetail{}, err
 	}
-	// Tooling's /sobjects/ApexTrigger/<id> returns the full record
-	// including Body directly — no Metadata envelope needed.
 	path := c.ToolingPath("sobjects/ApexTrigger/" + id)
 	body, err := c.get(path, nil)
 	if err != nil {
@@ -211,9 +189,6 @@ func UpdateTriggerMetadata(target, id string, patch map[string]any) error {
 			meta[k] = v
 		}
 	}
-	// If the caller sent any real-Metadata keys, merge them into the
-	// fetched Metadata first — Tooling validates the whole envelope on
-	// PATCH so partial Metadata writes fail.
 	if len(meta) > 0 {
 		existing, err := GetToolingMetadata(target, "ApexTrigger", id)
 		if err != nil {
@@ -237,9 +212,6 @@ func UpdateTriggerMetadata(target, id string, patch map[string]any) error {
 	return nil
 }
 
-// composeTriggerEvents walks the UsageXxx bool columns on a raw
-// Tooling record and returns a compact human-readable string like
-// "before insert, after update". Empty if nothing is set.
 func composeTriggerEvents(r map[string]any) string {
 	bits := []struct {
 		Key   string
@@ -262,7 +234,6 @@ func composeTriggerEvents(r map[string]any) string {
 	return joinCSV(out)
 }
 
-// joinCSV joins with ", " without importing strings for one call.
 func joinCSV(xs []string) string {
 	if len(xs) == 0 {
 		return ""

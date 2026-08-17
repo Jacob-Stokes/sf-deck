@@ -67,7 +67,6 @@ func TestSideDim_TruncatesPerLineNotWholeBlock(t *testing.T) {
 	if len(outLines) != len(inLines) {
 		t.Fatalf("line count changed: %d in, %d out — multi-line block collapsed", len(inLines), len(outLines))
 	}
-	// The old bug: everything past line one vanished into "…".
 	if !strings.Contains(plain, "reparented") {
 		t.Fatalf("tail of wrapped text lost: %q", plain)
 	}

@@ -38,7 +38,6 @@ func TestRowsShape(t *testing.T) {
 		t.Fatalf("rows: got %d, want %d", got, want)
 	}
 
-	// Spot-check the first row
 	r := rows[0]
 	if r.Get("Name") != "Account" {
 		t.Errorf("Name: got %q, want %q", r.Get("Name"), "Account")
@@ -61,7 +60,6 @@ func TestRowsShape(t *testing.T) {
 		t.Errorf("Notes: got %q", rows[2].Get("Notes"))
 	}
 
-	// Missing column reads as empty rather than panicking
 	if rows[0].Get("Notes") != "" {
 		t.Errorf("expected empty Notes for first row, got %q", rows[0].Get("Notes"))
 	}
@@ -115,11 +113,9 @@ func TestWriteCSV(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	got := buf.String()
-	// Header row first
 	if !strings.HasPrefix(got, "Name,Kind,Ref,Parent,Org,URL,Added,Notes\n") {
 		t.Errorf("header row missing or wrong:\n%s", got)
 	}
-	// Comma-containing value should be quoted by encoding/csv
 	if !strings.Contains(got, `"Acc, with comma"`) {
 		t.Errorf("comma value not quoted in CSV:\n%s", got)
 	}
@@ -138,11 +134,9 @@ func TestWriteJSON(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	got := buf.String()
-	// First key in the object should be "Name" (matches Headers[0])
 	if !strings.Contains(got, `"Name":"Flow \"with quotes\""`) {
 		t.Errorf("JSON output mis-shaped:\n%s", got)
 	}
-	// Trailing newline so scripts can append
 	if !strings.HasSuffix(got, "]\n") {
 		t.Errorf("expected trailing newline+]: %q", got[len(got)-3:])
 	}

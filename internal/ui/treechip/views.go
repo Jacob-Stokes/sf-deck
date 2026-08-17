@@ -8,17 +8,10 @@ package treechip
 // breadcrumb segments for the current path, plus pinned-favourite
 // nodes. The renderer composes them into a single horizontal strip.
 type StripModel struct {
-	// Breadcrumb is the current path, root → leaf. Empty when at the
-	// synthetic top. The renderer shows these as clickable chips —
-	// click any segment to jump back to it.
 	Breadcrumb []TreeNode
 
-	// Pins are favourite nodes anywhere in the tree. Click any to
-	// JumpTo() that node directly. Independent of path.
 	Pins []TreeNode
 
-	// CurrentID is the leaf-end ID of Breadcrumb (or "" at root).
-	// Renderers use this to highlight the active segment.
 	CurrentID string
 }
 
@@ -32,13 +25,9 @@ type StripModel struct {
 // the UI layer calls reg.Source() + the typed ItemSource directly
 // for the rows.
 type MainModel struct {
-	Subnodes []TreeNode
-	// SubnodeCounts gives per-subnode item-count + descendant-count
-	// hints used to render summary lines on each row. Computed lazily
-	// by the UI layer; treechip doesn't compute them.
+	Subnodes      []TreeNode
 	SubnodeCounts map[string]NodeCount
 
-	// AtRoot is true when the current path is empty.
 	AtRoot bool
 }
 

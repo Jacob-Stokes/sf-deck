@@ -82,7 +82,6 @@ func TestRecordUpdate_RejectsShortID(t *testing.T) {
 
 func TestRecordUpdate_RejectsBadFieldSyntax(t *testing.T) {
 	a := newWriteTestApp()
-	// "Name" without = should be rejected at flag.Set time.
 	code, _ := runWriteCLI(t, a, "--json", "record", "update",
 		"--org", "scr", "--id", "001DM00000TEST3AAA", "--field", "JustName")
 	if code != headless.ExitInvalidArg {
@@ -111,7 +110,6 @@ func TestRecordUpdate_SafetyBlockedOnProd(t *testing.T) {
 	if errObj["code"] != headless.ErrSafetyBlocked {
 		t.Errorf("error.code = %v, want %s", errObj["code"], headless.ErrSafetyBlocked)
 	}
-	// Shape matches docs/headless-mode-plan.md example.
 	details, _ := errObj["details"].(map[string]any)
 	if details["required_write_kind"] != "records" {
 		t.Errorf("details.required_write_kind = %v", details["required_write_kind"])
@@ -150,7 +148,6 @@ func TestKVFlag_Parses(t *testing.T) {
 		t.Fatalf("Set industry: %v", err)
 	}
 	if err := k.Set("Description=Multi=word=value"); err != nil {
-		// = inside the value is fine — we split on the first one.
 		t.Fatalf("Set with embedded =: %v", err)
 	}
 	if k.values["Name"] != "Acme" {
@@ -172,8 +169,6 @@ func TestKVFlag_RejectsBadInput(t *testing.T) {
 }
 
 func TestWriteSafetyBlocked_EnvelopeShape(t *testing.T) {
-	// Build the canonical BlockedError + render it. Pins the wire
-	// shape independently of which CLI verb produced it.
 	be := app.BlockedError{
 		Target:   "prod",
 		Username: "boss@x",

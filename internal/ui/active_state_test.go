@@ -55,15 +55,12 @@ func TestRecordDetailStemTracksReturnTab(t *testing.T) {
 	}}
 	_ = m.ensureOrgData("u@t.com")
 
-	// Drill from /soql → /record. The tab strip should highlight
-	// /soql, not /records (the old hard-coded behaviour).
 	m.recordDetailReturnTab = TabSOQL
 	m.setTab(TabRecordDetail)
 	if got := m.stemForTab(TabRecordDetail); got != TabSOQL {
 		t.Fatalf("record detail stem from SOQL = %v, want %v", got, TabSOQL)
 	}
 
-	// Drill from /reports → /record. Same property.
 	m.recordDetailReturnTab = TabReportDetail
 	m.setTab(TabRecordDetail)
 	if got := m.stemForTab(TabRecordDetail); got != TabReports {
@@ -104,8 +101,6 @@ func TestTransientDrillsDoNotPolluteLastTabInStem(t *testing.T) {
 	}}
 	d := m.ensureOrgData("u@t.com")
 
-	// Simulate: user on /home, opens record drill via ctrl+f.
-	// Resolution under the home stem should still be /home.
 	m.recordDetailReturnTab = TabHome
 	m.setTab(TabRecordDetail)
 	if got := m.resolveStem(TabHome); got != TabHome {
@@ -122,7 +117,6 @@ func TestTransientDrillsDoNotPolluteLastTabInStem(t *testing.T) {
 		t.Fatalf("after /report drill, resolveStem(Reports) = %v, want %v", got, TabReports)
 	}
 
-	// And for /trigger drills from /apex.
 	d.LastTabInStem = nil
 	m.setTab(TabApex)
 	m.triggerDetailReturnTab = TabApex
@@ -131,9 +125,6 @@ func TestTransientDrillsDoNotPolluteLastTabInStem(t *testing.T) {
 		t.Fatalf("after /trigger drill, resolveStem(Apex) = %v, want %v", got, TabApex)
 	}
 
-	// Per-entity drills (TabObjectDetail) SHOULD still be remembered:
-	// the user might genuinely want to press 2 to return to the Account
-	// schema they were inspecting. This is the feature, not the bug.
 	d.LastTabInStem = nil
 	m.setTab(TabObjectDetail)
 	if got := m.resolveStem(TabObjects); got != TabObjectDetail {

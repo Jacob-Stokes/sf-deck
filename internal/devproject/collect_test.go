@@ -7,10 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// Pure functions in collect.go. No store, no FS, no org contact.
-
-// ----- LabelForItem ----------------------------------------------
-
 func TestLabelForItem_PrefersName(t *testing.T) {
 	got := LabelForItem(Item{Name: "Account.Phone", Kind: KindField, Ref: "Account.Phone"})
 	if got != "Account.Phone" {
@@ -32,8 +28,6 @@ func TestLabelForItem_FallsBackToKindAndRef(t *testing.T) {
 	}
 }
 
-// ----- SupportedKinds --------------------------------------------
-
 func TestSupportedKinds_IncludesAllExpected(t *testing.T) {
 	kinds := SupportedKinds()
 	seen := map[ItemKind]bool{}
@@ -53,8 +47,6 @@ func TestSupportedKinds_IncludesAllExpected(t *testing.T) {
 		}
 	}
 }
-
-// ----- sObjectFromRecord -----------------------------------------
 
 func TestSObjectFromRecord_ExtractsType(t *testing.T) {
 	rec := map[string]any{
@@ -81,8 +73,6 @@ func TestSObjectFromRecord_EmptyType(t *testing.T) {
 		t.Error("expected ok=false for empty type")
 	}
 }
-
-// ----- recordDisplayName -----------------------------------------
 
 func TestRecordDisplayName_PrefersName(t *testing.T) {
 	rec := map[string]any{"Name": "Acme Co", "Id": "001x"}
@@ -120,8 +110,6 @@ func TestRecordDisplayName_EmptyRecord(t *testing.T) {
 	}
 }
 
-// ----- displayLabelForSObject -----------------------------------
-
 func TestDisplayLabelForSObject_LabelMatchesName(t *testing.T) {
 	got := displayLabelForSObject(sf.SObject{Name: "Account", Label: "Account"})
 	if got != "Account" {
@@ -142,8 +130,6 @@ func TestDisplayLabelForSObject_EmptyLabel(t *testing.T) {
 		t.Errorf("got %q, want Account", got)
 	}
 }
-
-// ----- FromOpenable: a couple of representative kinds -------------
 
 func TestFromOpenable_NilReturnsFalse(t *testing.T) {
 	_, _, _, _, ok := FromOpenable(nil)

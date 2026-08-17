@@ -31,19 +31,13 @@ func TestGlobalSearchModalSizeInvariant(t *testing.T) {
 	m := New(c)
 	m.width, m.height = 200, 60
 
-	// Set up the search state directly — bypassing the kickoff cmd
-	// chain since we don't need it for a render test.
 	_ = m.openGlobalSearch() // populate base scope
 	if m.globalSearch == nil {
 		t.Fatal("openGlobalSearch returned without setting state")
 	}
 
-	// Render with whatever the natural empty hits are.
 	got0 := m.renderGlobalSearch()
 
-	// Now stuff a synthetic hit list to simulate "lots of fields
-	// after scope-in." Use bare entries — the only thing that
-	// matters for size is len(s.hits).
 	m.globalSearch.hits = make([]globalSearchHit, 200)
 	for i := range m.globalSearch.hits {
 		m.globalSearch.hits[i] = globalSearchHit{
@@ -55,12 +49,9 @@ func TestGlobalSearchModalSizeInvariant(t *testing.T) {
 	}
 	got200 := m.renderGlobalSearch()
 
-	// Trim to 5 hits.
 	m.globalSearch.hits = m.globalSearch.hits[:5]
 	got5 := m.renderGlobalSearch()
 
-	// Compare box dimensions via lipgloss.Width/Height — those
-	// strip ANSI codes and count visible cells.
 	width := func(s string) int { return lipgloss.Width(s) }
 	height := func(s string) int { return strings.Count(s, "\n") + 1 }
 

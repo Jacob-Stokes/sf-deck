@@ -1,14 +1,5 @@
 package ui
 
-// chip_domains.go — the single registration point for chip domains.
-//
-// Everything per-domain hangs off one table: the registry (with its
-// built-in chips), and the New-view wizard's field catalogue. Adding a
-// domain means adding ONE entry here plus a chipSurface wired into the
-// tab registry — the registries map, settings reload, active-org
-// gating, and the wizard all derive from this table.
-// TestEveryChipDomainHasWizardCatalogue iterates it.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/qchip"
 )
@@ -19,7 +10,6 @@ import (
 // reload, active-org gating) can't forget it.
 const domainSchemaFields chipDomain = "fields"
 
-// chipDomainDef declares one chip domain.
 type chipDomainDef struct {
 	Domain   chipDomain
 	Builtins []qchip.Chip
@@ -30,15 +20,12 @@ type chipDomainDef struct {
 	WizardFields func(m Model, scope string) []cwField
 }
 
-// chipDomainDefs is the table. Order is cosmetic.
 func chipDomainDefs() []chipDomainDef {
 	static := func(fn func() []cwField) func(Model, string) []cwField {
 		return func(Model, string) []cwField { return fn() }
 	}
 	return []chipDomainDef{
 		{Domain: domainRecords, Builtins: qchip.RecordBuiltins,
-			// Records builds its catalogue from the live describe of
-			// the scoped sObject rather than a static list.
 			WizardFields: func(m Model, scope string) []cwField { return m.recordFields(scope) }},
 		{Domain: domainObjects, Builtins: qchip.SObjectBuiltins, WizardFields: static(objectFields)},
 		{Domain: domainFlows, Builtins: qchip.FlowBuiltins, WizardFields: static(flowFields)},
@@ -63,8 +50,6 @@ func chipDomainDefs() []chipDomainDef {
 	}
 }
 
-// newChipRegistries builds the per-domain registry map from the table.
-// Called once from newModel.
 func newChipRegistries() map[chipDomain]*qchip.Registry {
 	out := make(map[chipDomain]*qchip.Registry, len(chipDomainDefs()))
 	for _, def := range chipDomainDefs() {
@@ -73,8 +58,6 @@ func newChipRegistries() map[chipDomain]*qchip.Registry {
 	return out
 }
 
-// chipRegistry returns the registry for a domain, or nil for unknown
-// domains. The single accessor every consumer goes through.
 func (m Model) chipRegistry(d chipDomain) *qchip.Registry {
 	return m.chipRegistries[d]
 }

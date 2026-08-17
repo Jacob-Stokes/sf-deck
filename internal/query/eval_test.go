@@ -29,32 +29,25 @@ func TestEvalCompareOps(t *testing.T) {
 		node Node
 		want bool
 	}{
-		// Eq / NotEq
 		{"eq-string-true", Cmp("Status", OpEq, "Active"), true},
 		{"eq-string-false", Cmp("Status", OpEq, "Draft"), false},
 		{"eq-int-true", Cmp("ApiVersion", OpEq, 60), true},
 		{"eq-int-false", Cmp("ApiVersion", OpEq, 50), false},
 		{"eq-bool-true", Cmp("IsActive", OpEq, true), true},
 		{"ne", Cmp("Status", OpNotEq, "Draft"), true},
-		// Contains / Starts / Ends
 		{"contains", Cmp("Name", OpContains, "open"), true},
 		{"contains-fold", Cmp("Name", OpContains, "OPEN"), true},
 		{"starts", Cmp("DeveloperName", OpStartsWith, "FSL_"), true},
 		{"ends", Cmp("DeveloperName", OpEndsWith, "Assign"), true},
-		// Ordered compare on numbers
 		{"gt", Cmp("ApiVersion", OpGT, 50), true},
 		{"gt-equal", Cmp("ApiVersion", OpGT, 60), false},
 		{"gte", Cmp("ApiVersion", OpGTE, 60), true},
 		{"lt", Cmp("ApiVersion", OpLT, 70), true},
 		{"lte", Cmp("ApiVersion", OpLTE, 60), true},
-		// Ordered compare on date strings (lexical compare matches
-		// chronological order for ISO-8601).
 		{"date-gt", Cmp("Status", OpGT, "Acti"), true},
-		// IsNull
 		{"isnull-explicit-nil", Cmp("NullField", OpIsNull, nil), true},
 		{"isnull-missing", Cmp("Missing", OpIsNull, nil), true},
 		{"isnull-non-null", Cmp("Status", OpIsNull, nil), false},
-		// In
 		{"in-match", Cmp("Status", OpIn, []any{"Draft", "Active"}), true},
 		{"in-miss", Cmp("Status", OpIn, []any{"Draft", "Obsolete"}), false},
 	}

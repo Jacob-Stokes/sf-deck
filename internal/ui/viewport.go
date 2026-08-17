@@ -1,10 +1,5 @@
 package ui
 
-// viewport.go — thin wrappers forwarding to uilayout.
-// All viewport/scroll logic now lives in internal/ui/uilayout/viewport.go.
-// These package-level aliases allow existing callers in internal/ui/
-// to keep using unqualified names without any changes.
-
 import "github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 
 func renderRows(

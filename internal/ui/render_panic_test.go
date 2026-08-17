@@ -1,16 +1,6 @@
 package ui
 
 // Tests for View()'s panic recovery wrapper.
-//
-// The wrapper's purpose is to keep the TTY alive when a render-tree
-// panic happens at runtime — instead of Bubble Tea crashing the
-// session with an opaque stack trace, the user sees a fallback frame
-// telling them where to find the log.
-//
-// We test renderPanicFrame directly (the inner helper) plus call
-// View() via a deliberate panic injected by viewImpl to assert the
-// integration: panic propagates → recover catches → fallback frame
-// is non-empty + carries the recovered message.
 
 import (
 	"strings"
@@ -54,10 +44,6 @@ func TestViewRecoverFromPanic(t *testing.T) {
 	}
 }
 
-// callWithRecover mirrors View()'s recover shape exactly so the test
-// exercises the same code path. If renderPanicFrame is wrong the
-// test fails; if View()'s wiring drifts from this shape, the test
-// becomes a tripwire that catches the drift.
 func callWithRecover(fn func() tea.View) (out tea.View) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -67,8 +53,6 @@ func callWithRecover(fn func() tea.View) (out tea.View) {
 	return fn()
 }
 
-// teaViewString extracts the body string from a tea.View. The body
-// lives on the Content field — tests inspect it directly.
 func teaViewString(v tea.View) string {
 	return v.Content
 }

@@ -158,7 +158,6 @@ func TestInferredPrivilegedSObjectIsRegatedBeforeMutation(t *testing.T) {
 	remote := &fakeRemote{}
 	service := serviceAt(settings.SafetyRecords, remote)
 	remote.err = nil
-	// Override the fake's resolved object through a narrow wrapper.
 	wrapped := &resolvedObjectRemote{fakeRemote: remote, object: "User"}
 	service.remote = wrapped
 	_, err := service.Update(context.Background(), UpdateInput{

@@ -7,16 +7,11 @@ import (
 )
 
 func (m *Model) moveFieldDetailCursor(delta int) {
-	// Cursor walks the navigable rows of the MAIN pane (every property,
-	// editable or read-only), not the sidebar action menu. The sidebar
-	// is info-only now.
 	n := m.fieldDetailNavCount()
 	m.fieldActionCur = clampDelta(m.fieldActionCur, delta, n)
 }
 
 func (m *Model) activateFieldDetail() tea.Cmd {
-	// Enter fires the action the cursored MAIN-pane row maps to.
-	// Read-only rows (SOQL caps, picklist values, …) are a no-op.
 	idx, ok := m.fieldDetailActionForCursor()
 	if !ok {
 		return nil
@@ -47,7 +42,6 @@ func (m *Model) ensureFieldDetailData(d *orgData, o sf.Org) tea.Cmd {
 }
 
 func (m *Model) moveValidationDetailCursor(delta int) {
-	// Cursor walks the navigable MAIN-pane rows; sidebar is info-only.
 	n := m.validationDetailNavCount()
 	m.validationActionCur = clampDelta(m.validationActionCur, delta, n)
 }
@@ -125,12 +119,9 @@ func (m Model) refreshRecordTypeDetailData(d *orgData) tea.Cmd {
 
 func (m *Model) moveTriggerDetailCursor(delta int) {
 	if !m.bodyFocus {
-		// Row cursor has focus — walk the 3 main-pane action rows
-		// (status / edit body / delete).
 		m.triggerActionCur = clampDelta(m.triggerActionCur, delta, 3)
 		return
 	}
-	// Body focused — scroll the Apex source.
 	d := m.activeOrgData()
 	if d == nil || d.Triggers.DrillID == "" {
 		return
@@ -147,9 +138,6 @@ func (m *Model) moveTriggerDetailCursor(delta int) {
 }
 
 func (m *Model) activateTriggerDetail() tea.Cmd {
-	// Enter fires the cursored row's action. When the body is focused,
-	// the natural action is "edit body" (Enter while reading the
-	// source opens the editor).
 	idx := trgActEditBody
 	if !m.bodyFocus {
 		mapped, ok := triggerNavActionForCursor(m.triggerActionCur)

@@ -5,9 +5,6 @@ package ui
 // Lists every non-favourite chip for the current scope; picking one
 // sets it as the active chip on the strip without adding it to the
 // favourites list (a one-off "I want this view right now" action).
-//
-// Re-uses internal/ui/picker.go — generic anchored dropdown over
-// qchip.Chip. Same widget the field picker + value picker use.
 
 import (
 	"strings"
@@ -52,10 +49,6 @@ func (m *Model) openChipOverflowFor(domain chipDomain, scope string) tea.Cmd {
 		pickerW = m.width - 4
 	}
 	anchorX := wX + 4
-	// Anchor below the chip strip with a one-row gap, not glued to
-	// the top edge of the main pane. The header + tab bar + strip
-	// take ~6 rows; sit one row below that so the picker visibly
-	// belongs to the strip without flush-bumping the panel border.
 	anchorY := 7
 
 	// Take most of the terminal height — the picker default is 12
@@ -106,13 +99,6 @@ type chipOverflowPickedMsg struct {
 	chipID string
 }
 
-// applyChipOverflowPicked sets the picked chip as the active strip
-// selection AND populates the transient slot for that surface. The
-// chip stays on the strip in a distinct style (transient, not
-// favourite) until either:
-//   - the user picks a different chip from M (replaces this one)
-//   - the user pins it via 'f' (transient slot clears, chip moves
-//     to the favourites group)
 func (m Model) applyChipOverflowPicked(msg chipOverflowPickedMsg) (Model, tea.Cmd) {
 	cmd := (&m).applyChipSelection(msg.domain, msg.scope, msg.chipID)
 	return m, cmd
@@ -141,9 +127,6 @@ func (m *Model) applyChipSelection(domain chipDomain, scope, chipID string) tea.
 		return m.onTabChanged()
 	}
 
-	// Favourite already on the strip? Just move the cursor onto it —
-	// no transient slot needed (a transient copy would render the
-	// chip twice).
 	surf := chipSurfaceForDomain(domain)
 	if surf != nil && surf.SetChipIdx != nil {
 		for i, row := range m.stripRows(domain, "*") {
@@ -154,8 +137,6 @@ func (m *Model) applyChipSelection(domain chipDomain, scope, chipID string) tea.
 		}
 	}
 
-	// Not on the strip: occupy the transient slot, then move the
-	// cursor onto the freshly-added row.
 	if m.activeTransient == nil {
 		m.activeTransient = map[string]string{}
 	}

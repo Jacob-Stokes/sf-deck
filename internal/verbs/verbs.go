@@ -3,23 +3,6 @@
 // declared here as a Spec; CLI dispatch + IPC dispatch + skill
 // doc generation all consume this same registry so adding or
 // renaming a verb is a one-edit operation.
-//
-// Strict parity: a Spec that declares a CLI binding MUST have a
-// dispatch entry; a Spec that declares an IPC binding MUST have a
-// Backend method. The drift test in verbs_test.go fails when this
-// invariant breaks.
-//
-// Layout: one Spec per (noun, verb) operation. CLI and IPC bindings
-// hang off the Spec — when both are populated, they represent the
-// same logical operation exposed over two transports. When only one
-// is populated, it's intentional (e.g. soql.seed is IPC-only since
-// it pushes into the TUI editor; instance.list is CLI-only since
-// the IPC instance IS the running process).
-//
-// Stability tiers:
-//   - "stable"     : public contract, semver-protected
-//   - "experimental": may change without notice; surfaced to agents
-//   - "deprecated" : still works, has a replacement
 package verbs
 
 import "sort"

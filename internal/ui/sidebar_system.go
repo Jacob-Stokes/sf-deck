@@ -1,10 +1,5 @@
 package ui
 
-// Per-surface sidebars for the operational / system tabs: apex
-// logs, setup audit trail, flow interviews, active-user sessions,
-// communities, deploys, packages. Split out of sidebar.go (which
-// keeps the shared panel primitives + registry dispatch).
-
 import (
 	"fmt"
 )
@@ -37,11 +32,6 @@ func (m Model) sidebarApexLog(inner int) string {
 	return renderKVPanel(inner, "Apex Log", rows, extra...)
 }
 
-// sidebarSetupAudit shows one Setup-change event in full. The Display
-// sentence and Action code are truncated in the table but rendered
-// whole here (sideKV word-wraps long values), so this panel — and the
-// `i` inspect modal that reuses it — is the only place you see the
-// complete change description.
 func (m Model) sidebarSetupAudit(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -68,9 +58,6 @@ func (m Model) sidebarSetupAudit(inner int) string {
 		{"by", by},
 		{"section", dashIfEmpty(r.Section)},
 		{"action", dashIfEmpty(r.Action)},
-		// Display last: it's the longest field and wraps to multiple
-		// lines, so keeping it at the bottom keeps the short KV rows
-		// aligned above it.
 		{"change", dashIfEmpty(r.Display)},
 	}
 	extra := []string{"", sideDim("  "+firstPretty(Keys.OpenDefault)+" open actor  ·  "+
@@ -78,9 +65,6 @@ func (m Model) sidebarSetupAudit(inner int) string {
 	return renderKVPanel(inner, "Setup Change", rows, extra...)
 }
 
-// sidebarFlowInterview shows one flow interview in full — the flow +
-// timestamp label, its status, and (the key diagnostic) the element it
-// is currently sitting on or died at. Reused by the `i` inspect modal.
 func (m Model) sidebarFlowInterview(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -105,7 +89,6 @@ func (m Model) sidebarFlowInterview(inner int) string {
 		{"started", when},
 		{"by", dashIfEmpty(r.CreatedBy)},
 		{"id", r.ID},
-		// Label last — it's the longest and wraps.
 		{"flow", dashIfEmpty(r.Label)},
 	}
 	extra := []string{"", sideDim("  "+firstPretty(Keys.OpenDefault)+" open starter  ·  "+
@@ -197,9 +180,6 @@ func (m Model) sidebarUserSession(inner int) string {
 	return renderKVPanel(inner, "Session", rows, extra...)
 }
 
-// sidebarCommunity shows one Experience site's config — the settings
-// the columns leave off (guest files, internal login, private messages,
-// description) plus URL / status / member count / id.
 func (m Model) sidebarCommunity(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -247,8 +227,6 @@ func (m Model) sidebarDeploy(inner int) string {
 	}
 	r, ok := d.DeployList.Selected()
 	if m.tab() == TabDeployDetail && d.DeployCur != "" {
-		// Drilled in: pin the sidebar to the drilled deploy, not
-		// whatever the (hidden) list cursor points at.
 		if row, found := m.deployRowByID(d.DeployCur); found {
 			r, ok = row, true
 		}

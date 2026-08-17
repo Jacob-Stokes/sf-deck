@@ -4,44 +4,16 @@ package ui
 // sf struct (sf.Flow, sf.ApexClassRow, sf.SObject, …) so that
 // Targets() and YankTargets() reuse the SAME implementations the
 // top-level /flows, /apex, /objects, etc. tabs use.
-//
-// Why this matters: each typed struct already knows how to build
-// its full Lightning destination menu (Flow Builder + Setup +
-// list view) and its yank menu (id + DeveloperName + URL). We don't
-// reinvent any of it — we just instantiate the struct with the
-// fields we have (typically Id and a couple of others) and let
-// the existing impl do the work.
-//
-// Fields we DON'T have on a devproject.Item (ActiveVersionID for
-// flows, ApiVersion for apex, IsValid flags, ModifiedBy…) become
-// zero-values. The Targets() impls all handle these gracefully —
-// missing fields just drop the targets that needed them, never
-// crash. The result is "what we have works the same as anywhere
-// else; what we're missing is just absent from the menu."
 
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// openableForItem returns the live per-kind sf typed-row that
-// implements both sf.Openable and (for most kinds) sf.Yankable,
-// reusing the existing implementation. Returns nil for kinds with
-// no Lightning destination at all (apex snippets, saved soql
-// queries — both sf-deck-local concepts).
-//
-// Where possible, the FULL row from the org's cached resource is
-// returned — that way the per-kind Targets() impl sees every field
-// (ActiveVersionID for flows, ApiVersion for apex, the
-// folder/developer pair for reports, etc.) and produces the same
-// menu users see on the kind's top-level tab. Falls back to a
-// minimal synthetic row when the cache hasn't loaded for that org
-// or the item isn't present — degraded but always functional.
 func openableForItem(m Model, it devproject.Item) sf.Openable {
 	d := m.data[it.OrgUser]
 	switch it.Kind {
 	case devproject.KindSObject:
-		// Ref = API name. Find the full SObject when loaded.
 		if d != nil {
 			for _, s := range d.SObjects.Value() {
 				if s.Name == it.Ref {
@@ -52,9 +24,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 		return sf.SObject{Name: it.Ref, Label: it.Name}
 
 	case devproject.KindField:
-		// Ref = "<sobject>.<field>". Find the full Field on the parent
-		// describe so the menu carries every URL the top-level
-		// /objects → Schema path produces.
 		sobj, fname := splitSObjectField(it.Ref)
 		if sobj == "" || fname == "" {
 			return nil
@@ -74,9 +43,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 		}
 
 	case devproject.KindFlow:
-		// Ref = FlowDefinitionId. Look up the full Flow so the Flow
-		// Builder target (which needs ActiveVersionID / LatestVersionID)
-		// is part of the menu — same shape as /flows.
 		if d != nil {
 			for _, f := range d.Flows.Value() {
 				if f.DefinitionID == it.Ref {
@@ -100,9 +66,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 		return sf.ApexClassRow{ID: it.Ref, Name: it.Name}
 
 	case devproject.KindApexTrigger:
-		// sf.TriggerRow doesn't implement Openable directly — keep the
-		// triggerOpenable fallback. Still try to pull the cached row
-		// for richer name / parent context.
 		if it.Ref == "" {
 			return nil
 		}
@@ -143,8 +106,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 		return sf.PermissionSet{ID: it.Ref, Label: it.Name}
 
 	case devproject.KindPermissionSetGroup:
-		// No PSG cache on orgData; the synthetic struct carries
-		// enough for the basic open-in-Setup link.
 		return sf.PermissionSetGroup{ID: it.Ref, MasterLabel: it.Name}
 
 	case devproject.KindProfile:
@@ -189,7 +150,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 		return sf.LWCBundle{ID: it.Ref, MasterLabel: it.Name}
 
 	case devproject.KindAura:
-		// AuraBundle has its own Openable impl distinct from LWC.
 		if d != nil {
 			for _, a := range d.AuraBundles.Value() {
 				if a.ID == it.Ref {
@@ -200,8 +160,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 		return sf.AuraBundle{ID: it.Ref, MasterLabel: it.Name}
 
 	case devproject.KindValidationRule:
-		// sf.ValidationRuleRow is scoped per-object internally — it
-		// doesn't implement Openable. Build a small Openable here.
 		if it.Type == "" || it.Ref == "" {
 			return nil
 		}
@@ -222,13 +180,6 @@ func openableForItem(m Model, it devproject.Item) sf.Openable {
 	return nil
 }
 
-// --- fallback Openables for kinds with no direct sf.* impl ---
-
-// triggerOpenable is the minimal Openable for an apex trigger row.
-// The sf.TriggerRow struct doesn't implement Openable (it's used
-// inside per-sobject views where the parent comes from the
-// surrounding tab); we replicate the trigger's Lightning targets
-// here from just (id, name, parent).
 type triggerOpenable struct {
 	id, name, parent string
 }
@@ -295,10 +246,6 @@ func (r recordTypeOpenable) YankTargets() []sf.YankTarget {
 	return commonItemYank(r.id, r.name, r.parent)
 }
 
-// commonItemYank renders the boilerplate yank menu for the fallback
-// Openables — id, name, parent. Used by triggerOpenable +
-// validationRuleOpenable + recordTypeOpenable so they all expose
-// the same shape.
 func commonItemYank(id, name, parent string) []sf.YankTarget {
 	var out []sf.YankTarget
 	if id != "" {
@@ -319,8 +266,6 @@ func commonItemYank(id, name, parent string) []sf.YankTarget {
 	return out
 }
 
-// splitSObjectField splits "Account.Phone" into ("Account", "Phone").
-// Returns empty strings when the input isn't dotted.
 func splitSObjectField(ref string) (string, string) {
 	for i, r := range ref {
 		if r == '.' {
@@ -330,10 +275,6 @@ func splitSObjectField(ref string) (string, string) {
 	return "", ""
 }
 
-// identityFromTagDetail is the TabSpec.Identity closure for
-// /tag-detail. Resolves the cursored row in m.tagItems and wraps it
-// in an ItemIdentity carrying both the (Kind, Ref) for downstream
-// surfaces AND the openable so `o` works.
 func identityFromTagDetail(m Model) (ItemIdentity, bool) {
 	rows := m.tagItems.Filtered()
 	if len(rows) == 0 {
@@ -346,8 +287,6 @@ func identityFromTagDetail(m Model) (ItemIdentity, bool) {
 	return identityForItem(m, rows[cur]), true
 }
 
-// identityFromDevProjectItems is the SubtabSpec.Identity closure for
-// the /dev-project-detail Items subtab. Same shape as tag detail.
 func identityFromDevProjectItems(m Model) (ItemIdentity, bool) {
 	d := m.activeOrgData()
 	if d == nil {
@@ -364,17 +303,6 @@ func identityFromDevProjectItems(m Model) (ItemIdentity, bool) {
 	return identityForItem(m, rows[cur]), true
 }
 
-// identityForItem packages a devproject.Item into the ItemIdentity
-// shape the open / drill machinery expects. The Openable is
-// kind-specific (see openableForItem); kinds with no Lightning
-// destination get nil here so the open dispatcher gracefully
-// flashes "nothing to open here" rather than firing a half-built
-// URL.
-//
-// Model is threaded through so openableForItem can pull the FULL
-// per-kind row from the org's cached resource — produces a
-// fuller open / yank menu (identical to the top-level tab) when
-// the resource is loaded.
 func identityForItem(m Model, it devproject.Item) ItemIdentity {
 	label := it.Name
 	if label == "" {

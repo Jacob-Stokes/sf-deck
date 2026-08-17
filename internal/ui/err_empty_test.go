@@ -9,7 +9,6 @@ import (
 )
 
 func TestErrEmptyMessage(t *testing.T) {
-	// Known SF error code -> raw error + a human hint.
 	apiOff := &sf.SFError{Code: "API_DISABLED_FOR_ORG", Message: "API is not enabled"}
 	got := errEmptyMessage(apiOff)
 	if !strings.Contains(got, "couldn't load") {
@@ -25,13 +24,11 @@ func TestErrEmptyMessage(t *testing.T) {
 		t.Errorf("missing permission hint for INSUFFICIENT_ACCESS")
 	}
 
-	// Unknown/plain error -> raw text, no invented hint (still shown, not swallowed).
 	plain := errors.New("dial tcp: connection refused")
 	g := errEmptyMessage(plain)
 	if !strings.Contains(g, "connection refused") {
 		t.Errorf("plain error text must be surfaced, got %q", g)
 	}
-	// Only one line (headline) when there's no hint.
 	if strings.Count(g, "\n") != 0 {
 		t.Errorf("plain error should be single-line, got %q", g)
 	}

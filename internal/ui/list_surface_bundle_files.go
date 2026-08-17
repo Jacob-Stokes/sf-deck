@@ -4,12 +4,6 @@ package ui
 // on-disk directory. Sibling to list_surface_bundle_detail.go's
 // COMPONENTS view; both live under TabBundleDetail and the user
 // flips between them with `[` / `]`.
-//
-// Mode is intentionally simple: ReadDir(b.Path + cwd) each time
-// the cwd changes. No watcher. The .. row appears at the top of
-// every non-root view so Enter on it pops one level. Real
-// directories show `<dir>` markers + size 0 to keep parity with
-// regular files in the same table.
 
 import (
 	"os"
@@ -24,10 +18,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// bundleFileRow is one entry in the FILES view's list.
-// IsParent flags the synthetic ".." row at the top of any
-// non-root listing; the activate hook treats it as "pop one
-// segment of cwd."
 type bundleFileRow struct {
 	Name     string
 	IsDir    bool
@@ -36,11 +26,6 @@ type bundleFileRow struct {
 	Modified string // pre-formatted "2006-01-02 15:04"
 }
 
-// bundleFileColumnSchema is the column spec for the FILES view.
-// Name / kind / size / modified — same shape any file explorer
-// shows. Kind is rendered as a small inline tag so the user can
-// see at a glance whether a row is a dir without having to read
-// the size column.
 func bundleFileColumnSchema() tablemodel.Schema[bundleFileRow] {
 	return tablemodel.Schema[bundleFileRow]{
 		DefaultColumns: func(scope string) []string {
@@ -97,8 +82,6 @@ func bundleFileColumnSchema() tablemodel.Schema[bundleFileRow] {
 	}
 }
 
-// bundleFileListCols is the canonical column spec returned by
-// the TabSpec.ListTable hook for the files view.
 func bundleFileListCols() []uilayout.ListColumn {
 	return mustResolveColumns(bundleFileColumnSchema()).ListColumns()
 }
@@ -138,7 +121,6 @@ func readBundleDir(bundleRoot, relCwd string) ([]bundleFileRow, error) {
 			Modified: info.ModTime().Format("2006-01-02 15:04"),
 		})
 	}
-	// Sort dirs first, then files, both alpha.
 	parentRow := -1
 	for i, r := range rows {
 		if r.IsParent {
@@ -147,7 +129,6 @@ func readBundleDir(bundleRoot, relCwd string) ([]bundleFileRow, error) {
 		}
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
-		// Keep .. at the top.
 		if rows[i].IsParent {
 			return true
 		}

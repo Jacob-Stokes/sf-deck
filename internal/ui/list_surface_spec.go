@@ -3,23 +3,6 @@ package ui
 // list_surface_spec.go — generic builder that collapses the
 // repeated BuildRenderModel boilerplate every static list surface
 // was writing by hand.
-//
-// Before: each surface declared a 60-90 line listSurface literal
-// that resolved the schema, installed the sort hook, filtered the
-// list, built marks/gutters, and assembled a listRenderModel. The
-// variation between surfaces was 5-10 lines (title format, marks
-// fn, gutter wiring); the rest was identical scaffolding.
-//
-// After: surfaces declare a typed ListViewTableSpec[T] with just
-// the variation. The spec's Build() method returns a
-// listRenderModel built from the spec's pieces — sort hook,
-// filtered items, marks, gutters, recolor, empty hint, version.
-//
-// Reports stays separate (dynamic columns from server response).
-// Chip-driven surfaces (objects, flows, apex by chip, perms by
-// chip) still need bespoke BuildRenderModel closures because the
-// chip selection forks the resource lookup; this builder targets
-// the "one ListView[T] + Resource[T] + schema" cases.
 
 import (
 	"charm.land/lipgloss/v2"
@@ -59,10 +42,7 @@ type ListViewTableSpec[T any] struct {
 	StatePtr func(d *orgData) *uilayout.ListTableState
 	Title    func(m Model, d *orgData, items []T) string
 	Empty    string
-	// EmptyFn is the dynamic alternative to Empty — used when the
-	// empty-state message depends on org state (e.g. licenses query
-	// failed with an error vs. just no rows). EmptyFn wins when set.
-	EmptyFn func(m Model, d *orgData) string
+	EmptyFn  func(m Model, d *orgData) string
 
 	// ResErr returns the backing resource's last fetch error, if any.
 	// When set and the list is empty, the empty-state renders the error
@@ -79,16 +59,8 @@ type ListViewTableSpec[T any] struct {
 	FlagsAware   bool
 	FooterExtras string
 
-	// ColStyles is an optional per-column-name style override map
-	// applied to the resolved column list before render. Used by
-	// surfaces (home Limits/Licenses) that paint columns in fixed
-	// theme palettes regardless of row content. Empty = no override.
 	ColStyles map[string]lipgloss.Style
 
-	// RowKindRef, when non-nil, maps one item to its taggable
-	// (kind, ref) identity — the per-row analogue of the surface's
-	// cursored-row Identity resolver. Enables bulk tagging (T):
-	// the picker targets every row of the current filtered view.
 	RowKindRef func(item T) (devproject.ItemKind, string)
 }
 
@@ -142,10 +114,6 @@ func (s ListViewTableSpec[T]) Build(m Model, d *orgData) (listRenderModel, bool)
 		})
 
 	items := lv.Filtered()
-	// Recompute marks against the filtered slice — the sort
-	// callback above saw the full list; the render closure now
-	// needs the filtered subset's marks. Cheap: marks slices are
-	// small and lazy.
 	if s.Marks != nil {
 		marks = s.Marks(items)
 	}
@@ -201,10 +169,6 @@ func (s ListViewTableSpec[T]) Build(m Model, d *orgData) (listRenderModel, bool)
 	return model, true
 }
 
-// marksFor returns the cached marks slice — internal helper that
-// recomputes if the spec didn't pre-cache (defensive; the build
-// path always pre-caches but the sort-install callback may fire
-// before that).
 func (s ListViewTableSpec[T]) marksFor(items []T) []uilayout.RowMark {
 	if s.Marks == nil {
 		return nil
@@ -212,10 +176,6 @@ func (s ListViewTableSpec[T]) marksFor(items []T) []uilayout.RowMark {
 	return s.Marks(items)
 }
 
-// listSurfaceFromSpec wires a ListViewTableSpec[T] into a complete
-// listSurface, filling in the Cols/State/SearchPtr/MoveCursor/
-// ResetCursor closures from the spec's accessors. Saves another
-// ~6 lines of boilerplate per surface.
 func listSurfaceFromSpec[T any](spec ListViewTableSpec[T]) listSurface {
 	return listSurface{
 		State: func(d *orgData) *uilayout.ListTableState {

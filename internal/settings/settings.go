@@ -1,70 +1,4 @@
 // Package settings reads + writes ~/.sf-deck/settings.toml.
-//
-// The only thing it holds today is the Safety level — a guardrail
-// that gates future write operations (record DML, metadata deploys,
-// execute-anonymous Apex). Salesforce itself enforces access via
-// profiles and FLS; Safety is a *client-side* preflight so users
-// don't fire writes by accident against the wrong org.
-//
-// File shape (safety + a sampling of the behaviour knobs):
-//
-//	# ~/.sf-deck/settings.toml
-//	[defaults]
-//	production = "read_only"
-//	sandbox    = "records"
-//	scratch    = "full"
-//	devhub     = "records"
-//
-//	[orgs."some-alias"]
-//	safety = "read_only"
-//
-//	# How the app opens (every bool also has a "<key>_set" twin so
-//	# "wants false" is distinct from "never said" — the Set* mutators
-//	# handle this; hand-editing just needs the _set flag set true).
-//	[ui.startup]
-//	sidebar_open       = true
-//	query_line_visible = false
-//	left_rail_open     = false
-//	start_tab          = "home"        # tab id; "" = home
-//	default_sort       = "asc"         # asc | desc — first-press sort dir
-//	global_search_mode = "metadata"    # metadata | records
-//	soql_seed          = "SELECT Id, Name FROM Account LIMIT 20"
-//
-//	# Default row counts for server fetches (0 = built-in default).
-//	[ui.limits]
-//	recent_records    = 50
-//	notifications     = 50
-//	deploy_history    = 10
-//	async_job_history = 10
-//	reference_picker  = 20
-//	global_search     = 50   # SOSL cap, hard-clamped to SF's max of 50
-//
-//	# Pane + modal sizing (0 = built-in default).
-//	[ui.layout]
-//	object_pinned_subtabs = 6
-//	autocomplete_rows     = 8
-//	column_resize_step    = 4
-//	downloads_modal_rows  = 16
-//	command_palette_rows  = 18
-//	global_search_rows    = 40
-//
-//	# Salesforce API client tuning (timeouts in seconds, polls in ms;
-//	# 0 = built-in default). api_version "" = use the org-reported one.
-//	[ui.api]
-//	http_timeout_sec     = 30
-//	cli_timeout_sec      = 30
-//	retrieve_timeout_sec = 300
-//	deploy_timeout_sec   = 60
-//	deploy_poll_ms       = 1000
-//	bulk_poll_ms         = 5000
-//	api_version          = ""
-//
-//	# Stable sf-deck release discovery. Enabled by default; setting the
-//	# environment variable SF_DECK_NO_UPDATE_CHECK=1 disables automatic
-//	# checks for that process without changing this preference.
-//	[ui.updates]
-//	automatic     = true
-//	automatic_set = true
 package settings
 
 import (
@@ -111,20 +45,8 @@ type UIConfig struct {
 	Debug           DebugConfig      `toml:"debug"`
 	Updates         UpdatesConfig    `toml:"updates,omitempty"`
 
-	// SortPerView, when true, gives each view (chip) on a list surface
-	// its own sort — switching views restores that view's last sort.
-	// Default false: sort is shared across views on the same surface
-	// (set a sort once, it follows you as you flip views). Column widths
-	// and scroll always stay shared regardless. Persisted as a string
-	// ("view" / "") so absence reads as the shared default.
 	SortPerView string `toml:"sort_per_view,omitempty"`
 
-	// SidebarPosition is the user-facing single control for where the
-	// context sidebar sits: "rhs" (right of main, default), "bottom"
-	// (stacked below main), or "auto" (reactive placement — reserved,
-	// currently a no-op / "coming soon"). Empty reads as "rhs". This
-	// supersedes the old per-toggle Startup.SidebarStacked / AutoLayout
-	// knobs as the settings-menu entry point.
 	SidebarPosition string `toml:"sidebar_position,omitempty"`
 
 	// WelcomeSeen is set true once the first-launch welcome modal has
@@ -141,10 +63,6 @@ type UIConfig struct {
 	LegalAcceptedVersion string `toml:"legal_accepted_version,omitempty"`
 	LegalAcceptedAt      string `toml:"legal_accepted_at,omitempty"`
 
-	// DemoOrgImported is set true once the user has imported the demo
-	// org from the welcome modal (or the re-entry action). Drives the
-	// checkbox state ("already done") and whether the demo org is
-	// re-seeded on boot.
 	DemoOrgImported bool `toml:"demo_org_imported,omitempty"`
 
 	// Chips is the unified user-defined chip catalogue. Each entry
@@ -158,12 +76,6 @@ type UIConfig struct {
 	// and the next Save() drops the old sections).
 	Chips []ChipConfig `toml:"chips,omitempty"`
 
-	// ChipBuiltinFavOverrides lets users override the shipped
-	// favourite-or-not default for built-in chips, keyed by
-	// "<domain>.<chip-id>" (e.g. "records.recent" → false to
-	// hide Recent from the strip). User chips store Favourite
-	// directly on their ChipConfig; this map is for built-ins
-	// whose canonical state lives in code.
 	ChipBuiltinFavOverrides map[string]bool `toml:"chip_builtin_fav_overrides,omitempty"`
 
 	// Legacy fields — kept for one release for backwards compat. The
@@ -180,15 +92,6 @@ type UIConfig struct {
 	// renders in compact (dot) mode.
 	TagColumnHidden bool `toml:"tag_column_hidden,omitempty"`
 
-	// TagColumnMode is a 3-state cycle for the tag gutter, driven
-	// by Ctrl+T:
-	//
-	//   ""        / "compact" → coloured dots (5 cells, default)
-	//   "expanded"             → tag pills with names (28 cells)
-	//   "hidden"               → not rendered (0 cells)
-	//
-	// Empty string means "use the default" so a fresh user with no
-	// settings file sees dots immediately.
 	TagColumnMode string `toml:"tag_column_mode,omitempty"`
 
 	// ProjectColumnHidden hides the synthetic project-membership
@@ -197,49 +100,15 @@ type UIConfig struct {
 	// Ctrl+P; persists across sessions.
 	ProjectColumnHidden bool `toml:"project_column_hidden,omitempty"`
 
-	// FlagColumnMode is a 3-state cycle for the FLAGS column,
-	// driven by Ctrl+F:
-	//
-	//   ""        / "full" → full label per flag (default)
-	//   "letter"            → single-letter glyphs (e.g. "ms" for managed+session)
-	//   "hidden"            → column not rendered at all
-	//
-	// Empty string = "use the default" so a fresh user with no
-	// settings file sees the full labels immediately.
 	FlagColumnMode string `toml:"flag_column_mode,omitempty"`
 
-	// ReportExportPostProcessors stores the per-report default
-	// post-processor list. Keyed by Salesforce report Id, value is the
-	// ordered list of transform IDs (as defined in
-	// internal/postprocess.All()). When the user presses `e` on a
-	// report, the saved set fires; `E` opens the chooser modal and
-	// rewrites this entry on save.
-	ReportExportPostProcessors map[string][]string `toml:"report_export_postprocessors,omitempty"`
-	// ReportExportDefault is the default post-processor list applied
-	// to reports the user hasn't customised yet. Empty means "no
-	// post-processing" (vanilla SF xlsx).
-	ReportExportDefault []string `toml:"report_export_default,omitempty"`
-	// ReportExportDir is where exported xlsx files and project
-	// bundles land. Defaults to the user's home directory (~).
-	// ~/expansion handled at use time.
-	ReportExportDir string `toml:"report_export_dir,omitempty"`
-	// ReportExportFilenamePattern is the format string used to render
-	// each export's filename (extension is appended automatically).
-	// Tokens: {name} {id} {view} {file} {timestamp} {date} {time}.
-	// Default: "{name}-{timestamp}".
-	ReportExportFilenamePattern string `toml:"report_export_filename_pattern,omitempty"`
+	ReportExportPostProcessors  map[string][]string `toml:"report_export_postprocessors,omitempty"`
+	ReportExportDefault         []string            `toml:"report_export_default,omitempty"`
+	ReportExportDir             string              `toml:"report_export_dir,omitempty"`
+	ReportExportFilenamePattern string              `toml:"report_export_filename_pattern,omitempty"`
 
-	// RecentByOrg keys the per-org "recently visited" list (records
-	// today, more entity types later). Outer key is the org username
-	// so each connection has its own history. The UI layer caps the
-	// list to ~100 entries on every write.
 	RecentByOrg map[string][]RecentConfig `toml:"recent_by_org,omitempty"`
 
-	// TreeChipByOrg holds per-(org, domain) state for the treechip
-	// subsystem — pinned favourite nodes + last-visited path so
-	// re-entering a tab restores position. Outer key is the org
-	// username; inner key is the domain ("report-folders",
-	// "accounts", future trees).
 	TreeChipByOrg map[string]map[string]TreeChipConfig `toml:"treechip_by_org,omitempty"`
 
 	// LoadedDevProjectByOrg maps org-user → loaded dev-project id.
@@ -259,31 +128,18 @@ type UIConfig struct {
 	// new key.
 	LoadedOrgProjectByOrgLegacy map[string]string `toml:"loaded_org_project_by_org,omitempty"`
 
-	// Input controls cursor-navigation tunables. Distinct from Keymap
-	// (which is the *binding* layer — what triggers what); this is the
-	// *behaviour* layer — how big each step is, how the wheel feels.
 	Input InputConfig `toml:"input,omitempty"`
 
-	// Recent controls the /recent surface (display cap, etc).
 	Recent RecentConfigSection `toml:"recent,omitempty"`
 
-	// Exports tunes the export tracker (history cap, etc).
 	Exports ExportsConfigSection `toml:"exports,omitempty"`
 
-	// Search tunes the global search modal's ranking knobs.
 	Search SearchConfigSection `toml:"search,omitempty"`
 
-	// Home tunes the /home landing surface (banner animation, etc).
 	Home HomeConfigSection `toml:"home,omitempty"`
 
-	// ChipDefaults tunes shared chip-driven fetch defaults (records,
-	// users, any future chip-strip surface). Per-chip Limit on the
-	// chip's own Query AST overrides; this is the inherited
-	// default. Named distinctly from the unified `Chips` slice (the
-	// user's chip catalogue) which lives at top level.
 	ChipDefaults ChipsConfigSection `toml:"chip_defaults,omitempty"`
 
-	// TabBar customises which tabs occupy the number bar.
 	TabBar TabBarConfig `toml:"tab_bar,omitempty"`
 
 	// OrgGroups is the user's tree-shaped grouping of authenticated
@@ -295,26 +151,12 @@ type UIConfig struct {
 	// refresh.
 	OrgGroups OrgGroupsConfig `toml:"org_groups,omitempty"`
 
-	// Compare holds saved org-to-org metadata comparison definitions
-	// (the /compare tab's Saved subtab). Each is a reusable template:
-	// source, target, and the metadata-type scope.
 	Compare CompareConfig `toml:"compare,omitempty"`
 
-	// Startup controls how the app opens — sidebar/rail visibility,
-	// the seed SOQL query, default sort direction, etc. These are the
-	// values model.go bakes into the initial Model; surfacing them lets
-	// a user shape their default working layout.
 	Startup StartupConfigSection `toml:"startup,omitempty"`
 
-	// Limits controls the default row counts for the various server
-	// fetches (recent records, notifications, deploy history, …). Each
-	// is a "how many rows do I want by default" knob; 0 falls back to
-	// the package default.
 	Limits LimitsConfigSection `toml:"limits,omitempty"`
 
-	// Layout controls sizing knobs for panes + modals (pinned object
-	// subtabs, autocomplete popup height, modal row counts, gutter
-	// widths, column resize step). Terminal-size-dependent preferences.
 	Layout LayoutConfigSection `toml:"layout,omitempty"`
 
 	// API tunes the Salesforce API client behaviour — HTTP/CLI
@@ -356,11 +198,6 @@ type InputConfig struct {
 	// DefaultWheelMaxStep (20). Negatives clamp to 1.
 	WheelMaxStep int `toml:"wheel_max_step,omitempty"`
 
-	// FlowVersionEnterOpens controls what Enter does on a flow version
-	// row: true (default) opens the version in Flow Builder (browser),
-	// false drills into the in-terminal definition viewer. The `Set`
-	// companion distinguishes "user chose false" from "unset". The
-	// footer hint on the versions view follows this setting.
 	FlowVersionEnterOpens    bool `toml:"flow_version_enter_opens,omitempty"`
 	FlowVersionEnterOpensSet bool `toml:"flow_version_enter_opens_set,omitempty"`
 }
@@ -369,9 +206,6 @@ type InputConfig struct {
 // always the "More…" overflow modal sentinel — every tab not in
 // Pinned is reachable from there.
 type TabBarConfig struct {
-	// Pinned is the ordered list of tab string IDs occupying slots
-	// 1-8. Empty = use built-in defaults (see DefaultPinnedTabs in
-	// internal/ui). Up to 8 entries; extras are clipped on use.
 	Pinned []string `toml:"pinned,omitempty"`
 
 	// UserSetPinned mirrors the recent-excluded-kinds pattern —
@@ -421,19 +255,6 @@ type RecentConfigSection struct {
 	// package default (50). Negatives clamp to 1.
 	MaxEntries int `toml:"max_entries,omitempty"`
 
-	// ExcludedKinds drops entries whose Kind matches any value
-	// here, BEFORE the chip strip is applied. Used for kinds that
-	// Salesforce's RecentlyViewed surfaces but which are usually
-	// noise in a "where was I?" log: list views, groups, installed
-	// packages, etc.
-	//
-	// Empty list ("") means "use the built-in defaults" —
-	// listview, public_group, package, user. Set to a non-nil but
-	// empty list (TOML: `excluded_kinds = []`) to opt OUT of all
-	// defaults and include every kind.
-	//
-	// The kind values match the RecentKind* constants in
-	// internal/ui/recent.go.
 	ExcludedKinds []string `toml:"excluded_kinds,omitempty"`
 
 	// excludedKindsSet is set non-nil by SetRecentExcludedKinds to
@@ -442,15 +263,6 @@ type RecentConfigSection struct {
 	// this flag is unset.
 	UserSetExcludedKinds bool `toml:"excluded_kinds_set,omitempty"`
 
-	// ExcludedSFTypes drops entries whose Salesforce sObject Type
-	// matches any value here, filtered at the RecentlyViewed SOQL
-	// level. Unlike ExcludedKinds (which works on sf-deck's own Kind
-	// buckets), these are raw API type names — builder internals
-	// (FlowRecordElement, OmniProcessElement, …) and admin artifacts
-	// that Salesforce surfaces but users don't think of as records.
-	//
-	// Empty / unset → the built-in defaults (defaultRecentExcludedSFTypes).
-	// Set to a non-nil empty list to filter nothing.
 	ExcludedSFTypes        []string `toml:"excluded_sf_types,omitempty"`
 	UserSetExcludedSFTypes bool     `toml:"excluded_sf_types_set,omitempty"`
 }
@@ -468,11 +280,6 @@ type ExportsConfigSection struct {
 // ranking knobs AND the adaptive-debounce filter for list-table
 // search inputs.
 type SearchConfigSection struct {
-	// LoadedProjectBoost is added to the score of any entry whose
-	// ref belongs to the active org's loaded dev project. Higher =
-	// project items bubble closer to the top. 0 falls back to the
-	// package default (3.5). Negatives are accepted (push project
-	// items DOWN) — niche, but supported.
 	LoadedProjectBoost float64 `toml:"loaded_project_boost,omitempty"`
 
 	// RecentBoostDecayHours controls how long a recent visit keeps
@@ -481,20 +288,8 @@ type SearchConfigSection struct {
 	// falls back to the package default (24). Negatives clamp to 1.
 	RecentBoostDecayHours int `toml:"recent_boost_decay_hours,omitempty"`
 
-	// DebounceMs is the window the dispatcher waits before
-	// promoting Buffer → Effective when the last filter exceeded
-	// FastFilterThresholdMs. 0 falls back to
-	// SearchDebounceMsFallback (100). Lower = more responsive but
-	// more wasted work on big lists; higher = fewer filter passes
-	// but a longer "results catch up" lag at the end of a typing
-	// burst.
 	DebounceMs int `toml:"debounce_ms,omitempty"`
 
-	// FastFilterThresholdMs is the wall-time under which a filter
-	// is considered "instant" — the next buffer change is applied
-	// synchronously without debounce. Lists that filter under this
-	// threshold feel exactly like the un-debounced behaviour. 0
-	// falls back to SearchFastFilterThresholdMsFallback (50).
 	FastFilterThresholdMs int `toml:"fast_filter_threshold_ms,omitempty"`
 }
 
@@ -507,16 +302,8 @@ type HomeConfigSection struct {
 	// animation off entirely.
 	BannerIntervalMs int `toml:"banner_interval_ms,omitempty"`
 
-	// DisableBanner stops the rotating cloud-banner animation
-	// entirely (the banner still renders, just static). Useful for
-	// users who find motion distracting or who tail their terminal
-	// in screen recordings.
 	DisableBanner bool `toml:"disable_banner,omitempty"`
 
-	// HideBanner removes the /home cloud banner ENTIRELY (not just
-	// its animation) — the sidebar's ORG card starts straight at the
-	// details. For users who want the vertical space or find the
-	// banner superfluous.
 	HideBanner bool `toml:"hide_banner,omitempty"`
 }
 
@@ -549,8 +336,6 @@ type ChipsConfigSection struct {
 	ListViewPreviewLimit int `toml:"listview_preview_limit,omitempty"`
 }
 
-// --- Startup defaults ---------------------------------------------------
-
 // StartupConfigSection captures the initial-Model defaults model.go
 // bakes in. Every bool is a *tri-state* via a paired "...Set" flag so
 // "user wants false" is distinguishable from "user never said" — the
@@ -559,34 +344,20 @@ type ChipsConfigSection struct {
 // the built-in default as an argument and return it untouched unless
 // the user set an override.
 type StartupConfigSection struct {
-	// SidebarOpen — whether the right sidebar starts visible. Built-in
-	// default: true.
 	SidebarOpen    bool `toml:"sidebar_open,omitempty"`
 	SidebarOpenSet bool `toml:"sidebar_open_set,omitempty"`
 
-	// SidebarStacked — whether the sidebar starts stacked below the
-	// main pane (vs beside it). Built-in default: false.
 	SidebarStacked    bool `toml:"sidebar_stacked,omitempty"`
 	SidebarStackedSet bool `toml:"sidebar_stacked_set,omitempty"`
 
-	// QueryLineVisible — whether the SOQL query line under the records
-	// chip strip starts shown. Built-in default: false (hidden).
 	QueryLineVisible    bool `toml:"query_line_visible,omitempty"`
 	QueryLineVisibleSet bool `toml:"query_line_visible_set,omitempty"`
 
-	// LeftRailOpen — whether the left org rail starts pinned open.
-	// Built-in default: false.
 	LeftRailOpen    bool `toml:"left_rail_open,omitempty"`
 	LeftRailOpenSet bool `toml:"left_rail_open_set,omitempty"`
 
-	// StartTab is the tab string ID to open on launch (e.g. "home",
-	// "soql", "objects"). Empty falls back to the built-in default
-	// (home). Unknown IDs are ignored by the UI layer.
 	StartTab string `toml:"start_tab,omitempty"`
 
-	// DefaultSort is the default sort direction for list columns the
-	// user hasn't explicitly sorted: "asc" or "desc". Empty falls back
-	// to the built-in default (asc).
 	DefaultSort string `toml:"default_sort,omitempty"`
 
 	// ChordSortModifiedDesc is the first-press direction for the q-s
@@ -597,32 +368,13 @@ type StartupConfigSection struct {
 	// column, descending for a recency sort.
 	ChordSortModifiedDesc string `toml:"chord_sort_modified_desc,omitempty"`
 
-	// GlobalSearchMode is the default mode the global-search modal
-	// opens in: "metadata" (local index) or "records" (SOSL). Empty
-	// falls back to the built-in default (metadata).
 	GlobalSearchMode string `toml:"global_search_mode,omitempty"`
 
-	// SOQLSeed is the query pre-loaded into the SOQL editor on a fresh
-	// session. Empty falls back to the built-in default
-	// ("SELECT Id, Name FROM Account LIMIT 20").
 	SOQLSeed string `toml:"soql_seed,omitempty"`
 
-	// AutoLayout — when true, sf-deck decides sidebar placement at
-	// STARTUP based on terminal width: wide enough → sidebar on the
-	// right (beside the main pane, leaving room for many columns);
-	// too narrow → sidebar stacked below the main pane so columns get
-	// the full width. This is a one-shot startup decision, NOT
-	// reactive — resizing the window afterwards does not move the
-	// sidebar back. Built-in default: false (opt-in). Overrides the
-	// explicit SidebarStacked startup preference when it fires.
 	AutoLayout    bool `toml:"auto_layout,omitempty"`
 	AutoLayoutSet bool `toml:"auto_layout_set,omitempty"`
 
-	// AutoLayoutMinWidth is the terminal width (columns) at or above
-	// which AutoLayout keeps the sidebar on the right; below it, the
-	// sidebar is stacked below at startup. 0 falls back to the
-	// built-in default (StartupAutoLayoutMinWidthFallback). Only
-	// consulted when AutoLayout is true.
 	AutoLayoutMinWidth int `toml:"auto_layout_min_width,omitempty"`
 }
 
@@ -643,7 +395,6 @@ const (
 	StartupAutoLayoutMinWidthFallback = 175
 )
 
-// boolOr returns the user override when set, else the built-in default.
 func boolOr(val, set, def bool) bool {
 	if set {
 		return val
@@ -686,29 +437,6 @@ func (s *Settings) SetAutomaticUpdateChecks(enabled bool) {
 // StartupSidebarOpen / etc. resolve each tri-state bool. def is the
 // built-in default the caller (model.go) would otherwise use.
 
-// StartupAutoLayout resolves whether to auto-decide sidebar placement
-// at startup based on terminal width. Built-in default: false — the
-// user opts in from Settings → Startup & defaults.
-
-// StartupAutoLayoutMinWidth resolves the width threshold below which
-// auto-layout stacks the sidebar. 0 / negative → built-in fallback.
-
-// StartupStartTab resolves the launch tab ID.
-
-// StartupDefaultSortDesc reports whether list columns default to
-// descending. Built-in default is ascending (false).
-
-// StartupGlobalSearchRecordsMode reports whether the global-search
-// modal should open in records (SOSL) mode rather than metadata.
-
-// StartupSOQLSeed resolves the editor seed query.
-
-// --- Startup setters (used by the settings modal) -----------------------
-// Each bool setter writes the value AND its companion "...Set" flag so
-// the accessor knows the user spoke (vs. leave-at-default).
-
-// --- Default row limits -------------------------------------------------
-
 // LimitsConfigSection holds the default row counts for server fetches.
 // Each 0 falls back to the matching package default; negatives clamp
 // to 1.
@@ -747,11 +475,6 @@ func clampLimit(v, fallback int) int {
 // LimitGlobalSearch resolves the SOSL result cap, additionally clamped
 // to Salesforce's hard max of 50.
 
-// --- Limit setters (settings modal) -------------------------------------
-// All take 0 to mean "clear the override" (back to the fallback).
-
-// --- Layout / sizing ----------------------------------------------------
-
 // LayoutConfigSection holds pane + modal sizing knobs. 0 falls back to
 // the package default; negatives clamp to the documented minimum.
 type LayoutConfigSection struct {
@@ -773,7 +496,6 @@ const (
 	LayoutGlobalSearchRowsFallback    = 40
 )
 
-// layoutVal resolves a layout knob with a per-knob minimum floor.
 func layoutVal(v, fallback, min int) int {
 	if v == 0 {
 		return fallback
@@ -783,10 +505,6 @@ func layoutVal(v, fallback, min int) int {
 	}
 	return v
 }
-
-// --- Layout setters (settings modal) ------------------------------------
-
-// --- API client tuning --------------------------------------------------
 
 // APIConfigSection tunes the Salesforce API client. Durations are in
 // the unit named by each field; 0 falls back to the package default.
@@ -875,8 +593,6 @@ func (s *Settings) APIVersionOverride() string {
 	}
 	return strings.TrimSpace(s.UI.API.APIVersion)
 }
-
-// --- API setters (settings modal) ---------------------------------------
 
 func (s *Settings) SetAPIHTTPTimeoutSec(n int) {
 	if s != nil {
@@ -981,12 +697,6 @@ func (s *Settings) SetSearchFastFilterThresholdMs(n int) {
 // $limit field; full-dataset export goes through ctrl+x (Bulk API).
 const DefaultChipLimitFallback = 2000
 
-// DefaultChipLimit resolves the effective chip-fetch row cap —
-// settings override > package default. Returns >= 1.
-
-// SetDefaultChipLimit writes the user-set chip cap. Pass 0 to clear
-// the override (back to DefaultChipLimitFallback).
-
 // TreeChipConfig persists treechip state for one (org, domain) pair.
 // Pins is an unordered list of node IDs the user has pinned to their
 // strip; LastPath is the breadcrumb path they were on when they last
@@ -1036,11 +746,8 @@ type ChipConfig struct {
 	// written before this field existed. New writes always populate Share.
 	Share ChipShare `toml:"share,omitempty"`
 
-	// Query is the embedded QueryYAML. Stored as a typed sub-struct
-	// rather than `any` so toml emits a stable shape.
 	Query ChipQueryYAML `toml:"query"`
 
-	// Posterity link, populated when Origin == "imported".
 	SourceID   string `toml:"source_id,omitempty"`
 	SourceName string `toml:"source_name,omitempty"`
 	ImportedAt string `toml:"imported_at,omitempty"`
@@ -1142,7 +849,6 @@ func (s ChipShare) Allows(orgUser string, groupMembers func(groupID, username st
 		}
 		return groupMembers(s.Group, orgUser)
 	default:
-		// Unknown / future kind — fail closed (don't show).
 		return false
 	}
 }
@@ -1266,10 +972,6 @@ type LensConfig struct {
 	// valid.
 	Origin string `toml:"origin,omitempty"`
 
-	// Import-only posterity. Set on import; preserved on round-trip
-	// even if the user later edits Label/SOQLWhere. The link to the
-	// Salesforce list view is informational; there's no automatic
-	// re-sync between the lens and the source view.
 	SourceID   string `toml:"source_id,omitempty"`
 	SourceName string `toml:"source_name,omitempty"`
 	ImportedAt string `toml:"imported_at,omitempty"`
@@ -1322,9 +1024,6 @@ type ExtensionsConfig struct {
 // everyday use. Kept in its own [ui.debug] section so it's obvious these
 // are debug knobs, not features.
 type DebugConfig struct {
-	// ForceWelcome, when true, shows the first-launch welcome modal on
-	// EVERY launch regardless of welcome_seen — so the modal can be
-	// tested repeatedly without hand-editing welcome_seen back to false.
 	ForceWelcome bool `toml:"force_welcome,omitempty"`
 }
 
@@ -1504,7 +1203,6 @@ func (s *Settings) snapshotLocked() *Settings {
 		Orgs:     maps.Clone(s.Orgs),
 		UI:       s.UI, // value copy; clone its maps + slices below
 	}
-	// Maps (the fatal case).
 	cp.UI.ChipBuiltinFavOverrides = maps.Clone(s.UI.ChipBuiltinFavOverrides)
 	cp.UI.ReportExportPostProcessors = maps.Clone(s.UI.ReportExportPostProcessors)
 	cp.UI.RecentByOrg = maps.Clone(s.UI.RecentByOrg)
@@ -1518,8 +1216,6 @@ func (s *Settings) snapshotLocked() *Settings {
 		}
 		cp.UI.TreeChipByOrg = outer
 	}
-	// Encoded slices — a mutator's append() writes the backing array the
-	// encoder reads, so clone the header+backing for each.
 	cp.UI.ThemeFavourites = slices.Clone(s.UI.ThemeFavourites)
 	cp.UI.Chips = slices.Clone(s.UI.Chips)
 	cp.UI.Lenses = slices.Clone(s.UI.Lenses)
@@ -1561,20 +1257,6 @@ func lockSettingsFile(settingsPath string) (func(), error) {
 		_ = f.Close()
 	}, nil
 }
-
-// CacheTTL resolves the effective TTL for a resource key. Per-resource
-// override beats default_ttl; default_ttl beats the hardcoded fallback
-// which the caller passes as fallback. Hardcoded fallbacks stay at the
-// call site (each Resource[T] already declares its natural TTL) so a
-// missing config silently behaves the same as before.
-
-// CacheTTLOverride returns the raw override string set by the user
-// for a given key, or "" when no override is configured. Surfaces
-// in the cache-settings modal so users can tell at a glance which
-// rows are theirs vs the shipped defaults.
-
-// SetCacheTTLOverride writes (or clears with an empty value) the
-// per-key TTL override. Caller owns Save().
 
 // InspectorURL returns the user's configured Salesforce Inspector
 // base URL, or "" if unset. Callers pass "" through as "don't surface
@@ -1685,11 +1367,6 @@ func (s *Settings) DeleteFlowFilter(id string) {
 // migrator after entries have been converted into ChipConfig so the
 // next Save() drops the old sections from disk.
 
-// Chips returns the unified user chip slice (built-ins live in code).
-
-// ChipsForDomain returns chips matching the given domain — "records",
-// "objects", "flows".
-
 // SetChips replaces the entire unified slice. Callers own Save().
 // Each entry is normalised so any legacy OrgUser is rewritten into Share
 // — keeps the on-disk shape uniform after a bulk replace.
@@ -1699,22 +1376,9 @@ func (s *Settings) DeleteFlowFilter(id string) {
 // OrgUser is migrated to Share before write so freshly-saved chips
 // never carry both shapes.
 
-// DeleteChip removes by (domain, id). No-op when absent.
-
 // Build into a FRESH slice — reusing s.UI.Chips[:0] would mutate the
 // shared backing array a concurrent reader / Save snapshot may still
 // be looking at.
-
-// ChipFavouriteOverridesFor returns the slice of "<domain>.<chip-id>"
-// keys → bool mappings that apply to the given domain. The map is
-// flat per-key but the domain prefix lets one settings.toml store
-// overrides for records / objects / flows in the same map.
-
-// SetChipFavouriteOverridesFor replaces the per-domain entries in the
-// override map. Keys are stored as "<domain>.<chip-id>" so a single
-// settings file holds every domain's overrides without nesting.
-
-// Drop any existing entries for this domain.
 
 // ReportExportTransforms returns the post-processor list for the given
 // report id, falling back to the user's default. Empty slice means
@@ -1835,14 +1499,6 @@ func (s *Settings) SetLoadedDevProjectForOrg(orgUser, projectID string) {
 	// authoritative going forward.
 	s.UI.LoadedOrgProjectByOrgLegacy = nil
 }
-
-// TreeChipForOrg returns the persisted treechip state for an
-// (org, domain) pair — pinned node IDs + last visited path. Both
-// slices are empty when nothing's been recorded yet.
-
-// SetTreeChipForOrg replaces the persisted treechip state for one
-// (org, domain). Empty pins + empty path clears the entry so
-// settings.toml stays tidy.
 
 // ReportExportDir returns the configured export directory. Default
 // is the user's home directory (~) — chosen because Downloads on
@@ -2014,14 +1670,6 @@ type OrgGroupConfig struct {
 	Members   []string `toml:"members,omitempty"`
 }
 
-// OrgGroups returns the user's persisted org groups in render order.
-// Returns nil for an unconfigured user (everything renders under
-// the synthetic "Ungrouped" section).
-
-// SetOrgGroups replaces the persisted groups + order. Order is
-// derived from the slice itself; callers that need explicit control
-// can pass groups in render order. Caller owns Save().
-
 // OrgGroupForUsername returns the id of the group that owns the
 // given org username, or "" when the org is in no group (renders
 // under "Ungrouped"). First match wins — schema invariant is one
@@ -2041,15 +1689,11 @@ type OrgGroupConfig struct {
 // real signal momentarily must never destroy persisted assignments.
 // Without this guard, clearing the cache wiped all group memberships.
 
-// Don't conclude "all orgs gone" from an empty/unknown set.
-
 // Per-group removal flag — a removal in an earlier group must
 // not cause a later (unchanged) group to be rewritten. The
 // previous shared flag aliased g.Members[:0] writes across
 // groups, corrupting membership of groups that lost nothing.
 
-// cloneOrgGroup returns a deep copy so callers can mutate without
-// stepping on the persisted state until they call SetOrgGroups.
 func cloneOrgGroup(g OrgGroupConfig) OrgGroupConfig {
 	out := OrgGroupConfig{
 		ID:        g.ID,
@@ -2064,8 +1708,6 @@ func cloneOrgGroup(g OrgGroupConfig) OrgGroupConfig {
 	return out
 }
 
-// --- Compare (saved comparison definitions) -------------------------------
-
 // CompareConfig holds the user's saved org-to-org comparison templates
 // plus retrieval tuning.
 type CompareConfig struct {
@@ -2077,13 +1719,6 @@ type CompareConfig struct {
 	// defaultCompareConcurrency.
 	Concurrency int `toml:"concurrency,omitempty"`
 
-	// BodyCapKB is the per-component body-retain cap. A compare always
-	// keeps a HASH of every component (for equality), but only RETAINS the
-	// full body in memory if it's ≤ this size; larger bodies (Profiles,
-	// StaticResources — measured at ~75% of all-types memory) are dropped
-	// and re-fetched lazily on drill-in. Bounds peak memory without
-	// touching drill-in for the ~99% of components that are small.
-	// 0 / unset → defaultCompareBodyCapKB.
 	BodyCapKB int `toml:"body_cap_kb,omitempty"`
 
 	// RetainCeilingMB is the safety net: once retained bodies total this
@@ -2101,24 +1736,12 @@ const defaultCompareConcurrency = 6
 // CompareConcurrency returns the configured parallel-retrieve cap,
 // clamped to a sane range, falling back to the default when unset.
 
-// hard ceiling: beyond this only risks API-limit rejections
-
-// defaultCompareBodyCapKB: 256 KB comfortably exceeds any normal field/
-// layout/flow/class (KB to low-tens-of-KB) yet drops Profiles/StaticResources
-// (MBs each), which dominate memory.
 const defaultCompareBodyCapKB = 256
 
-// defaultCompareRetainCeilingMB caps total retained bodies. 150 MB keeps
-// peak memory modest while leaving room for a normal interactive compare's
-// bodies fully in hand.
 const defaultCompareRetainCeilingMB = 150
 
 // CompareBodyCapBytes returns the per-component retain cap in BYTES,
 // clamped, falling back to the default when unset.
-
-// a floor: capping below ~8KB would drop almost everything
-
-// 1 GB/component — effectively "no cap"
 
 // CompareRetainCeilingBytes returns the total retained-body ceiling in
 // BYTES, clamped, falling back to the default when unset.
@@ -2133,11 +1756,6 @@ type CompareDef struct {
 	Scope  []string `toml:"scope,omitempty"`
 	Method string   `toml:"method,omitempty"` // "Auto" / "Tooling" / "Metadata API"
 }
-
-// CompareDefs returns a copy of the saved comparison definitions.
-
-// SetCompareDefs replaces the saved comparison definitions. Caller owns
-// Save(). Dedupes by Name (last wins), drops nameless entries.
 
 func cloneCompareDef(d CompareDef) CompareDef {
 	out := CompareDef{Name: d.Name, Source: d.Source, Target: d.Target, Method: d.Method}
@@ -2202,7 +1820,6 @@ func (s *Settings) RecentExcludedKinds() []string {
 		return defaultRecentExcludedKinds()
 	}
 	if s.UI.Recent.ExcludedKinds == nil {
-		// User explicitly cleared the list — include every kind.
 		return nil
 	}
 	out := make([]string, len(s.UI.Recent.ExcludedKinds))
@@ -2228,12 +1845,6 @@ func (s *Settings) SetRecentExcludedKinds(kinds []string) {
 	s.UI.Recent.ExcludedKinds = out
 }
 
-// defaultRecentExcludedSFTypes is the built-in RecentlyViewed noise
-// list: raw Salesforce sObject type names that surface in the recent
-// stream but which users don't think of as records — Flow / OmniStudio
-// builder internals (one row per element clicked while editing) and
-// setup/admin artifacts. ListView / Report / Dashboard are NOT here —
-// those are real and route to their own recent chips.
 func defaultRecentExcludedSFTypes() []string {
 	return []string{
 		"FlowRecordElement", "FlowRecordVersion", "FlowRecord",
@@ -2335,13 +1946,9 @@ const DefaultWheelMinIntervalMs = 12
 // WheelQuietGapMs returns the wheel-throttle idle window. Defaults
 // to DefaultWheelQuietGapMs when unset; clamps negatives to 1.
 
-// SetWheelQuietGapMs persists the idle window. n <= 0 resets to default.
-
 // WheelMinIntervalMs returns the minimum gap between accepted ticks.
 // Defaults to DefaultWheelMinIntervalMs when unset; clamps negatives
 // to 1.
-
-// SetWheelMinIntervalMs persists the min interval. n <= 0 resets.
 
 // DefaultWheelMaxStep caps the per-accepted-tick cursor delta. 20
 // rows ≈ one screenful in a typical 60-row terminal — so even a
@@ -2352,8 +1959,6 @@ const DefaultWheelMaxStep = 20
 
 // WheelMaxStep returns the cap on cursor delta per accepted wheel.
 // Defaults to DefaultWheelMaxStep when unset; clamps negatives to 1.
-
-// SetWheelMaxStep persists the per-tick cursor cap. n <= 0 resets.
 
 // DefaultRecentMaxEntries is the per-org local visit log cap when
 // the user hasn't configured one.
@@ -2468,17 +2073,6 @@ const DefaultHomeBannerIntervalMs = 400
 // the caller skips animation entirely; this getter still returns a
 // value to keep the type contract simple.
 
-// SetHomeBannerIntervalMs persists the tick interval. n <= 0 resets.
-
-// DisableHomeBanner reports whether the banner animation is off.
-
-// SetDisableHomeBanner persists the banner-disable flag.
-
-// HideHomeBanner reports whether the /home cloud banner is hidden
-// entirely (vs DisableHomeBanner which only freezes its animation).
-
-// SetHideHomeBanner persists the banner-hide flag.
-
 // DefaultListViewPreviewLimit is the row count we fetch when
 // /records is driven by a Salesforce List View chip and the user
 // hasn't pinned a per-chip Limit. Same default as the legacy
@@ -2527,7 +2121,6 @@ func (s *Settings) SetReportExportFilenamePattern(pat string) {
 	s.UI.ReportExportFilenamePattern = strings.TrimSpace(pat)
 }
 
-// defaultExportDir picks the default export directory.
 func defaultExportDir() string {
 	// Home directory: the only path on every platform that the user
 	// is guaranteed to own + read. macOS Downloads + Documents trigger

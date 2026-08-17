@@ -11,8 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// IPC verb handlers for record DML (create/get/update/delete/recent) and metadata CRUD. Split out of control_backend.go.
-
 func (s *ControlState) RecordGet(args control.RecordGetArgs) (any, error) {
 	target, _, err := s.resolveTargetForIPC(args.OrgAlias, args.OrgUser)
 	if err != nil {

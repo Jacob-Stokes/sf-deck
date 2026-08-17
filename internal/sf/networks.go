@@ -1,14 +1,5 @@
 package sf
 
-// networks.go — Experience Cloud sites (the `Network` standard object).
-//
-// "Network" is Salesforce's internal name for what users call
-// Experience Cloud sites / communities / portals. Each Network is a
-// distinct externally-facing site with its own users, branding, and
-// URL prefix. We surface them for the "Log in to community as user"
-// action: to impersonate a contact's portal user we need the Network
-// ID + the target user's ID to feed to /servlet/servlet.su.
-
 import (
 	"fmt"
 )

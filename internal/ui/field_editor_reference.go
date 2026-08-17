@@ -3,26 +3,6 @@ package ui
 // Reference (lookup) field editor. References point at another
 // record by Id; the user almost never knows the Id but does know
 // the name. Phase 1 keeps the editor simple:
-//
-//   - On Init, populate Raw with the current name (when present)
-//     and ChosenID with the current Id.
-//   - HandleKey treats the buffer like a search query — every
-//     keystroke updates it; the user can submit a SOSL search by
-//     pressing Enter, which fires a referenceSearchMsg.
-//   - SearchResults land back via referenceSearchResultMsg and
-//     are surfaced as a list under the cell so the user picks
-//     one with arrow + Enter.
-//   - Polymorphic references (referenceTo has >1 entry) are
-//     handled with a prefix nudge: the user has to type the
-//     target type's prefix first (e.g. "Account: Acme"). We
-//     accept the form and pass the first matching entry; SF
-//     resolves by Id anyway, so the prefix is just for the
-//     user's search filter.
-//
-// For phase 1 we render the inline list of hits in the cell;
-// future work could route through the anchored picker. Keeping it
-// flat means search-as-you-type works without an extra modal
-// layer.
 
 import (
 	"fmt"
@@ -35,17 +15,12 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// referenceEditor handles reference (lookup) field edits. Owns a
-// search query buffer + list of recent hits + cursor into them.
 type referenceEditor struct{}
 
 func init() {
 	registerFieldEditor(&referenceEditor{}, "reference")
 }
 
-// We extend EditState through a tiny package-private struct stored
-// in Picker — keeps the discriminated-union footprint small while
-// giving reference editor its own state shape.
 type referenceState struct {
 	Hits      []sf.SearchHit
 	HitCursor int
@@ -117,7 +92,6 @@ func (e *referenceEditor) RenderEditCell(s *EditState, width int, focused bool) 
 			body += "  " + lipgloss.NewStyle().Foreground(theme.Muted).
 				Render("(type ↵ to search "+strings.Join(s.Field.ReferenceTo, "/")+")")
 		}
-		// List the hits below the query line.
 		for i, hit := range state.Hits {
 			arrow := "  "
 			if i == state.HitCursor {
@@ -133,16 +107,11 @@ func (e *referenceEditor) RenderEditCell(s *EditState, width int, focused bool) 
 	return body
 }
 
-// referenceSearchMsg fires when the user hits Enter on the query
-// line. The orchestrator (recordEditSession in stage 7) catches
-// it, runs sf.SearchRecords, and posts a referenceSearchResultMsg
-// back.
 type referenceSearchMsg struct {
 	Field string // field API name
 	Query string
 }
 
-// referenceSearchResultMsg lands when the SOSL search completes.
 type referenceSearchResultMsg struct {
 	Field string
 	Hits  []sf.SearchHit
@@ -177,9 +146,6 @@ func (e *referenceEditor) HandleKey(s *EditState, msg tea.KeyMsg) (bool, tea.Cmd
 		}
 		return true, nil
 	case "enter", "↵":
-		// Two modes: (a) hits already shown → pick the cursored
-		// one; (b) no hits yet → fire a search with the current
-		// query.
 		if len(state.Hits) > 0 {
 			h := state.Hits[state.HitCursor]
 			s.ChosenID = h.ID
@@ -224,20 +190,8 @@ func (e *referenceEditor) Commit(s *EditState) (CommitMode, any, error) {
 	return CommitValue, s.ChosenID, nil
 }
 
-// referenceSearchFor is the per-org search dispatcher. Called by
-// the recordEditSession (stage 7) when a referenceSearchMsg lands.
-// Resolves the field's first referenceTo entry, runs SOSL, and
-// returns a result message.
-//
-// Polymorphic refs (referenceTo has >1) use the first entry — phase
-// 1 simplification. If the user really needs to pick across multiple
-// types they can type the type name into the query and SOSL's
-// IN NAME FIELDS clause won't help, but `FIND {term}` would —
-// future enhancement.
 func referenceSearchFor(alias string, m Model, msg referenceSearchMsg) tea.Cmd {
 	return func() tea.Msg {
-		// Resolve referenceTo + the target object's nameField from
-		// the cached describe.
 		field, target, nameField := resolveReferenceTarget(m, msg.Field)
 		_ = field
 		if target == "" {
@@ -280,8 +234,6 @@ func resolveReferenceTarget(m Model, fieldName string) (sf.Field, string, string
 	return sf.Field{}, "", "Name"
 }
 
-// targetNameField looks up the nameField (the field marked
-// NameField=true on the target's describe). Defaults to "Name".
 func targetNameField(m Model, target string) string {
 	d := m.activeOrgData()
 	if d == nil {

@@ -18,10 +18,6 @@ type updateCheckMsg struct {
 	manual bool
 }
 
-// updateCheckCmd starts release discovery without blocking first paint. Auto
-// checks are skipped in demo/development builds and when disabled; a manual
-// check is allowed from a development build but demo remains strictly
-// no-network.
 func (m *Model) updateCheckCmd(manual bool) tea.Cmd {
 	if m == nil || m.updates == nil {
 		return nil

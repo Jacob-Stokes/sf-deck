@@ -74,9 +74,6 @@ var devProjectItemsListSurface = listSurface{
 	},
 }
 
-// devProjectItemListCols is the published column list — uses the
-// schema's DefaultColumns under the hood so the surface keeps a
-// single source of truth.
 func devProjectItemListCols() []uilayout.ListColumn {
 	return mustResolveColumns(devProjectItemColumnSchema()).ListColumns()
 }

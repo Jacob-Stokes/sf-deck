@@ -5,10 +5,6 @@ package ui
 // other choice modals because (a) it doesn't dim the background,
 // (b) it's positioned not centered, (c) Esc reverts the live preview
 // rather than just dismissing.
-//
-// Launched from the settings modal (V → Theme); Esc returns there
-// without saving. Enter persists to settings.toml. F toggles the
-// cursored theme as a favourite.
 
 import (
 	"fmt"
@@ -20,24 +16,14 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// themePickerState holds the modal's runtime state.
 type themePickerState struct {
-	// originalID is the theme that was active when the picker opened.
-	// Esc reverts to this; Enter commits the candidate.
 	originalID string
 
-	// candidateID is the currently-highlighted theme. Live-applied via
-	// theme.ApplyPalette on every cursor move so the rest of the UI
-	// renders in the candidate's colours immediately.
 	candidateID string
 
-	// search filters the visible list by case-insensitive substring.
 	search searchState
 }
 
-// openThemePicker launches the picker. Records the original theme so
-// Esc can revert. Closes any open settings/choice modal so the picker
-// is the only modal layer above the live UI.
 func (m *Model) openThemePicker() tea.Cmd {
 	currentID := "tokyo-night"
 	if m.settings != nil {
@@ -53,8 +39,6 @@ func (m *Model) openThemePicker() tea.Cmd {
 	return nil
 }
 
-// renderThemePicker draws the floating modal. Returned string is
-// pre-positioned via the compositor (see render.go's overlay handling).
 func (m Model) renderThemePicker() string {
 	if m.themePicker == nil {
 		return ""
@@ -81,7 +65,6 @@ func (m Model) renderThemePicker() string {
 	lines = append(lines, titleStyle.Render("Theme"))
 	lines = append(lines, strings.Repeat("─", width-2))
 
-	// Search bar — always visible. Shows the live buffer with a "/" hint.
 	var searchLine string
 	switch {
 	case !tp.search.Active && tp.search.Buffer() == "":
@@ -145,7 +128,6 @@ func (m Model) renderThemePicker() string {
 	return box
 }
 
-// handleThemePickerKey is the reducer while the picker is visible.
 func (m Model) handleThemePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.themePicker == nil {
 		return m, nil
@@ -153,14 +135,9 @@ func (m Model) handleThemePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	tp := m.themePicker
 	key := msg.String()
 
-	// If search is active, route input there first — but reserve a
-	// few keys (esc, enter, ctrl+c) so the user can always escape
-	// even mid-typing. Up/down break out of typing without losing the
-	// buffer so users can search-then-pick fluidly.
 	if tp.search.Active {
 		switch key {
 		case "esc":
-			// First esc: drop search focus, keep buffer.
 			if tp.search.Buffer() != "" {
 				tp.search.Active = false
 				tp.search.Committed = true
@@ -169,7 +146,6 @@ func (m Model) handleThemePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			tp.search.Active = false
 			return m.cancelThemePicker()
 		case "enter":
-			// Commit search; keep cursor on the highlighted row.
 			tp.search.Active = false
 			tp.search.Committed = tp.search.Buffer() != ""
 			ids := filteredThemeIDs(m, tp.search.Buffer())
@@ -199,7 +175,6 @@ func (m Model) handleThemePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 				return m.applyThemePickerSearch()
 			}
 		default:
-			// Forward to the textinput for printable characters.
 			if tp.search.Inited {
 				newInput, _ := tp.search.Input.Update(msg)
 				tp.search.Input = newInput
@@ -209,7 +184,6 @@ func (m Model) handleThemePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Search not active.
 	switch key {
 	case "esc", "ctrl+c":
 		return m.cancelThemePicker()
@@ -235,7 +209,6 @@ func (m Model) handleThemePickerKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case matches(key, Keys.ThemePickerFavourite):
 		return m.themePickerToggleFavourite()
 	case matches(key, Keys.ThemePickerClear):
-		// Clear the search buffer entirely.
 		if tp.search.Buffer() != "" {
 			tp.search.SetBuffer("")
 			tp.search.Committed = false
@@ -268,8 +241,6 @@ func (m Model) themePickerMove(delta int) (Model, tea.Cmd) {
 			break
 		}
 		cur = next
-		// If we landed on the divider, hop one more in the same
-		// direction. If that's out of bounds, back off.
 		if ids[cur] == themeDividerID {
 			next = cur + step
 			if next < 0 || next >= len(ids) {
@@ -300,7 +271,6 @@ func (m Model) themePickerJump(idx int) (Model, tea.Cmd) {
 		idx = len(ids) - 1
 	}
 	if ids[idx] == themeDividerID {
-		// Walk forward, then backward, to find the nearest real id.
 		for j := idx + 1; j < len(ids); j++ {
 			if ids[j] != themeDividerID {
 				idx = j
@@ -322,9 +292,6 @@ func (m Model) themePickerJump(idx int) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// applyThemePickerSearch is fired after every keystroke in the search
-// buffer. Keeps the candidate cursor on a still-visible row, or jumps
-// to the first match when the previous candidate filtered out.
 func (m Model) applyThemePickerSearch() (Model, tea.Cmd) {
 	tp := m.themePicker
 	ids := filteredThemeIDs(m, tp.search.Buffer())
@@ -332,7 +299,6 @@ func (m Model) applyThemePickerSearch() (Model, tea.Cmd) {
 		return m, nil
 	}
 	if indexOf(ids, tp.candidateID) < 0 {
-		// Pick the first non-divider id.
 		for _, id := range ids {
 			if id != themeDividerID {
 				tp.candidateID = id
@@ -345,9 +311,6 @@ func (m Model) applyThemePickerSearch() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// themePickerToggleFavourite flips the cursored theme's favourite
-// flag and persists settings immediately so the change survives a
-// later Esc-cancel of the picker session.
 func (m Model) themePickerToggleFavourite() (Model, tea.Cmd) {
 	tp := m.themePicker
 	if m.settings == nil || tp.candidateID == "" {
@@ -361,8 +324,6 @@ func (m Model) themePickerToggleFavourite() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// commitThemePicker persists the candidate as the active theme and
-// closes the picker.
 func (m Model) commitThemePicker() (Model, tea.Cmd) {
 	tp := m.themePicker
 	if tp == nil {
@@ -382,8 +343,6 @@ func (m Model) commitThemePicker() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// cancelThemePicker reverts to the original theme and re-opens the
-// settings meta-menu so the user can pick something else.
 func (m Model) cancelThemePicker() (Model, tea.Cmd) {
 	tp := m.themePicker
 	if tp == nil {
@@ -392,8 +351,6 @@ func (m Model) cancelThemePicker() (Model, tea.Cmd) {
 	theme.ApplyPalette(tp.originalID)
 	m.clearRenderCache()
 	m.themePicker = nil
-	// Re-open the settings meta-menu so the picker dismiss feels like
-	// a back-step rather than dropping the user out of settings entirely.
 	cmd := m.openSettingsModal()
 	return m, cmd
 }
@@ -404,11 +361,6 @@ func (m Model) cancelThemePicker() (Model, tea.Cmd) {
 // becomes "selected".
 const themeDividerID = "__divider__"
 
-// filteredThemeIDs returns the theme list ordered for the picker:
-// favourites (curated favourites first, then user favourites) → divider
-// → curated non-favourites → divider → rest. Optionally filtered by
-// query. Result is the visible-row order; index lookups + scrolling
-// use it.
 func filteredThemeIDs(m Model, query string) []string {
 	all := theme.PaletteIDs()
 	favs := map[string]bool{}
@@ -437,8 +389,6 @@ func filteredThemeIDs(m Model, query string) []string {
 		}
 	}
 
-	// Filter each group independently so the divider only appears
-	// between groups that actually have content after filtering.
 	if query != "" {
 		q := strings.ToLower(query)
 		palettes := theme.Palettes()
@@ -462,7 +412,6 @@ func filteredThemeIDs(m Model, query string) []string {
 	return ordered
 }
 
-// filterIDs returns ids for which keep returns true, preserving order.
 func filterIDs(ids []string, keep func(string) bool) []string {
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -473,7 +422,6 @@ func filterIDs(ids []string, keep func(string) bool) []string {
 	return out
 }
 
-// indexOf returns the position of v in xs, or -1.
 func indexOf(xs []string, v string) int {
 	for i, x := range xs {
 		if x == v {
@@ -483,8 +431,6 @@ func indexOf(xs []string, v string) int {
 	return -1
 }
 
-// windowAround returns [start, end) viewport indices. Cursor sits
-// ~1/3 down the visible window so movement reads naturally.
 func windowAround(cursor, n, visible int) (int, int) {
 	if visible <= 0 || n <= 0 {
 		return 0, 0
@@ -507,15 +453,10 @@ func windowAround(cursor, n, visible int) (int, int) {
 	return start, end
 }
 
-// ellipsisTrunc clips a styled string to width using lipgloss-aware
-// truncation so ANSI escapes survive intact.
 func ellipsisTrunc(s string, width int) string {
 	if lipgloss.Width(s) <= width {
 		return s
 	}
-	// Fall back to a simple rune slice — visible-width truncation
-	// inside ANSI is tricky and the rows here are short labels
-	// where this is good enough.
 	if len(s) <= width {
 		return s
 	}

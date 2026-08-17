@@ -52,8 +52,6 @@ func installListViewOrderRows[T any](
 	state.RowsOrdered = true
 	desc := state.SortDesc
 	key := listViewOrderKey(cols, state.SortColumn, desc)
-	// SetOrder short-circuits on a stable key but the closure literal
-	// below still escapes every frame; skip construction entirely.
 	if lv.OrderKey() == key {
 		return
 	}

@@ -113,10 +113,6 @@ func TestPickExportFormat_RejectsUnknown(t *testing.T) {
 }
 
 func TestPickExportFormat_RejectsBundleFormat(t *testing.T) {
-	// package-xml, sfdx-project are bundle formats — they aren't
-	// supported by the SOQL export path. pickExportFormat doesn't
-	// currently enumerate them; if the user passes "package-xml" via
-	// --format we want a clear error.
 	_, err := pickExportFormat("/tmp/x.csv", "package-xml")
 	if err == nil {
 		t.Error("expected error for package-xml")

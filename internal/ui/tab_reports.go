@@ -1,12 +1,5 @@
 package ui
 
-// /reports list + drill-in.
-//
-// Phase 1 surface: read-only browse + cached preview. Each row is a
-// saved report; Enter drills into the cached run and shows the detail
-// rows + grand total. `r` re-pulls the cached run; `R`/export are
-// reserved for later phases.
-
 import (
 	"fmt"
 	"strings"
@@ -50,8 +43,6 @@ func (m Model) renderReports(w, innerH int) string {
 	)
 }
 
-// renderReportsDashboards is the Dashboards subtab body — chip strip
-// plus the shared list-table renderer.
 func (m Model) renderReportsDashboards(w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -93,8 +84,6 @@ func (m Model) renderReportsDashboards(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderReportsReportTypes is the Report Types subtab body — same
-// shape as Dashboards over the analytics reportTypes catalogue.
 func (m Model) renderReportsReportTypes(w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -136,9 +125,6 @@ func (m Model) renderReportsReportTypes(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderReportsDefault is the Reports-subtab body — the folder-tree
-// + report-list view. Receives the budget AFTER the subtab strip is
-// drawn (dispatchSubtab handles the strip).
 func (m Model) renderReportsDefault(w, innerH int) string {
 	inner := w - 4
 
@@ -151,8 +137,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 	}
 	d := m.ensureOrgDataRef(o.Username)
 
-	// Lazy: registry might not exist on first paint if EnsureData
-	// hasn't fired yet. Show a loading state cleanly.
 	if d.ReportFolders == nil {
 		return theme.Subtle.Render("  initialising folders…")
 	}
@@ -164,7 +148,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 		return redLine("  folders failed to load: " + d.ReportFoldersSrc.LoadErr().Error())
 	}
 
-	// Resolve current path's items.
 	main, mainErr := reg.MainModel()
 	if mainErr != nil {
 		return redLine("  " + mainErr.Error())
@@ -172,9 +155,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 	curID := reg.Path().CurrentID()
 	folderReports := filterReportsByFolder(d.ReportList.Items(), curID)
 
-	// Apply the local search query — scoped to subnodes + folder
-	// reports only. Search is case-insensitive substring on the
-	// label / report name. Empty query = no filter.
 	q := strings.ToLower(strings.TrimSpace(d.ReportList.Search.Buffer()))
 	matchSubnodes := main.Subnodes
 	matchReports := folderReports
@@ -193,9 +173,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 		}
 	}
 
-	// Header bar. Subtab strip is drawn upstream by dispatchSubtab;
-	// here we only own the folder strip + the per-folder header
-	// row + search bar.
 	var lines []string
 	stripLine := m.renderReportFolderStrip(reg, inner)
 	if stripLine != "" {
@@ -219,16 +196,12 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 	reportsLoading := d.Reports.Busy() ||
 		(d.ReportList.Len() == 0 && d.Reports.FetchedAt().IsZero())
 
-	// Build a flat row list for the viewport renderer. Section
-	// headers become "ghost" rows the cursor skips. Folders come
-	// first, then reports.
 	type mainRow struct {
 		header string // when set, render as section header (non-selectable)
 		folder *treechip.TreeNode
 		report *sf.ReportSummary
 	}
 	var rows []mainRow
-	// Mappings between visible-row index and selectable-item index.
 	selectableToRow := []int{}
 	if len(matchSubnodes) > 0 {
 		rows = append(rows, mainRow{header: fmt.Sprintf("SUBFOLDERS · %d", len(matchSubnodes))})
@@ -250,7 +223,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 		}
 	}
 
-	// Empty-state messaging when no rows survived the filter.
 	if len(rows) == 0 {
 		switch {
 		case reportsLoading:
@@ -266,20 +238,16 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Selectable cursor (over subfolders+reports, not headers).
 	totalSelectable := len(matchSubnodes) + len(matchReports)
 	sel := m.reportsRowCursor()
 	if sel >= totalSelectable {
 		sel = 0
 	}
-	// Convert selectable index → flat-row index for highlight.
 	selRowIdx := -1
 	if sel >= 0 && sel < len(selectableToRow) {
 		selRowIdx = selectableToRow[sel]
 	}
 
-	// Pre-style table headers / rows so renderRows can shuffle them
-	// without re-doing the work.
 	folderStyle := lipgloss.NewStyle().Foreground(theme.Fg)
 	reportCols := []tableColumn{
 		{Header: "NAME", Width: -1, Style: folderStyle},
@@ -317,7 +285,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 		return ""
 	}
 
-	// Reserve = chrome before the row block; trailing = bottom hint.
 	const trailing = 2 // blank line + hint line
 	lines = append(lines, renderRows(
 		len(rows), selRowIdx, innerH, len(lines), trailing, inner,
@@ -330,15 +297,6 @@ func (m Model) renderReportsDefault(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderReportFolderStrip composes the breadcrumb chip strip from
-// the registry's StripModel. Reuses the existing chip-pill widget
-// shape so it's visually consistent with the qchip strips on
-// /records / /objects / /flows.
-//
-// When the active org has a project loaded, a synthetic 📁 pin is
-// prepended (active when ReportsProjectMode is on) — same idea as
-// the auto-pinned project chip on flat surfaces, just shaped for
-// the breadcrumb model.
 func (m Model) renderReportFolderStrip(reg *treechip.Registry, width int) string {
 	sm := reg.StripModel()
 	var parts []string
@@ -350,15 +308,12 @@ func (m Model) renderReportFolderStrip(reg *treechip.Registry, width int) string
 		sep := lipgloss.NewStyle().Foreground(theme.Border).Render("  │  ")
 		parts = append(parts, sep)
 	}
-	// Always-on "All" chip = path = []. Active when at root and not
-	// in project mode.
 	allActive := !projectActive && len(sm.Breadcrumb) == 0
 	parts = append(parts, renderTreeBreadcrumbChip("All", allActive))
 	for i, n := range sm.Breadcrumb {
 		active := !projectActive && i == len(sm.Breadcrumb)-1
 		parts = append(parts, renderTreeBreadcrumbChip("▸ "+n.Label, active))
 	}
-	// Pinned favourites (after a separator).
 	if len(sm.Pins) > 0 {
 		sep := lipgloss.NewStyle().Foreground(theme.Border).Render("  │  ")
 		var pinChips []string
@@ -390,9 +345,6 @@ func renderTreeBreadcrumbChip(label string, active bool) string {
 		Render(label)
 }
 
-// filterReportsByFolder returns the subset of reports whose OwnerId
-// (== Folder.Id) matches the current folder. At the root (folderID
-// = ""), returns reports with no recognised folder — orphans.
 func filterReportsByFolder(reports []sf.ReportSummary, folderID string) []sf.ReportSummary {
 	out := reports[:0:0]
 	for _, r := range reports {
@@ -414,8 +366,6 @@ func (m Model) visibleReportsItems() ([]treechip.TreeNode, []sf.ReportSummary) {
 		return nil, nil
 	}
 	q := strings.ToLower(strings.TrimSpace(d.ReportList.Search.Buffer()))
-	// Project-mode short-circuits folder semantics: report list is the
-	// loaded project's collected reports for this org, no subfolders.
 	scope := m.activeScope()
 	if d.ReportsProjectMode && scope.Loaded() {
 		all := d.ReportList.Items()
@@ -452,12 +402,6 @@ func (m Model) visibleReportsItems() ([]treechip.TreeNode, []sf.ReportSummary) {
 	return subs, reps
 }
 
-// reportsRowCursor returns the unified row cursor over the combined
-// (visible subfolders + visible reports) list at the current folder.
-// Stored on the orgData cursor store keyed by folder id so
-// re-drilling restores position. Search-filtered cursor is NOT
-// keyed by query — clearing the search puts you back where you
-// were before typing.
 func (m Model) reportsRowCursor() int {
 	d := m.activeOrgData()
 	if d == nil || d.ReportFolders == nil {
@@ -478,10 +422,6 @@ func ansiTruncate(s string, width int, suffix string) string {
 	return ansi.Truncate(s, width, suffix)
 }
 
-// renderReportDetail draws the cached preview for the drilled-in report
-// — the grand-total bucket's rows + any aggregate the SF run returned.
-// Joined ("MultiBlock") reports surface as "open in SF" only since the
-// row shape differs from tabular/summary/matrix.
 func (m Model) renderReportDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -493,7 +433,6 @@ func (m Model) renderReportDetail(w, innerH int) string {
 		return theme.Subtle.Render("  press enter on a report in /reports first")
 	}
 
-	// Header from the catalogue row.
 	var summary sf.ReportSummary
 	for _, r := range d.Reports.Value() {
 		if r.ID == d.ReportCur {
@@ -527,9 +466,6 @@ func (m Model) renderReportDetail(w, innerH int) string {
 		lines = append(lines, "")
 	}
 
-	// MultiBlock = SF's term for joined reports. Phase 1 doesn't try to
-	// render those — the row shape diverges per block; surface as
-	// "open in Lightning" only.
 	if strings.EqualFold(summary.Format, "MultiBlock") {
 		lines = append(lines, theme.Subtle.Render("  joined reports aren't previewed here yet"))
 		lines = append(lines, m.footerHint("  "+firstPretty(Keys.OpenDefault)+" → open in Lightning", inner))
@@ -551,18 +487,11 @@ func (m Model) renderReportDetail(w, innerH int) string {
 
 	header := fmt.Sprintf("ROWS · %d", len(run.Rows))
 	if !run.AllData {
-		// SF caps the sync endpoint at 2000 detail rows. Surface that
-		// inline so users know to fall back to xlsx export when more
-		// matters (export reuses the SF "give me everything" path).
 		header += " · capped at 2000"
 	}
 	lines = append(lines, sectionTitle(header)+stateSuffix(r.Busy(), r.Err()))
 
 	if len(run.Rows) == 0 {
-		// Aggregate-only result (e.g. summary report grouped by Stage)
-		// or genuinely empty. Either way, render whatever totals came
-		// back so the user isn't staring at "no data" when there's a
-		// grand total available.
 		if len(run.Aggregates) > 0 {
 			lines = append(lines, "", sectionTitle("AGGREGATES"))
 			for label, val := range run.Aggregates {
@@ -577,26 +506,16 @@ func (m Model) renderReportDetail(w, innerH int) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Hand off the table block to the shared renderer. The
-	// orchestrator above keeps the report-specific chrome (header
-	// title block + aggregate fallback for empty runs); the
-	// per-frame model carries everything the renderer needs.
 	listCols := buildReportRunCols(run.Columns, run.Rows)
 	rows := run.Rows
 	cell := reportRunCell(rows, listCols)
 	emptySearch := &searchState{}
-	// If the report's projection includes "Id", users can drill into
-	// the underlying record from any row. Surface this in the footer
-	// hint; suppress when no Id column exists (drill would no-op
-	// anyway, no point advertising it).
 	footer := firstPretty(Keys.ReportExport) + " export"
 	if reportHasIDColumn(run.Columns) {
 		footer = firstPretty(Keys.OpenDefault) + " open record · " + footer
 	}
 	sortDataKey := reportRunSortDataKey(d.ReportCur, r.FetchedAt().UnixNano(), len(rows), len(listCols))
 	adapter := reportRunTableAdapter(&m, d, d.ReportCur, r.FetchedAt().UnixNano(), rows, listCols, cell)
-	// listRenderModel.Cursor is a display-space int; convert at the
-	// render boundary.
 	cursor := int(adapter.DisplayCursor())
 	model := listRenderModel{
 		Title:        "ROWS · " + fmt.Sprintf("%d", len(rows)) + reportCappedSuffix(run.AllData),
@@ -607,10 +526,8 @@ func (m Model) renderReportDetail(w, innerH int) string {
 		Cursor:       cursor,
 		Cell:         cell,
 		FooterExtras: footer,
-		// Same shape as SOQL: report runs swap wholesale on
-		// re-execute. Row + column count as a coarse signature.
-		DataVersion: listVersionWithStore(len(rows)*1009+len(listCols)*7, m),
-		SortDataKey: sortDataKey,
+		DataVersion:  listVersionWithStore(len(rows)*1009+len(listCols)*7, m),
+		SortDataKey:  sortDataKey,
 	}
 	usedAbove := usedLines(lines)
 	budget := innerH - usedAbove
@@ -664,10 +581,6 @@ func reportRunTableAdapter(
 	}
 }
 
-// reportCappedSuffix appends the "capped at 2000" warning for report
-// runs where SF's sync endpoint truncated the result. The Title
-// field on the render model carries it so the user sees the cap
-// inline with the row count.
 func reportCappedSuffix(allData bool) string {
 	if allData {
 		return ""
@@ -675,10 +588,6 @@ func reportCappedSuffix(allData bool) string {
 	return " · capped at 2000"
 }
 
-// buildReportRunCols turns the report run's column metadata + rows
-// into the ListColumn spec the shared list-table primitive consumes.
-// Min derived from header label; ideal capped at AutoMaxIdeal; max
-// is the longest cell width across all rows.
 func buildReportRunCols(cs []sf.ReportColumn, rows []map[string]any) []uilayout.ListColumn {
 	out := make([]uilayout.ListColumn, 0, len(cs))
 	for _, c := range cs {
@@ -723,10 +632,6 @@ func reportHasIDColumn(cs []sf.ReportColumn) bool {
 	return false
 }
 
-// stringifyReportCell coerces a cell value to a display string. SF
-// returns numbers as float64, dates as ISO strings, picklists as
-// already-resolved labels (we already prefer label over value at parse
-// time). Just renders whatever's there.
 func stringifyReportCell(v any) string {
 	if v == nil {
 		return ""
@@ -740,8 +645,6 @@ func stringifyReportCell(v any) string {
 		}
 		return "false"
 	case float64:
-		// Strip trailing zeros for cleaner integer display while
-		// preserving precision for actual decimals.
 		if t == float64(int64(t)) {
 			return fmt.Sprintf("%d", int64(t))
 		}

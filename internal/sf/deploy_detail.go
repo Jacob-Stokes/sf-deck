@@ -1,11 +1,5 @@
 package sf
 
-// Deep-detail fetch for one DeployRequest. The tooling SOQL behind
-// the /deploys list only carries counters; the REST deployRequest
-// endpoint (same one `sf project deploy report` uses) returns the
-// per-component and per-test breakdown — file, line, problem text,
-// stack traces. That's what the /deploy drill renders.
-
 import (
 	"encoding/json"
 	"net/url"
@@ -64,8 +58,6 @@ type DeployDetail struct {
 	TestTime  string
 }
 
-// deployRequestEnvelope mirrors the slice of the REST response we
-// care about.
 type deployRequestEnvelope struct {
 	DeployResult struct {
 		ID      string `json:"id"`

@@ -31,7 +31,6 @@ func TestComponentTypesAreYankable(t *testing.T) {
 			t.Errorf("%s: YankTargets() empty — value-yanks missing", c.name)
 			continue
 		}
-		// The first value target carries the primary identity string.
 		if ts[0].Value != c.wantAPI {
 			t.Errorf("%s: first yank value = %q, want %q", c.name, ts[0].Value, c.wantAPI)
 		}
@@ -52,7 +51,6 @@ func TestUserRowYankTargets(t *testing.T) {
 // TestYankLabelDroppedWhenEqualsAPI: no redundant "Label" row when the
 // label just repeats the API name.
 func TestYankLabelDroppedWhenEqualsAPI(t *testing.T) {
-	// MasterLabel == DeveloperName → only api + id, no label row.
 	ts := LWCBundle{DeveloperName: "same", MasterLabel: "same", ID: "0Rb1"}.YankTargets()
 	for _, y := range ts {
 		if y.ID == "label" {

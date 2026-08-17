@@ -1,16 +1,5 @@
 // Package recent owns the data types + pure-logic transforms behind
 // sf-deck's "recently visited" log.
-//
-// The package holds nothing UI-specific: just the Entry struct, the
-// merge/sort/filter pipeline that combines the local log with
-// Salesforce's RecentlyViewed feed, the per-row formatters, and the
-// settings round-trip helpers. The UI shell in internal/ui owns the
-// per-org log mutation, persistence triggers, and the per-tab visit
-// closures (recentVisitX).
-//
-// Origin tagging: every Entry carries an Origin tag (deck / sf / both)
-// set by Merge so the renderer can show a small badge and chips can
-// filter by source.
 package recent
 
 import (
@@ -34,17 +23,6 @@ type Entry struct {
 	OrgUser   string    `toml:"-"`              // username scope; never persisted (the per-org map handles that)
 	VisitedAt time.Time `toml:"visited_at"`
 
-	// Origin is set at merge time, not persisted. One of:
-	//   "deck" — sf-deck-only (this user opened it via sf-deck, and
-	//            either it's a kind Salesforce doesn't track —
-	//            flows / apex / etc. — or the SF fetch hadn't seen
-	//            it yet at merge time)
-	//   "sf"   — Salesforce-only (came from RecentlyViewed; the
-	//            user hasn't touched it via sf-deck this session)
-	//   "both" — present in both sources; sf-deck stream's timestamp
-	//            wins at dedupe time
-	// Empty when set by persistence load (rendered as "deck" since
-	// the persisted stream is sf-deck's view).
 	Origin string `toml:"-"`
 }
 
@@ -71,8 +49,6 @@ func (e Entry) Field(name string) (any, bool) {
 	case "Id", "ID":
 		return e.ID, true
 	case "Origin":
-		// Default to "deck" when unset — entries loaded from the
-		// persisted log have no Origin set; treat them as deck-tracked.
 		if e.Origin == "" {
 			return OriginDeck, true
 		}
@@ -146,10 +122,6 @@ type SFRow struct {
 func Merge(local []Entry, sf []SFRow) []Entry {
 	out := make([]Entry, 0, len(local)+len(sf))
 
-	// Index local entries by (kind, id) so dedupe works across every
-	// kind, not just records. Keeps the SF-only branch from
-	// double-emitting things the user already has in their local log
-	// (e.g. an apex class opened via sf-deck AND via Lightning).
 	type entryKey struct{ kind, id string }
 	localByKey := make(map[entryKey]int, len(local))
 	for i, e := range local {
@@ -165,9 +137,6 @@ func Merge(local []Entry, sf []SFRow) []Entry {
 		}
 		kind := KindForSFType(r.SObjectType)
 		if i, ok := localByKey[entryKey{kind, r.ID}]; ok {
-			// Already in local — promote to "both" but keep local's
-			// timestamp (the user's last sf-deck open is the better
-			// "when did I last touch this" signal).
 			taken[i] = true
 			continue
 		}
@@ -181,8 +150,6 @@ func Merge(local []Entry, sf []SFRow) []Entry {
 		})
 	}
 
-	// Walk local: copy each entry, tagging records that appeared in
-	// SF as "both"; everything else stays "deck".
 	for i, e := range local {
 		out = append(out, Entry{
 			Kind:      e.Kind,
@@ -243,8 +210,6 @@ func NameForRow(r Entry) string {
 		return name
 	}
 	if id := strings.TrimSpace(r.ID); id != "" {
-		// Short Id form — first 4 chars + "…" for visual compactness.
-		// The full Id is in the ID column anyway.
 		if len(id) > 6 {
 			return id[:4] + "…"
 		}
@@ -296,9 +261,6 @@ func KindForSFType(t string) string {
 	case "ApexClass":
 		return KindApexClass
 	case "ApexTrigger":
-		// Reuse apex_class — we don't have a separate trigger kind
-		// on the persistence side and they live in the Apex chip
-		// together.
 		return KindApexClass
 	case "LightningComponentBundle":
 		return KindLWC

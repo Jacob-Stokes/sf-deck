@@ -1,26 +1,5 @@
 package ui
 
-// Demo-mode core for `sf-deck --demo`: the ui-side flag, the cache
-// seeder, and the demo stand-ins for live behaviours (browser opens,
-// SOSL, the deploy watch poll). The fixture catalogs themselves live
-// in demo_seed_data.go.
-//
-// Three entirely fictional orgs ("Northwind Trading") with enough
-// seeded cache that every list surface shows full pages: org list,
-// home payload, a ~95-object catalog with a describe for every
-// object, flows, apex classes, deploys (one InProgress row that the
-// demo re-poll flips to Succeeded so the live-watch moment records
-// for real), records for the flagship objects, the /system + /users
-// operational lists (audit trail, interviews, jobs, sessions), and
-// the code drill-downs — a body for every apex class and trigger,
-// full sources for every LWC/Aura bundle, a definition map for every
-// flow version. Everything is hand-written / index-generated, so by
-// construction nothing real can leak.
-//
-// Seeding writes through the same cache layer the app reads — demo
-// mode IS the normal data path with the network removed (see
-// resource.DemoMode + sf.DemoMode).
-
 import (
 	"fmt"
 	"strings"
@@ -56,9 +35,6 @@ func applyDemoSettings(st *settings.Settings) {
 		"home", "soql", "objects", "flows",
 		"apex", "components", "users", "system",
 	})
-	// A lived-in visit log: every surface's "Recently viewed" chip
-	// reads from this, so a fresh demo doesn't open onto empty
-	// default chips everywhere.
 	for _, u := range []string{demoDev, demoUAT, demoProd} {
 		st.SetRecentForOrg(u, demoRecentVisits())
 	}
@@ -95,17 +71,8 @@ func SeedDemoCache(c *cache.Cache) error {
 	return seedDemoOrgData(c, orgs)
 }
 
-// seedDemoOrgData writes every demo org's per-org cache payloads (home,
-// sobjects, flows, apex, records, FLS, …) WITHOUT touching the global
-// org list. SeedDemoCache uses it after seeding the org list for
-// `--demo`; the demo-org import path (welcome modal) uses it directly to
-// pour the demo world into the REAL cache alongside live orgs, merging
-// the org list separately rather than overwriting it.
 func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 	objs := demoSObjects()
-	// Generated once, seeded per-org: the code drill-downs (apex +
-	// trigger bodies, bundle sources), the flow-version definitions,
-	// and the per-sObject trigger lists.
 	apexDetails := demoApexClassDetails()
 	triggerDetails := demoTriggerDetails()
 	lwcDetails := demoLWCBundleDetails()
@@ -144,25 +111,16 @@ func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 		if err := seed("permsets", demoPermsetPicker()); err != nil {
 			return err
 		}
-		// Per-flow version lists so drilling into a flow shows a
-		// populated versions table (cache key flowversions:<defID>),
-		// not a demo-mode network error.
 		for defID, versions := range demoFlowVersionsByDef() {
 			if err := seed("flowversions:"+defID, versions); err != nil {
 				return err
 			}
 		}
-		// The flow-version definition viewer reads one metadata map
-		// per version (flowversiondef:<versionID>).
 		for verID, def := range flowVersionDefs {
 			if err := seed("flowversiondef:"+verID, def); err != nil {
 				return err
 			}
 		}
-		// Code drill-downs: a body for every apex class and trigger,
-		// full file sets for every LWC / Aura bundle — so Enter on any
-		// code row lands on real-looking source instead of a demo-mode
-		// network error.
 		for id, det := range apexDetails {
 			if err := seed("apex_class:"+id, det); err != nil {
 				return err
@@ -183,18 +141,11 @@ func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 				return err
 			}
 		}
-		// Per-sObject trigger lists back the object drill's Triggers
-		// subtab; empty lists included so no object demo-errors.
 		for sobject, list := range triggersByTable {
 			if err := seed("triggers:"+sobject, list); err != nil {
 				return err
 			}
 		}
-		// A describe for EVERY object in the catalog, so any drill
-		// the user (or tape) makes lands on a populated fields list
-		// instead of a demo-mode network error — and an FLS payload
-		// for every (object, permset) pair so the FLS grid works on
-		// all of them.
 		picker := demoPermsetPicker()
 		for _, so := range objs {
 			desc := demoDescribeFor(so)
@@ -211,12 +162,6 @@ func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 				}
 			}
 		}
-		// Records are NoCache in live mode but cacheable in demo
-		// (resource.DemoMode), so these land through the same loader.
-		// The records surface reads per-CHIP resources
-		// (chiprecords:<sobject>:<chipID>), so each built-in chip
-		// gets its own slice; the plain records:<sobject> key backs
-		// the no-clause fallback path.
 		ord := 0
 		for sobject, list := range demoRecordLists() {
 			ord++
@@ -232,8 +177,6 @@ func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 				}
 			}
 		}
-		// The Visited chip (default on per-sObject records) fetches
-		// `Id IN (visit-log ids)` through its own chip resource.
 		for sobject, list := range demoVisitedChipRecords() {
 			if err := seed("chiprecords:"+sobject+":"+recentlyViewedChipID, list); err != nil {
 				return err
@@ -273,10 +216,6 @@ func demoHome(o sf.Org) HomeData {
 			{Name: "FileStorageMB", Max: 20480, Remaining: 18920},
 		},
 		RecentDeploys: demoDeploys()[:3],
-		// Home-subtab payloads: the user summary feeds /users' Recent
-		// list, AsyncJobs the Home jobs summary — same fixtures the
-		// dedicated /system + /users resources are seeded with, so the
-		// two views agree.
 		Users: sf.UserSummary{
 			TotalActive: 34, TotalInactive: 7,
 			RecentLogins: demoRecentLogins(),
@@ -285,9 +224,6 @@ func demoHome(o sf.Org) HomeData {
 	}
 }
 
-// demoRecordHits is the demo stand-in for SOSL: case-insensitive
-// substring match over the seeded record Names, shaped like real
-// GlobalSearchHits so the records tier of ctrl+k works end-to-end.
 func demoRecordHits(term string) []sf.GlobalSearchHit {
 	t := strings.ToLower(strings.TrimSpace(term))
 	if t == "" {
@@ -313,9 +249,6 @@ func demoRecordHits(term string) []sf.GlobalSearchHit {
 	return hits
 }
 
-// demoFlipInFlightDeploys is the demo stand-in for the live in-flight
-// re-poll: after the deploy has "run" for a bit, it completes. Gives
-// the hero tape a real status flip through the real watch machinery.
 func demoFlipInFlightDeploys(rows []sf.DeployRow) []sf.DeployRow {
 	out := make([]sf.DeployRow, len(rows))
 	copy(out, rows)

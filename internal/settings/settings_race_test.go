@@ -36,7 +36,6 @@ func TestSaveEncodeRaceAgainstMutators(t *testing.T) {
 		}
 	}()
 
-	// Mutator goroutines hammering the maps the encoder reads.
 	mutators := []func(i int){
 		func(i int) { s.SetOrg(orgKey(i), SafetyRecords, false) },
 		func(i int) { s.SetRecentForOrg(orgKey(i), []RecentConfig{{}}) },
@@ -58,6 +57,5 @@ func TestSaveEncodeRaceAgainstMutators(t *testing.T) {
 }
 
 func orgKey(i int) string {
-	// A handful of distinct keys so entries are both added and overwritten.
 	return string(rune('a' + i%8))
 }

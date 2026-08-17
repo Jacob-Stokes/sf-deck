@@ -41,8 +41,6 @@ func TestTimeoutLabel_WithDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	got := timeoutLabel(ctx)
-	// Allow a small window for clock drift between context creation
-	// and timeoutLabel reading the deadline.
 	if got != "10s" && got != "9s" {
 		t.Errorf("timeoutLabel(10s deadline) = %q, want \"10s\" or \"9s\"", got)
 	}
@@ -72,8 +70,6 @@ func TestRunSFCtx_TimeoutKillsProcess(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-nil error when ctx times out, got nil")
 	}
-	// Should die in well under 1s (timeout is 50ms; SIGKILL is
-	// near-instant). 1s is a generous CI cushion.
 	if elapsed > time.Second {
 		t.Errorf("expected fast kill on timeout, took %v", elapsed)
 	}
@@ -90,21 +86,12 @@ func TestRunSFCtx_TimeoutMessage(t *testing.T) {
 	if _, err := exec.LookPath("sleep"); err != nil {
 		t.Skip("sleep not available on PATH")
 	}
-	// Spawn via runSFCtx but override the binary by going through
-	// exec.CommandContext directly — runSFCtx hard-codes "sf", so
-	// we re-implement the same shape with "sleep" as the binary
-	// to exercise the timeout-detection branch.
-	//
-	// The actual error message construction (argsLabel, timeoutLabel)
-	// is covered by separate unit tests above; this test just
-	// confirms the branch fires.
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sleep", "10")
 	if err := cmd.Run(); err == nil {
 		t.Fatal("expected timeout error")
 	}
-	// Verify the ctx-driven branch the runSFCtx error formatter would take.
 	if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		t.Errorf("ctx.Err() = %v, want context.DeadlineExceeded", ctx.Err())
 	}

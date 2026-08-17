@@ -3,22 +3,6 @@
 // SOQL or client-side as a predicate — is the same shape: a tree of
 // comparisons combined with AND/OR/NOT, plus optional ORDER BY,
 // LIMIT, and column projection.
-//
-// The AST has two execution modes implemented as independent walkers
-// over the same tree:
-//
-//	ToSOQL(expr) string     → server execution (sql.go)
-//	Eval(expr, row) bool    → client execution (eval.go)
-//
-// Lockstep: both walkers are tested side-by-side in sql_test.go so a
-// new operator can't land in one without showing up in the other.
-// That's the substitute for a shared compile-and-emit pass — each
-// walker is small enough that branching the same tree twice is
-// cleaner than synthesising an intermediate form.
-//
-// Persistence: the AST round-trips through a tagged-union form
-// (see node.go's NodeYAML) so settings.toml stays human-readable
-// while still encoding the tree structure.
 package query
 
 // Op enumerates the comparison operators a Compare node can carry.
@@ -84,9 +68,6 @@ func (o Op) String() string { return string(o) }
 // only — emitters break loudly if someone adds a new Node without
 // updating them.
 type Node interface {
-	// node is unexported so this interface can only be implemented
-	// inside this package. See https://go.dev/wiki/CodeReviewComments
-	// "Pseudo-Sealed Interfaces" for the pattern.
 	node()
 }
 

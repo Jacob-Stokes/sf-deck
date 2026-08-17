@@ -1,11 +1,5 @@
 package ui
 
-// Process-wide dependencies + stores threaded into every Model.
-//
-// Extracted from model.go as the pilot for the Model split. modelServices
-// is embedded into Model so existing field access (m.cache, m.settings, …)
-// keeps working unchanged.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/cache"
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
@@ -19,7 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/updatecheck"
 )
 
-// modelServices groups process-wide dependencies and stores.
 type modelServices struct {
 	cache       *cache.Cache
 	settings    *settings.Settings // per-org safety policy; never nil
@@ -33,11 +26,7 @@ type modelServices struct {
 	users       *userops.Service
 	exports     *exportRegistry
 	updates     updatecheck.Service
-	// control is the live-IPC bridge. Nil when sf-deck is launched
-	// without --control. When set, the update loop publishes snapshots
-	// to it after each frame and drains inbound write messages from
-	// its Writes() channel.
-	control *ControlState
+	control     *ControlState
 	// instanceNumber is the slot picked at startup via
 	// internal/instance. Always populated (no -1 sentinel) since the
 	// badge ALWAYS renders — even without --control the user wants

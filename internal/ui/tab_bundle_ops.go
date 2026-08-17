@@ -15,9 +15,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// onBundleDetailKey routes the per-tab keys (r/D/v/o/y) for
-// /bundle. Returns (consumed, cmd) — cmd is the goroutine to kick
-// for retrieve / deploy / validate ops.
 func (m *Model) onBundleDetailKey(key string) (bool, tea.Cmd) {
 	if m.tab() != TabBundleDetail || m.bundleCur == "" {
 		return false, nil
@@ -34,15 +31,6 @@ func (m *Model) onBundleDetailKey(key string) (bool, tea.Cmd) {
 		if b.Path == "" {
 			return true, nil
 		}
-		// On /bundle, the target depends on the active view:
-		//   - Components: cursored row's relative Path (the file
-		//     the manifest item lives in), falling back to the
-		//     bundle dir when no row is selected.
-		//   - Files: cursored file or directory under cwd. The
-		//     parent (..) row is treated like "open the parent
-		//     dir" which is a meaningful action (browse the
-		//     bundle's structure outside sf-deck).
-		//   - /bundles, no row, anything else: bundle root.
 		target := b.Path
 		if m.tab() == TabBundleDetail {
 			switch m.bundleDetailView {
@@ -93,9 +81,6 @@ func (m *Model) onBundleDetailKey(key string) (bool, tea.Cmd) {
 	return false, nil
 }
 
-// startBundleRetrieve kicks the full retrieve goroutine for the
-// bundle. Registers a job in the export tracker so Ctrl+J shows it,
-// and updates last_retrieved_at on completion.
 func startBundleRetrieve(m *Model, b devproject.Bundle) tea.Cmd {
 	alias := b.DefaultOrgAlias
 	if alias == "" && len(m.orgs) > 0 {
@@ -126,8 +111,6 @@ func startBundleRetrieve(m *Model, b devproject.Bundle) tea.Cmd {
 	return tea.Batch(worker, m.exportActivityTickCmd())
 }
 
-// startBundleDeploy is startBundleRetrieve's sibling for
-// `sf project deploy start`.
 func startBundleDeploy(m *Model, b devproject.Bundle) tea.Cmd {
 	org, ok := m.bundleTargetOrg(b)
 	if !ok {
@@ -214,9 +197,6 @@ func bundleWriteService(m *Model) *bundles.Service {
 	return bundles.New(m.devProjects, gate)
 }
 
-// bundleOpDoneMsg lands on Update when a retrieve/deploy/validate
-// goroutine returns. Op tells applyBundleOpDone which timestamp to
-// update + which flash to show.
 type bundleOpDoneMsg struct {
 	JobID    string
 	BundleID string
@@ -225,9 +205,6 @@ type bundleOpDoneMsg struct {
 	Err      error
 }
 
-// applyBundleOpDone updates the registry job + bundle timestamps +
-// flashes a result. On success, also kicks a fresh preview load so
-// the diff tables refresh against the new state.
 func (m *Model) applyBundleOpDone(msg bundleOpDoneMsg) tea.Cmd {
 	if msg.Err != nil {
 		if msg.JobID != "" {

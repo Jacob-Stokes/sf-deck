@@ -1,26 +1,5 @@
 package ui
 
-// Deep-collect wizard — shift+K on a "container" cursor target (today
-// just sObject; will grow to include permsets / profiles / flows) opens
-// a change-set-style "what to bring along?" picker.
-//
-// User toggles checkboxes:
-//   - the parent itself (always on by default)
-//   - dependent custom fields
-//   - validation rules
-//   - record types
-//   - triggers (off by default — usually noise)
-//
-// Enter resolves the selected expansions into devproject.Items, then
-// hands off to the existing org-project picker. Cancel closes without
-// touching the store.
-//
-// Counts shown next to each row come from the cached resource layer
-// when available ("(N)"); when not yet fetched we render "(?)" — the
-// resolve step at confirm time will fetch sync'ly inside its Cmd, so
-// the user still gets the right items added even if the wizard's count
-// hint was unknown.
-
 import (
 	"fmt"
 	"strings"
@@ -34,8 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// deepCollectKind enumerates the expansion options. Each maps to a
-// resolver in resolveDeepCollect (devproject_helpers.go).
 type deepCollectKind int
 
 const (
@@ -45,26 +22,18 @@ const (
 	deepKindValidationRules
 	deepKindRecordTypes
 	deepKindTriggers
-	// PSG components — used when the wizard is opened with a
-	// PermissionSetGroup target.
 	deepKindPSGComponents
 )
 
-// deepCollectOption is one row in the wizard.
 type deepCollectOption struct {
-	Kind   deepCollectKind
-	Label  string
-	Picked bool
-	// CountHint is "(N)" or "(?)" rendered after the label.
+	Kind      deepCollectKind
+	Label     string
+	Picked    bool
 	CountHint string
-	// Disabled rows are non-toggleable (e.g. zero items available).
-	Disabled bool
-	// Hint is an optional secondary line.
-	Hint string
+	Disabled  bool
+	Hint      string
 }
 
-// deepCollectState is the wizard. Carried on Model.deepCollect; nil =
-// hidden. Target captures what was under the cursor when shift+K fired.
 type deepCollectState struct {
 	Title  string
 	Hint   string
@@ -73,9 +42,6 @@ type deepCollectState struct {
 	Cursor int
 }
 
-// openDeepCollect installs the wizard for the given cursor target.
-// Returns nil if the target isn't expandable (caller should fall back
-// to single-item collect).
 func (m *Model) openDeepCollect(target sf.Openable) tea.Cmd {
 	switch t := target.(type) {
 	case sf.SObject:
@@ -100,13 +66,7 @@ func IsDeepCollectTarget(target sf.Openable) bool {
 	return false
 }
 
-// buildDeepCollectForPSG populates the wizard rows for a PSG.
-// Two options: the PSG itself (always on) and the component permsets
-// (on by default since the headline reason to "deep" collect a PSG
-// is to bring the actual perms with it).
 func (m *Model) buildDeepCollectForPSG(g sf.PermissionSetGroup) *deepCollectState {
-	// Components count is fetched on confirm; we don't have a cached
-	// list at wizard-open time. Show "(?)" — the resolver lazy-fetches.
 	return &deepCollectState{
 		Title:  "Collect " + g.MasterLabel + " — pick what to include",
 		Hint:   "space toggle · enter add to project · esc cancel",
@@ -119,10 +79,6 @@ func (m *Model) buildDeepCollectForPSG(g sf.PermissionSetGroup) *deepCollectStat
 	}
 }
 
-// buildDeepCollectForSObject populates the wizard rows for an sObject
-// cursor target. Counts use whatever's already cached on the active
-// org's data; when a child resource hasn't been fetched yet we mark
-// the row "(?)" and the resolver will lazy-fetch on confirm.
 func (m *Model) buildDeepCollectForSObject(s sf.SObject) *deepCollectState {
 	d := m.activeOrgData()
 	var customN, allN int
@@ -176,7 +132,6 @@ func (m *Model) buildDeepCollectForSObject(s sf.SObject) *deepCollectState {
 	}
 }
 
-// renderDeepCollect draws the wizard. Empty when not active.
 func (m Model) renderDeepCollect() string {
 	if m.deepCollect == nil {
 		return ""
@@ -226,7 +181,6 @@ func (m Model) renderDeepCollect() string {
 		Render(body)
 }
 
-// handleDeepCollectKey dispatches keys while the wizard is up.
 func (m *Model) handleDeepCollectKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.deepCollect == nil {
 		return *m, nil
@@ -257,7 +211,6 @@ func (m *Model) handleDeepCollectKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return *m, nil
 	case "enter":
 		target := st.Target
-		// Snapshot picks before clearing.
 		picks := make(map[deepCollectKind]bool, len(st.Items))
 		for _, opt := range st.Items {
 			picks[opt.Kind] = opt.Picked
@@ -270,29 +223,17 @@ func (m *Model) handleDeepCollectKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return *m, nil
 }
 
-// deepCollectConfirmedMsg fires after the wizard's Enter. Update calls
-// applyDeepCollectConfirmed to resolve the picks into items and hand
-// off to the org-project picker.
 type deepCollectConfirmedMsg struct {
 	Target sf.Openable
 	Picks  map[deepCollectKind]bool
 }
 
-// deepCollectPickedMsg arrives once the user picks a dev project for
-// the wizard's resolved item set. Update batches the AddItem loop;
-// items are tagged with OrgUser as the origin org.
 type deepCollectPickedMsg struct {
 	Items   []devproject.Item
 	DevID   string
 	OrgUser string
 }
 
-// applyDeepCollectConfirmed resolves the wizard's picks into a flat
-// list of devproject.Item, then opens the org-project picker. Sync
-// fetches under the hood for any child resource the user wants but
-// the cache doesn't have yet — these are small Tooling queries
-// (validation rules / record types / triggers) so the latency stays
-// well under a second on real orgs.
 func (m *Model) applyDeepCollectConfirmed(msg deepCollectConfirmedMsg) tea.Cmd {
 	if m.devProjects == nil {
 		m.flash("dev-projects unavailable")
@@ -315,8 +256,6 @@ func (m *Model) applyDeepCollectConfirmed(msg deepCollectConfirmedMsg) tea.Cmd {
 		return nil
 	}
 
-	// Fast path: when the active org has a project loaded, skip the
-	// dev-project chooser. Mirrors the single-collect fast-path.
 	d := m.ensureOrgData(user)
 	if d.LoadedDevProjectID != "" {
 		devID := d.LoadedDevProjectID
@@ -357,9 +296,6 @@ func (m *Model) applyDeepCollectConfirmed(msg deepCollectConfirmedMsg) tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// applyDeepCollectPicked AddItem-loops the resolved items onto the
-// chosen dev project, tagged with the originating org. Counts net-
-// new vs. duplicates separately so the flash is informative.
 func (m *Model) applyDeepCollectPicked(msg deepCollectPickedMsg) tea.Cmd {
 	if m.devProjects == nil {
 		return nil
@@ -415,11 +351,6 @@ func (m *Model) resolveDeepCollect(target string, op sf.Openable, picks map[deep
 	return nil, nil
 }
 
-// resolveDeepCollectPSG materializes the PSG wizard's picks into
-// devproject.Items. The PSG itself is one item; component permsets
-// expand into one KindPermissionSet item each (with Type holding the
-// PSG ID so the org-project tree view can fold permsets back under
-// their parent PSG visually).
 func (m *Model) resolveDeepCollectPSG(target string, g sf.PermissionSetGroup, picks map[deepCollectKind]bool) ([]devproject.Item, error) {
 	var items []devproject.Item
 	label := g.MasterLabel
@@ -447,9 +378,6 @@ func (m *Model) resolveDeepCollectPSG(target string, g sf.PermissionSetGroup, pi
 			items = append(items, devproject.Item{
 				Kind: devproject.KindPermissionSet,
 				Ref:  c.PermissionSetID,
-				// Stash the parent PSG id in Type so the
-				// /org-project-detail tree can fold this permset
-				// under its PSG header.
 				Type: g.ID,
 				Name: nm,
 			})
@@ -524,8 +452,6 @@ func (m *Model) resolveDeepCollectSObject(target string, s sf.SObject, picks map
 	return items, nil
 }
 
-// deepCollectFields turns the cached describe (or a fresh one when not
-// cached) into Item rows. Custom-only when wantAll=false.
 func (m *Model) deepCollectFields(target, sobject string, wantAll bool) ([]devproject.Item, error) {
 	d := m.activeOrgData()
 	var fields []sf.Field

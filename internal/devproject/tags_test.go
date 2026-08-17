@@ -49,7 +49,6 @@ func TestTags_CreateAndList(t *testing.T) {
 	if len(tags) != 2 {
 		t.Errorf("ListTags: got %d, want 2", len(tags))
 	}
-	// Sorted by name (case-insensitive); "cleanup-q2" < "tech-debt"
 	if tags[0].Name != "cleanup-q2" || tags[1].Name != "tech-debt" {
 		t.Errorf("ListTags wrong order: %v", tags)
 	}
@@ -77,7 +76,6 @@ func TestTags_UpdateAndRename(t *testing.T) {
 		t.Errorf("Update didn't stick: %+v", tags[0])
 	}
 
-	// Update to a name that collides with another tag → ErrTagExists.
 	b, _ := s.CreateTag("other", "", "")
 	if err := s.UpdateTag(a.ID, "other", "", ""); !errors.Is(err, ErrTagExists) {
 		t.Errorf("expected ErrTagExists on rename collision, got %v", err)
@@ -96,8 +94,6 @@ func TestTags_ApplyAndQuery(t *testing.T) {
 	s := openTestStore(t)
 	tag, _ := s.CreateTag("merge-fragile", "red", "")
 
-	// Apply same tag to fields across two orgs — bindings are
-	// per-(item, org) so both should land.
 	if err := s.ApplyTag(tag.ID, KindField, "Account.Phone", "alice@dev"); err != nil {
 		t.Fatalf("Apply 1: %v", err)
 	}
@@ -109,7 +105,6 @@ func TestTags_ApplyAndQuery(t *testing.T) {
 		t.Fatalf("Apply idempotent: %v", err)
 	}
 
-	// TagsFor returns just this org's binding.
 	tags, err := s.TagsFor(KindField, "Account.Phone", "alice@dev")
 	if err != nil {
 		t.Fatalf("TagsFor: %v", err)
@@ -118,7 +113,6 @@ func TestTags_ApplyAndQuery(t *testing.T) {
 		t.Errorf("TagsFor: got %v, want [merge-fragile]", tags)
 	}
 
-	// ItemsWithTag scoped to one org returns 1; cross-org returns 2.
 	bs, _ := s.ItemsWithTag(tag.ID, "alice@dev")
 	if len(bs) != 1 {
 		t.Errorf("ItemsWithTag scoped: got %d, want 1", len(bs))
@@ -135,7 +129,6 @@ func TestTags_RemoveAndDeleteCascade(t *testing.T) {
 	_ = s.ApplyTag(tag.ID, KindFlow, "0F1abc", "alice@dev")
 	_ = s.ApplyTag(tag.ID, KindFlow, "0F1xyz", "alice@dev")
 
-	// RemoveTag drops one binding; the other survives.
 	if err := s.RemoveTag(tag.ID, KindFlow, "0F1abc", "alice@dev"); err != nil {
 		t.Fatalf("RemoveTag: %v", err)
 	}
@@ -144,7 +137,6 @@ func TestTags_RemoveAndDeleteCascade(t *testing.T) {
 		t.Errorf("after RemoveTag: got %d, want 1", len(bs))
 	}
 
-	// DeleteTag cascades — the second binding should also be gone.
 	if err := s.DeleteTag(tag.ID); err != nil {
 		t.Fatalf("DeleteTag: %v", err)
 	}
@@ -164,7 +156,6 @@ func TestTags_SetTagsFor(t *testing.T) {
 	b, _ := s.CreateTag("b", "", "")
 	c, _ := s.CreateTag("c", "", "")
 
-	// Initial set: {a, b}.
 	if err := s.SetTagsFor(KindField, "Account.Phone", "alice@dev",
 		[]int64{a.ID, b.ID}); err != nil {
 		t.Fatalf("SetTagsFor 1: %v", err)
@@ -174,7 +165,6 @@ func TestTags_SetTagsFor(t *testing.T) {
 		t.Errorf("after first set: got %d, want 2", len(tags))
 	}
 
-	// Replace with {b, c} — a should be removed, c added.
 	if err := s.SetTagsFor(KindField, "Account.Phone", "alice@dev",
 		[]int64{b.ID, c.ID}); err != nil {
 		t.Fatalf("SetTagsFor 2: %v", err)
@@ -188,7 +178,6 @@ func TestTags_SetTagsFor(t *testing.T) {
 		t.Errorf("after replace: got %v, want [b c]", names)
 	}
 
-	// Empty set clears all bindings on the item.
 	if err := s.SetTagsFor(KindField, "Account.Phone", "alice@dev", nil); err != nil {
 		t.Fatalf("SetTagsFor empty: %v", err)
 	}
@@ -250,7 +239,6 @@ func TestTags_BulkLookup(t *testing.T) {
 	_ = s.ApplyTag(a.ID, KindField, "Account.Phone", "alice@dev")
 	_ = s.ApplyTag(b.ID, KindField, "Account.Phone", "alice@dev")
 	_ = s.ApplyTag(a.ID, KindField, "Account.Email", "alice@dev")
-	// Untagged item: Account.Fax (no bindings).
 
 	keys := []TagLookupKey{
 		{Kind: KindField, Ref: "Account.Phone"},
@@ -304,7 +292,6 @@ func TestTags_BulkApplyRemoveTags(t *testing.T) {
 		t.Fatalf("Lead should keep its pre-existing tag plus the bulk one, got %+v", tags)
 	}
 
-	// Bulk remove a from all three; Lead keeps b.
 	if err := s.BulkApplyRemoveTags(KindSObject, "alice@dev", refs, nil, []int64{a.ID}); err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +303,6 @@ func TestTags_BulkApplyRemoveTags(t *testing.T) {
 		t.Fatalf("Lead should keep only its own tag, got %+v", tags)
 	}
 
-	// Re-applying an existing binding is a no-op, not an error.
 	if err := s.BulkApplyRemoveTags(KindSObject, "alice@dev", []string{"Lead"}, []int64{b.ID}, nil); err != nil {
 		t.Fatalf("idempotent re-apply errored: %v", err)
 	}

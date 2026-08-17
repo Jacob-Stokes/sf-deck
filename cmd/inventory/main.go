@@ -1,13 +1,5 @@
 package main
 
-// cmd/inventory — emits docs/development/surfaces.md by walking sf-deck's
-// tabRegistry. Run from repo root:
-//
-//	go run ./cmd/inventory
-//
-// Pass -qa for docs/development/qa-checklist.md or -check to fail when the
-// checked-in output is stale.
-
 import (
 	"flag"
 	"fmt"

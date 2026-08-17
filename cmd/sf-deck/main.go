@@ -23,10 +23,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/usage"
 )
 
-// version, commit, and date are stamped at build time by goreleaser
-// via -ldflags. A bare `go build` leaves them at "dev" so a
-// developer running locally still gets a reasonable `--version`
-// instead of empty strings.
 var (
 	version = "dev"
 	commit  = "none"
@@ -58,11 +54,6 @@ func (a trackerAdapter) Recent() []ui.UsageCall {
 func main() {
 	buildinfo.Set(version, commit, date)
 
-	// Headless dispatch wins when the first positional arg is a
-	// known noun. Detect this BEFORE flag.Parse so a noun like
-	// "chip" doesn't get eaten by the global FlagSet, and so
-	// headless commands can run with their own (subcommand-local)
-	// flag parsing rather than the TUI's `-dump-keymap`.
 	args := cli.Parse(os.Args[1:])
 	if args.IsHeadless() {
 		runHeadless(args)
@@ -132,16 +123,10 @@ func main() {
 		ui.Demo = true
 	}
 
-	// --no-settings: run with built-in defaults, persist nothing.
-	// Same in-memory settings switch demo uses, without the rest of
-	// demo mode (real orgs, real cache/tags).
 	if *noSettings {
 		settings.Ephemeral = true
 	}
 
-	// Load user-defined keybindings before the TUI starts. Keymap is
-	// a TUI-only concern; the headless app.Open below doesn't touch
-	// it.
 	km, warn := ui.LoadKeymap()
 	ui.Keys = km
 
@@ -150,15 +135,6 @@ func main() {
 		return
 	}
 
-	// SkipOrgs: the TUI's orgsRes Resource enumerates orgs lazily on
-	// Init() with its own cache layer.  Letting app.Open shell out to
-	// `sf` synchronously here just blocked first paint for ~1.5s.
-	//
-	// IPC bundle handlers also need ResolveOrg to work from request 1
-	// — but the resolver falls through to the orgs cache when a.Orgs
-	// is empty, so we don't need to pay the startup tax even when
-	// --control is on. First launch ever with no cache → the
-	// resolver surfaces a "run sf org list" error to the agent.
 	a, err := app.Open(app.OpenOptions{SkipOrgs: true, Demo: *demo, NoCache: *noCache, NoTags: *noTags})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "startup:", err)
@@ -167,16 +143,10 @@ func main() {
 	defer a.Close()
 
 	if *demo {
-		// Seed the throwaway cache with the fictional Northwind world.
-		// From here the normal cache-first data path does the rest.
 		if err := ui.SeedDemoCache(a.Cache); err != nil {
 			fmt.Fprintln(os.Stderr, "demo seed:", err)
 			os.Exit(1)
 		}
-		// Seed the devprojects store (projects, items, bundles, tags,
-		// saved queries, apex snippets, soql history) so the modern
-		// /dev-projects, /bundles, /tags, /soql saved+history surfaces
-		// all have data on a fresh demo launch.
 		if err := ui.SeedDemoDevProjects(a.Projects, a.DemoDir()); err != nil {
 			fmt.Fprintln(os.Stderr, "demo seed (devprojects):", err)
 			os.Exit(1)
@@ -197,8 +167,6 @@ func main() {
 		model = model.WithDevProjects(a.Projects)
 	}
 	if warn != "" {
-		// Surface the keymap parse warning so the user knows their
-		// config file was ignored.
 		model = model.WithStartupWarning(warn)
 	}
 	if *enableControl && !a.Settings.LegalAccepted(productlegal.PolicyVersion) {
@@ -214,22 +182,14 @@ func main() {
 		model = model.WithStartupWarning(w)
 	}
 
-	// Claim an instance slot. We always claim — even without --control
-	// — so the top-left badge can show which window is which. The
-	// listener starts only when --control is set, in which case the
-	// Listen() call re-claims with the real socket path.
 	instanceNumber, controlState, controlServer := setupInstance(*enableControl, *controlLabel, a)
 	if controlServer != nil {
 		defer controlServer.Close()
 	} else {
-		// Even without the listener, release on clean shutdown so the
-		// slot frees up for the next window.
 		defer instance.Release(os.Getpid())
 	}
 	model.AttachControl(controlState, instanceNumber)
 
-	// Alt screen is set on the View return value now (bubbletea v2);
-	// no program-level option for it anymore. See internal/ui/render.go.
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -359,8 +319,6 @@ func runHeadless(args cli.Args) {
 		// acknowledgement (especially status and data deletion).
 		os.Exit(cli.Dispatch(nil, args, os.Stdout, os.Stderr))
 	case headlessUpdate:
-		// Release discovery needs neither Salesforce nor any local database,
-		// so keep it usable on a fresh machine before the sf CLI is installed.
 		a := &app.App{Updates: updatecheck.New()}
 		os.Exit(cli.Dispatch(a, args, os.Stdout, os.Stderr))
 	}

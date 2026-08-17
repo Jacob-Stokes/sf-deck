@@ -2,9 +2,6 @@ package settings
 
 import "strings"
 
-// Chip / lens / object-filter + tree-chip persistence accessors.
-// Split out of settings.go.
-
 // DefaultChipLimit resolves the effective chip-fetch row cap —
 // settings override > package default. Returns >= 1.
 func (s *Settings) DefaultChipLimit() int {

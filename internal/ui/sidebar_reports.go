@@ -2,9 +2,6 @@ package ui
 
 import "fmt"
 
-// Per-surface sidebars for /reports: report, dashboard, report
-// type, and cached-report-run detail. Split out of sidebar.go.
-
 func (m Model) sidebarReport(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {

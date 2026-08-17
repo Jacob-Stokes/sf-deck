@@ -1,25 +1,9 @@
 package ui
 
-// Demo-org injection. The welcome modal's "import demo org" action pours
-// the existing demo fixture world (the same data `--demo` seeds) into the
-// REAL cache under the demo usernames, registers those usernames as demo
-// targets in the sf layer (so any live-call attempt short-circuits to
-// seeded cache), and merges the demo orgs into the live org list. Unlike
-// `--demo` this coexists with real orgs in one session: real orgs fetch
-// live, the demo org serves seed.
-//
-// Persistence: a settings flag (ui.demo_org_imported) records the import
-// so the demo org is re-seeded + re-registered on the next boot. Removal
-// clears the flag, unregisters the targets, and purges the demo cache
-// namespaces.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// demoOrgUsernames returns the canonical usernames of the injected demo
-// orgs — the cache namespaces their data lives under and the targets the
-// sf layer treats as demo.
 func demoOrgUsernames() []string {
 	us := make([]string, 0, len(demoOrgs()))
 	for _, o := range demoOrgs() {
@@ -28,9 +12,6 @@ func demoOrgUsernames() []string {
 	return us
 }
 
-// demoTargetKeys returns every alias AND username for the demo orgs, so
-// registration covers whichever identifier a call site passes to
-// RESTClient.
 func demoTargetKeys() []string {
 	keys := make([]string, 0, len(demoOrgs())*2)
 	for _, o := range demoOrgs() {
@@ -44,8 +25,6 @@ func demoTargetKeys() []string {
 	return keys
 }
 
-// registerDemoTargets marks the demo orgs as demo in the sf layer. Called
-// on import and on boot when the demo org persists.
 func registerDemoTargets() {
 	sf.RegisterDemoTargets(demoTargetKeys()...)
 }
@@ -73,10 +52,6 @@ func (m *Model) importDemoOrg() {
 	m.flash("Demo org imported — find the 'northwind' orgs in your org panel.")
 }
 
-// mergeDemoOrgs returns orgs with the demo orgs appended when imported is
-// true (de-duplicated by username), or orgs unchanged when false. Applied
-// at every point m.orgs is refreshed from orgsRes so a live org reload
-// doesn't drop the injected demo orgs.
 func mergeDemoOrgs(orgs []sf.Org, imported bool) []sf.Org {
 	if !imported {
 		return orgs
@@ -94,10 +69,6 @@ func mergeDemoOrgs(orgs []sf.Org, imported bool) []sf.Org {
 	return out
 }
 
-// removeDemoOrg tears down the injected demo org: unregisters the demo
-// targets, clears the persistent flag, drops the demo orgs from the live
-// list, and purges their cache namespaces. Their cache rows are cleanly
-// keyed by the demo usernames, so the purge touches nothing real.
 func (m *Model) removeDemoOrg() {
 	sf.UnregisterDemoTargets(demoTargetKeys()...)
 	m.settings.SetDemoOrgImported(false)
@@ -110,8 +81,6 @@ func (m *Model) removeDemoOrg() {
 	demoSet := map[string]bool{}
 	for _, u := range demoOrgUsernames() {
 		demoSet[u] = true
-		// Drop in-memory orgData too; the disk-cache purge does not touch
-		// cursors and lists held in m.data.
 		delete(m.data, u)
 	}
 	kept := m.orgs[:0:0]
@@ -121,11 +90,6 @@ func (m *Model) removeDemoOrg() {
 		}
 	}
 	m.orgs = kept
-	// Re-anchor the selection properly. A bare `m.selected = 0` left
-	// selectedUsername pointing at the removed demo org — a dangling
-	// anchor the next orgs refetch had to correct by accident. Also
-	// re-anchor when the SELECTED username was a demo org even if the
-	// index still happens to be in range.
 	if m.selected >= len(m.orgs) || demoSet[m.selectedUsername] {
 		if len(m.orgs) > 0 {
 			m.setSelectedOrg(0)
@@ -137,11 +101,6 @@ func (m *Model) removeDemoOrg() {
 	m.flash("Demo org removed.")
 }
 
-// restoreDemoOrgOnBoot re-registers the demo targets when the demo org
-// persisted from a previous session, so its surfaces serve seed rather
-// than attempting live calls on this launch. The org list merge happens
-// wherever m.orgs is set (see mergeDemoOrgs). No cmd needed — the seed
-// data is already in the cache from the original import.
 func restoreDemoOrgOnBoot(imported bool) {
 	if imported {
 		registerDemoTargets()

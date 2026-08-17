@@ -1,28 +1,9 @@
 package ui
 
 // Central "can this sObject back a Records view?" gate.
-//
-// Salesforce surfaces plenty of entities in the object list that can't
-// actually serve records the way a normal sObject does:
-//
-//   - Platform Events (__e), Big Objects (__b), External Objects (__x)
-//     and assorted system entities report queryable=false and reject
-//     SOQL with INVALID_TYPE_FOR_OPERATION.
-//   - Setup/metadata entities (BatchProcessJobDefinition, …) report
-//     mruEnabled=false and have no LastViewedDate, so the "Recently
-//     Viewed" query throws INVALID_FIELD.
-//
-// sf-deck repeatedly learned this the hard way by firing a query and
-// surfacing the raw API error. This is the single source of truth: ask
-// recordsCapabilityFor before offering any records operation, rather
-// than discovering unsupported-ness from an error. Every records entry
-// point (render gate + fetch gate) reads it, so a new surface inherits
-// the same behaviour for free.
 
 import "strings"
 
-// recordsCapability is the resolved records-capability of one sObject,
-// derived from its (possibly-not-yet-loaded) describe.
 type recordsCapability struct {
 	// DescribeLoaded is false when the describe hasn't landed yet. While
 	// false the other fields are meaningless and callers must NOT gate —
@@ -30,15 +11,10 @@ type recordsCapability struct {
 	// this once it arrives). This is what stops a transient "not
 	// queryable" flash before the describe loads.
 	DescribeLoaded bool
-	// Queryable mirrors describe.queryable — whether SOQL works at all.
-	Queryable bool
-	// MruEnabled mirrors describe.mruEnabled — whether the "Recently
-	// Viewed" chip is meaningful (object has LastViewedDate tracking).
-	MruEnabled bool
+	Queryable      bool
+	MruEnabled     bool
 }
 
-// recordsCapabilityFor resolves the records-capability for an sObject.
-// Returns DescribeLoaded=false when the describe isn't cached yet.
 func (m Model) recordsCapabilityFor(sobject string) recordsCapability {
 	desc, ok := m.cachedDescribe(sobject)
 	if !ok {
@@ -51,9 +27,6 @@ func (m Model) recordsCapabilityFor(sobject string) recordsCapability {
 	}
 }
 
-// recordsCapabilityForData is the orgData-side variant used by the fetch
-// gate (which has d in hand, not the live Model's cachedDescribe path).
-// Same contract: DescribeLoaded=false means "don't gate yet".
 func recordsCapabilityForData(d *orgData, sobject string) recordsCapability {
 	r, ok := d.Describes[sobject]
 	if !ok || r.FetchedAt().IsZero() {

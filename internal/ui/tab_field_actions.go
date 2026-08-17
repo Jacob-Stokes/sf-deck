@@ -2,11 +2,6 @@ package ui
 
 // Field-detail action menu — uses the generic Action[Ctx] core.
 // See actions.go for the primitives.
-//
-// Adding a new action = one entry in fieldActionsFor(). Text edits
-// go through NewTextAction; toggle-style booleans through
-// NewBooleanAction; destructive actions through NewDestructiveAction.
-// Custom inline Start closures stay an escape hatch for one-offs.
 
 import (
 	"context"
@@ -18,8 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// fieldCtx is the per-selection snapshot handed to every field-
-// action Start closure.
 type fieldCtx struct {
 	Alias       string
 	OrgUser     string
@@ -116,12 +109,8 @@ func fieldActionsFor(ctx fieldCtx) []Action[fieldCtx] {
 			LoadCurrent:  loadFieldMetaString("description"),
 			Save:         saveFieldMetaString("description"),
 			SuccessFlash: fieldSuccessFlash,
-			// The description lives outside the describe, so refreshing the
-			// describe won't update the field-detail page's cached value —
-			// re-fetch the description itself (which also refreshes the
-			// describe for the other properties).
-			OnSuccess: refreshFieldDescriptionAfterEdit,
-			Disabled:  customOnly(),
+			OnSuccess:    refreshFieldDescriptionAfterEdit,
+			Disabled:     customOnly(),
 		}),
 		NewTextAction(TextActionSpec[fieldCtx]{
 			ID:        "field-edit-default",
@@ -223,16 +212,11 @@ func fieldActionsFor(ctx fieldCtx) []Action[fieldCtx] {
 	}
 }
 
-// fieldDeletedMsg signals that a field was deleted and we should
-// pop back from TabFieldDetail to TabObjectDetail + Schema, then
-// fire the carried describe-refresh cmd.
 type fieldDeletedMsg struct {
 	cacheKey string
 	innerCmd tea.Cmd
 }
 
-// saveFieldMetaString returns the Save closure for a string-valued
-// Metadata key on the current CustomField.
 func saveFieldMetaString(metaKey string) func(fieldCtx, string, any) error {
 	return func(c fieldCtx, val string, _ any) error {
 		id, err := customFieldIDCached(c.OrgData, c.Alias, c.Sobject, c.Field.Name)
@@ -246,9 +230,6 @@ func saveFieldMetaString(metaKey string) func(fieldCtx, string, any) error {
 	}
 }
 
-// saveFieldMetaAny returns the Save closure for an arbitrary-typed
-// Metadata key. Used by booleans — Salesforce accepts Go's bool
-// literal in the JSON payload.
 func saveFieldMetaAny(metaKey string) func(fieldCtx, any) error {
 	return func(c fieldCtx, val any) error {
 		id, err := customFieldIDCached(c.OrgData, c.Alias, c.Sobject, c.Field.Name)
@@ -262,9 +243,6 @@ func saveFieldMetaAny(metaKey string) func(fieldCtx, any) error {
 	}
 }
 
-// loadFieldMetaString returns a LoadCurrent closure that reads one
-// string Metadata key via Tooling. Used for properties the describe
-// doesn't expose (CustomField.description).
 func loadFieldMetaString(metaKey string) func(fieldCtx) func() (string, error) {
 	return func(c fieldCtx) func() (string, error) {
 		return func() (string, error) {
@@ -288,8 +266,6 @@ func fieldSuccessFlash(c fieldCtx) string {
 	return "updated " + c.Sobject + "." + c.Field.Name
 }
 
-// refreshFieldDescribeFor re-pulls the describe so the saved value
-// shows up in the field list + detail view without a manual r.
 func refreshFieldDescribeFor(c fieldCtx) tea.Cmd {
 	if c.DescribeRes == nil {
 		return nil
@@ -297,11 +273,6 @@ func refreshFieldDescribeFor(c fieldCtx) tea.Cmd {
 	return c.DescribeRes.Refresh(c.Cache)
 }
 
-// refreshFieldDescriptionAfterEdit is the description action's success
-// hook: the describe doesn't carry the description, so a describe refresh
-// alone would leave the field-detail page showing the stale cached value.
-// Drop the cached entry and re-fetch it via Tooling, batched with the
-// normal describe refresh (which keeps label/help/default fresh).
 func refreshFieldDescriptionAfterEdit(c fieldCtx) tea.Cmd {
 	if c.OrgData != nil && c.OrgData.FieldDescriptions != nil {
 		delete(c.OrgData.FieldDescriptions, c.Sobject+"."+c.Field.Name)
@@ -324,8 +295,6 @@ func refreshFieldDescriptionAfterEdit(c fieldCtx) tea.Cmd {
 	return tea.Batch(refreshFieldDescribeFor(c), refetch)
 }
 
-// orgAlias returns the preferred target argument for sf shelling out
-// / REST bootstrap — alias wins, username is the fallback.
 func orgAlias(o sf.Org) string {
 	if o.Alias != "" {
 		return o.Alias

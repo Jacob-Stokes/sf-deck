@@ -1,23 +1,6 @@
 package sf
 
 // SOAP Metadata API — readMetadata.
-//
-// The Metadata API is SOAP-only; the fast way to pull a component's full
-// definition is readMetadata (synchronous, up to 10 fullNames/call),
-// NOT the async retrieve job the `sf` CLI wraps. Parallel
-// readMetadata avoids the much slower wildcard-retrieve path on large
-// orgs.
-//
-// This client reuses the REST Client's already-bootstrapped session
-// (accessToken / instanceURL / apiVersion) — the same token works on
-// /services/Soap/m (verified). No jsforce, no extra auth: build the XML
-// envelope, POST, parse the <records> blocks back out.
-//
-// readMetadata does NOT support Apex (ApexClass/Trigger/Page/Component
-// return INVALID_TYPE — they're retrieve-only). Apex bodies come from a
-// bulk Tooling query instead (see bulk_apex.go). The SOAP path is for
-// CustomObject/CustomField/ValidationRule/RecordType/Flow/Layout/
-// PermissionSet/Profile/WorkflowRule/etc.
 
 import (
 	"fmt"
@@ -26,19 +9,12 @@ import (
 	"time"
 )
 
-// soapReadBatchMax is the readMetadata fullNames-per-call ceiling
-// (Salesforce caps at 10). Heavy types use a smaller batch — see
-// soapBatchSizeFor.
 const soapReadBatchMax = 10
 
 // soapReadTimeout bounds a single readMetadata POST. Generous because a
 // batch of large components (Profiles) can be tens of MB.
 const soapReadTimeout = 4 * time.Minute
 
-// soapBatchSizeFor returns how many fullNames to request per
-// readMetadata call for a given type. Profiles (and PermissionSets) are
-// enormous — 10 Profiles = ~34MB and times out — so they go 1–2 at a
-// time; everything else uses the full 10.
 func soapBatchSizeFor(metadataType string) int {
 	switch metadataType {
 	case "Profile":
@@ -94,12 +70,8 @@ func (c *Client) ReadMetadata(metadataType string, names []string) (map[string]s
 	return parseReadMetadataRecords(text), nil
 }
 
-// soapListMaxQueries is the listMetadata cap on ListMetadataQuery
-// elements per call (Salesforce allows up to 3 type queries per call).
 const soapListMaxQueries = 3
 
-// soapListEnvelope wraps a listMetadata call for up to 3 types. asOfVersion
-// is required by the API; we pass the client's apiVersion.
 func soapListEnvelope(token, asOfVersion string, types []string) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
@@ -230,8 +202,6 @@ func soapSessionExpired(raw []byte) bool {
 		strings.Contains(fault, "Session expired")
 }
 
-// parseListMetadataResult extracts each <result>…</result> block from a
-// listMetadataResponse into MetadataItems, grouped by their <type>.
 func parseListMetadataResult(xml string) map[string][]MetadataItem {
 	out := map[string][]MetadataItem{}
 	for _, rec := range extractBlocks(xml, "result") {
@@ -250,8 +220,6 @@ func parseListMetadataResult(xml string) map[string][]MetadataItem {
 	return out
 }
 
-// soapFault returns the faultstring if the response is a SOAP fault,
-// else "".
 func soapFault(xml string) string {
 	if !strings.Contains(xml, "Fault>") {
 		return ""
@@ -262,10 +230,6 @@ func soapFault(xml string) string {
 	return "SOAP fault"
 }
 
-// parseReadMetadataRecords extracts each <records …>…</records> block
-// from a readMetadataResponse and keys it by its <fullName>. The value
-// is the record's inner XML (the component definition). Nil records
-// (names that didn't exist) have no <fullName> and are skipped.
 func parseReadMetadataRecords(xml string) map[string]string {
 	out := map[string]string{}
 	for _, rec := range extractBlocks(xml, "records") {
@@ -278,13 +242,6 @@ func parseReadMetadataRecords(xml string) map[string]string {
 	return out
 }
 
-// --- tiny XML helpers (string-based; the payloads are well-formed SF
-// XML and we only need block extraction, not a full parser) ----------
-
-// extractBlocks returns the inner content of every top-level <tag …>…</tag>
-// element in s, handling nested same-name tags via depth counting and
-// honouring self-closing <tag …/> (which yields an empty block, skipped).
-// Matches both "<tag>" and "<tag attr=...>" openings.
 func extractBlocks(s, tag string) []string {
 	var out []string
 	openPrefix := "<" + tag
@@ -295,18 +252,15 @@ func extractBlocks(s, tag string) []string {
 		if start < 0 {
 			break
 		}
-		// Find end of the opening tag.
 		gt := strings.IndexByte(s[start:], '>')
 		if gt < 0 {
 			break
 		}
 		openEnd := start + gt + 1
-		// Self-closing?
 		if gt > 0 && s[start+gt-1] == '/' {
 			i = openEnd
 			continue
 		}
-		// Walk forward counting nested opens of the same tag.
 		depth := 1
 		j := openEnd
 		for depth > 0 {
@@ -317,7 +271,6 @@ func extractBlocks(s, tag string) []string {
 			}
 			nextClose += j
 			if nextOpen >= 0 && nextOpen < nextClose {
-				// nested open (ignore self-closing nested)
 				ngt := strings.IndexByte(s[nextOpen:], '>')
 				if ngt > 0 && s[nextOpen+ngt-1] != '/' {
 					depth++
@@ -336,8 +289,6 @@ func extractBlocks(s, tag string) []string {
 	return out
 }
 
-// indexOpen finds the next "<tag" that is a real element open (followed
-// by '>', ' ', '\t', '\n', or '/'), from position from.
 func indexOpen(s, openPrefix string, from int) int {
 	for from <= len(s)-len(openPrefix) {
 		idx := strings.Index(s[from:], openPrefix)
@@ -357,8 +308,6 @@ func indexOpen(s, openPrefix string, from int) int {
 	return -1
 }
 
-// innerText returns the text of the first <tag>…</tag> in s (no nesting
-// assumed; used for leaf elements like <fullName>/<faultstring>).
 func innerText(s, tag string) string {
 	open := "<" + tag + ">"
 	close := "</" + tag + ">"

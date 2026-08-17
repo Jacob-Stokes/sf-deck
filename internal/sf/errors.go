@@ -95,14 +95,9 @@ func AsSFError(err error) *SFError {
 	return nil
 }
 
-// parseHTTPError turns a raw non-2xx HTTP response body into a typed
-// *SFError. Salesforce usually returns an array of {message,errorCode,
-// fields} objects; we use the first one for the top-level error and
-// best-effort classify by code.
 func parseHTTPError(he *sfHTTPError) *SFError {
 	out := &SFError{HTTPCode: he.Status}
 
-	// Common shape: array of error objects.
 	var arr []struct {
 		Message   string   `json:"message"`
 		ErrorCode string   `json:"errorCode"`
@@ -113,7 +108,6 @@ func parseHTTPError(he *sfHTTPError) *SFError {
 		out.Message = arr[0].Message
 		out.Fields = arr[0].Fields
 	} else {
-		// Some endpoints return a single object instead of an array.
 		var single struct {
 			Message   string   `json:"message"`
 			ErrorCode string   `json:"errorCode"`
@@ -133,9 +127,6 @@ func parseHTTPError(he *sfHTTPError) *SFError {
 	return out
 }
 
-// classifyErrorCode maps Salesforce errorCodes to our ErrorKind. The
-// HTTP status is a fallback when there's no recognizable code (e.g.
-// network-layer 502s).
 func classifyErrorCode(code string, httpStatus int) ErrorKind {
 	switch code {
 	// Permission — user's profile / FLS / sharing rules block the op.
@@ -146,7 +137,6 @@ func classifyErrorCode(code string, httpStatus int) ErrorKind {
 		"METHOD_NOT_ALLOWED":
 		return ErrPermission
 
-	// Validation — user-fixable input problem.
 	case "REQUIRED_FIELD_MISSING",
 		"STRING_TOO_LONG",
 		"NUMBER_OUTSIDE_VALID_RANGE",
@@ -156,7 +146,6 @@ func classifyErrorCode(code string, httpStatus int) ErrorKind {
 		"INVALID_TYPE_ON_FIELD_IN_RECORD":
 		return ErrValidation
 
-	// Schema — wrong object shape, bad IDs, outdated describe.
 	case "MALFORMED_ID",
 		"INVALID_FIELD",
 		"INVALID_FIELD_FOR_INSERT_UPDATE",
@@ -178,7 +167,6 @@ func classifyErrorCode(code string, httpStatus int) ErrorKind {
 		return ErrSession
 	}
 
-	// Fallback to HTTP status.
 	switch {
 	case httpStatus == 401:
 		return ErrSession

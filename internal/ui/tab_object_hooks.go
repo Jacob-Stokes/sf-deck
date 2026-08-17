@@ -16,7 +16,6 @@ func (m *Model) cycleObjectDetailChip(delta int) tea.Cmd {
 	d := m.ensureOrgData(m.orgs[m.selected].Username)
 	switch m.currentSubtab() {
 	case SubtabSchema:
-		// ←/→ cycles the field-filter chip (All / Custom / Picklist / …).
 		m.cycleSchemaChip(delta)
 		return m.onTabChanged()
 	case SubtabRecords:
@@ -78,9 +77,6 @@ func (m *Model) moveObjectDetailCursor(delta int) {
 	}
 	switch m.currentSubtab() {
 	case SubtabDetails:
-		// Cursor walks the navigable rows of the MAIN pane (identity /
-		// features / fields), not the sidebar action menu. The sidebar
-		// is info-only now.
 		n := m.objectDetailNavCount()
 		m.objectActionCur = clampDelta(m.objectActionCur, delta, n)
 	case SubtabSchema:
@@ -184,9 +180,6 @@ func (m *Model) resetObjectDetailCursor() {
 		}
 		recordsRowAdapter(d, sobj, visible, visibleIdx).ResetDisplayTop()
 	default:
-		// Other subtabs (Details, FLS, Validation, RecordTypes,
-		// Triggers) don't have a row cursor in the usual sense —
-		// they're action menus or detail panes.  No-op.
 	}
 }
 
@@ -265,32 +258,13 @@ func (m *Model) ensureObjectDetailRecordsData(d *orgData, o sf.Org) []tea.Cmd {
 		return cmds
 	}
 	if currentChipMode(d, d.DescribeCur) == ChipModeSalesforce {
-		// SF mode's synthetic "Recently Viewed" chip needs the
-		// per-sObject RecentlyViewed payload loaded.  d.RecentlyViewed
-		// (the global top-N) is NOT sufficient — for users who've
-		// viewed many other sObjects it returns zero rows for the one
-		// we care about.  EnsureRecentlyViewedPerSObject runs a SOQL
-		// query scoped to this sObject.
-		//
-		// Skip the fetch for objects that aren't recently-viewable
-		// (mruEnabled=false) — they have no LastViewedDate, so the query
-		// throws INVALID_FIELD. Only query once the describe confirms
-		// MRU-enabled (DescribeLoaded=false → wait). The render path
-		// shows a hint for the non-viewable ones.
 		if recCap.DescribeLoaded && recCap.MruEnabled {
 			rv := d.EnsureRecentlyViewedPerSObject(targetArg(o), d.DescribeCur)
 			cmds = append(cmds, rv.Ensure(m.cache))
 		}
 		switch selected {
 		case "":
-			// Catalog hasn't loaded yet — nothing else to fetch.
 		case sfRecentlyViewedChipID:
-			// Synthetic SF Recently Viewed chip — routes through the
-			// chip-records resource (SOQL `Id IN (visited-ids)`) using
-			// the per-sObject RecentlyViewed payload.  No-op when the
-			// payload hasn't landed yet OR when it landed empty; the
-			// `recently_viewed_per_sobject` Apply hook re-fires
-			// EnsureChipRecords once IDs are available.
 			if c, ok := m.salesforceVisitedRecordsChip(d, d.DescribeCur, o.Username); ok {
 				rr := d.EnsureChipRecords(targetArg(o), d.DescribeCur, c, qchip.Substitutions{})
 				cmds = append(cmds, rr.Ensure(m.cache))
@@ -366,8 +340,6 @@ func (m *Model) activateObjectDetail() tea.Cmd {
 	case SubtabRecords:
 		return m.activateObjectDetailRecord()
 	case SubtabDetails:
-		// Enter fires the action the cursored MAIN-pane row maps to.
-		// Read-only rows (api name, capabilities, …) are a no-op.
 		idx, ok := m.objectDetailActionForCursor()
 		if !ok {
 			return nil

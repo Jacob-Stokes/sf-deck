@@ -49,10 +49,6 @@ func SubstituteWhere(n query.Node, subs Substitutions) query.Node {
 	return substituteNode(n, subs)
 }
 
-// substitute walks the AST and replaces $userId / $userid tokens in
-// CompareNode values with the runtime value. Other nodes pass through
-// unchanged. Returns a *new* Query — the input AST is left intact so
-// the same chip can be applied repeatedly to different orgs.
 func substitute(q query.Query, subs Substitutions) query.Query {
 	out := query.Query{
 		OrderBy: append([]query.OrderBy(nil), q.OrderBy...),

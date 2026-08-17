@@ -7,8 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// ---- wizardRowForField mapping per Salesforce field type -----------
-
 func TestWizardRowForFieldTypes(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -46,7 +44,6 @@ func TestWizardRowForFieldTypes(t *testing.T) {
 			true, query.OpEq, cwText, ""},
 		{"reference", sf.Field{Name: "OwnerId", Type: "reference", Filterable: true},
 			true, query.OpEq, cwText, ""},
-		// Unsupported types skip the catalogue.
 		{"blob", sf.Field{Name: "Body", Type: "base64", Filterable: true},
 			false, "", 0, ""},
 		{"location", sf.Field{Name: "ShippingAddress", Type: "location", Filterable: true},
@@ -110,13 +107,10 @@ func TestWizardRowForFieldFallsBackToNameWhenLabelMissing(t *testing.T) {
 	}
 }
 
-// ---- fieldsFromDescribe ordering + capping --------------------------
-
 func TestFieldsFromDescribePrioritisesAuditFields(t *testing.T) {
 	desc := sf.SObjectDescribe{
 		Name: "Account",
 		Fields: []sf.Field{
-			// Mix of fields including audit + a custom string.
 			{Name: "Custom_Field__c", Type: "string", Filterable: true, Custom: true},
 			{Name: "OwnerId", Type: "reference", Filterable: true},
 			{Name: "Name", Type: "string", Filterable: true, NameField: true},
@@ -163,7 +157,6 @@ func TestFieldsFromDescribeIncludesEveryFilterableField(t *testing.T) {
 		{Name: "Name", Type: "string", Filterable: true, NameField: true},
 		{Name: "CreatedDate", Type: "datetime", Filterable: true},
 		{Name: "LastModifiedDate", Type: "datetime", Filterable: true},
-		// Standard (non-custom) fields remain available after priority slots.
 		{Name: "Industry", Type: "picklist", Filterable: true},
 	}
 	for i := 0; i < 20; i++ {
@@ -172,11 +165,9 @@ func TestFieldsFromDescribeIncludesEveryFilterableField(t *testing.T) {
 		})
 	}
 	rows := fieldsFromDescribe(sf.SObjectDescribe{Fields: fields})
-	// All 25 (4 priority + 1 standard + 20 custom) should appear.
 	if len(rows) != 25 {
 		t.Fatalf("expected every filterable field to show, got %d (want 25)", len(rows))
 	}
-	// Priority audit comes first.
 	if rows[0].Field != "Name" {
 		t.Fatalf("Name should be first, got %s", rows[0].Field)
 	}
@@ -194,10 +185,6 @@ func TestFieldsFromDescribeIncludesEveryFilterableField(t *testing.T) {
 }
 
 func TestFieldsFromDescribeDeduplicates(t *testing.T) {
-	// Owner appears as a relationship + OwnerId as a lookup. The
-	// catalogue keys on Field name so the relationship variant isn't
-	// added twice (only one of them shows up since we iterate Fields
-	// once and skip duplicates).
 	desc := sf.SObjectDescribe{
 		Fields: []sf.Field{
 			{Name: "OwnerId", Type: "reference", Filterable: true},
@@ -216,8 +203,6 @@ func TestFieldsFromDescribeDeduplicates(t *testing.T) {
 	}
 }
 
-// ---- helpers ---------------------------------------------------------
-
 func contains(haystack, needle string) bool {
 	if len(needle) > len(haystack) {
 		return false
@@ -231,7 +216,6 @@ func contains(haystack, needle string) bool {
 }
 
 func customName(i int) string {
-	// kebab-stable Custom_<n>__c
 	digit := byte('0' + i%10)
 	tens := byte('0' + (i/10)%10)
 	return "Custom_" + string([]byte{tens, digit}) + "__c"

@@ -1,14 +1,5 @@
 package sf
 
-// global_search.go — multi-object SOSL primitive backing the
-// records mode of the global search modal.  See
-// docs/global-record-search-plan.md for the design.
-//
-// SOSL's FIND {...} RETURNING Obj1(...), Obj2(...), ... primitive
-// runs one server-side search across many sObjects in one call.
-// Returned `searchRecords` array carries each row's attributes.type
-// so callers can render mixed results in a flat list.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -41,16 +32,11 @@ type GlobalSearchTarget struct {
 // value keyed by field name; callers render whichever subset they
 // care about.
 type GlobalSearchHit struct {
-	Sobject string
-	ID      string
-	Name    string
-	// Secondary is the value of the target's Secondary field (if
-	// declared) — already string-ified.  Empty when Secondary
-	// wasn't requested or the value was nil.
+	Sobject   string
+	ID        string
+	Name      string
 	Secondary string
-	// Fields holds the raw projected field map for callers that
-	// want more than (Id, Name, Secondary).  Read-only.
-	Fields map[string]any
+	Fields    map[string]any
 }
 
 // GlobalSearch runs a multi-object FIND ... IN NAME FIELDS RETURNING
@@ -123,10 +109,6 @@ func GlobalSearchAlias(alias, term string, targets []GlobalSearchTarget, limit i
 	return c.GlobalSearch(term, targets, limit)
 }
 
-// buildGlobalSearchSOSL composes the FIND ... IN NAME FIELDS
-// RETURNING Obj1(F1, F2), Obj2(...) clause from targets.  The
-// fields list per target is deduped + sorted so the wire format
-// is deterministic (helps cache keys).
 func buildGlobalSearchSOSL(term string, targets []GlobalSearchTarget, limit int) string {
 	parts := make([]string, 0, len(targets))
 	for _, t := range targets {
@@ -154,8 +136,6 @@ func buildGlobalSearchSOSL(term string, targets []GlobalSearchTarget, limit int)
 			fields = append(fields, t.Secondary)
 			seen[t.Secondary] = true
 		}
-		// Deterministic ordering after Id + nameField so cache
-		// keys stay stable across map iteration.
 		rest := fields[2:]
 		sort.Strings(rest)
 		parts = append(parts, fmt.Sprintf("%s(%s)", t.Sobject, strings.Join(fields, ", ")))
@@ -168,9 +148,6 @@ func buildGlobalSearchSOSL(term string, targets []GlobalSearchTarget, limit int)
 	)
 }
 
-// sosjectTypeFromAttributes pulls the "type" out of the SF row's
-// attributes block: {"attributes": {"type": "Account", "url": ...}}.
-// Empty string when missing.
 func sosjectTypeFromAttributes(row map[string]any) string {
 	attrs, _ := row["attributes"].(map[string]any)
 	if attrs == nil {
@@ -188,10 +165,6 @@ func indexTargetsBySobject(targets []GlobalSearchTarget) map[string]GlobalSearch
 	return out
 }
 
-// stringifyField renders a raw JSON-decoded SF field value into the
-// human string the modal will show.  Numbers, bools, strings pass
-// through.  Nested objects (relationship traversals) flatten to
-// their .Name or .Id leaf.  Nil → "".
 func stringifyField(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -199,8 +172,6 @@ func stringifyField(v any) string {
 	case string:
 		return x
 	case float64:
-		// JSON decode produces float64 for all numerics; trim a
-		// trailing .0 so ints render cleanly.
 		if x == float64(int64(x)) {
 			return fmt.Sprintf("%d", int64(x))
 		}
@@ -297,12 +268,9 @@ func NameFieldFor(sobject string) string {
 // Asset, Quote, Entitlement, CollaborationGroup, Attachment, ...)
 // are also absent — the default "Name" fallback handles them.
 var systemSObjectNameFields = map[string]string{
-	// Activities — Subject is the canonical user-facing label.
 	"Task":  "Subject",
 	"Event": "Subject",
 
-	// Service Cloud — Subject for cases/emails, auto-numbers for
-	// work orders / appointments / contracts.
 	"Case":               "Subject",
 	"EmailMessage":       "Subject",
 	"WorkOrder":          "WorkOrderNumber",
@@ -312,7 +280,6 @@ var systemSObjectNameFields = map[string]string{
 	"ContractLineItem":   "LineItemNumber",
 	"Solution":           "SolutionName",
 
-	// Order / Contract / Returns — auto-numbers.
 	"Order":               "OrderNumber",
 	"OrderItem":           "OrderItemNumber",
 	"Contract":            "ContractNumber",
@@ -320,31 +287,22 @@ var systemSObjectNameFields = map[string]string{
 	"ReturnOrderLineItem": "ReturnOrderLineItemNumber",
 	"AssetRelationship":   "AssetRelationshipNumber",
 
-	// Content / Files — Title is the human label.
 	"ContentDocument": "Title",
 	"ContentVersion":  "Title",
 	"ContentNote":     "Title",
 	"Note":            "Title", // legacy notes (pre-Enhanced Notes)
 
-	// Chatter — FeedItem has a Body (Title is only populated for
-	// link/content posts), FeedComment is CommentBody.
 	"FeedItem":    "Body",
 	"FeedComment": "CommentBody",
 
-	// Case feed.
 	"CaseComment": "CommentBody",
 
-	// Ideas / Knowledge.
 	"Idea":           "Title",
 	"Knowledge__kav": "Title",
 
-	// Social / chat.
 	"SocialPost":         "Headline",
 	"LiveChatTranscript": "LiveChatTranscriptName",
 
-	// Junction / approval / audit objects that have NO meaningful
-	// label — explicit empty string so callers know to drop the
-	// name column entirely rather than try a fallback.
 	"ContentDocumentLink":     "",
 	"ProcessInstance":         "",
 	"ProcessInstanceStep":     "",

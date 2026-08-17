@@ -5,19 +5,6 @@ package ui
 // flows / reports) consult m.activeScope() during render to inject
 // the auto-pinned project chip; the user toggles load/unload via the
 // `_` key on /dev-projects.
-//
-// Ownership of state:
-//   orgData.LoadedDevProjectID — the persisted choice ("which dev
-//                                project is loaded for this org?").
-//   orgData.LoadedScope        — the hydrated lookup-friendly snapshot
-//                                of the project's items, filtered to
-//                                this org.
-// settings.toml stores the id, never the items — the items live in
-// the SQLite store and are refetched on load / re-hydrate.
-//
-// When the user K-collects an item into the loaded project, the
-// caller should also call m.refreshLoadedScope(d) so subsequent
-// renders see the addition without a sf-deck restart.
 
 import (
 	tea "charm.land/bubbletea/v2"
@@ -43,13 +30,6 @@ func (m Model) activeScope() *orgproject.Scope {
 	return d.LoadedScope
 }
 
-// loadDevProject sets the loaded dev-project id for the given org,
-// hydrates a Scope (filtered to that org's items), and persists the
-// choice. Empty id unloads (clears state + settings entry).
-//
-// Errors from the store are logged but not surfaced to the user as
-// a hard failure — the load completes with an empty Scope so the
-// rest of the UI doesn't get stuck. The user can retry.
 func (m *Model) loadDevProject(orgUser, devProjectID string, label string) {
 	if orgUser == "" {
 		return
@@ -58,9 +38,6 @@ func (m *Model) loadDevProject(orgUser, devProjectID string, label string) {
 	d.LoadedDevProjectID = devProjectID
 	if devProjectID == "" {
 		d.LoadedScope = nil
-		// Project mode on /reports doesn't make sense without a
-		// loaded project — drop the flag so the next /reports paint
-		// shows folders again rather than an empty list.
 		d.ReportsProjectMode = false
 	} else {
 		scope, err := orgproject.Hydrate(m.devProjects, devProjectID, orgUser, orgproject.ScopeOptions{
@@ -79,10 +56,6 @@ func (m *Model) loadDevProject(orgUser, devProjectID string, label string) {
 		m.settings.SetLoadedDevProjectForOrg(orgUser, devProjectID)
 		m.saveSettings("")
 	}
-	// Drop chip cursors back to 0 so when the user returns to a
-	// chip-shaped surface they land on the freshly-prepended project
-	// chip (now at index 0). On unload (devProjectID == ""), 0 just
-	// becomes whatever the first favourite is — also fine.
 	m.setObjectsChipIdx(0)
 	m.setFlowsChipIdx(0)
 	m.setRecordsChipIdx(0)
@@ -124,15 +97,6 @@ func (m *Model) refreshLoadedScope(d *orgData) {
 	m.compensateChipCursorsForPrepend(d, prev, scope)
 }
 
-// compensateChipCursorsForPrepend looks at each chip-bearing surface
-// and, for any kind where the project chip just transitioned from
-// hidden→visible, bumps that surface's chip cursor by +1 so the
-// user's previous selection stays under the cursor.
-//
-// Walks every chipSurface that exposes ScopeCount + a project-chip
-// predicate; bumps that surface's cursor by one when its scope just
-// transitioned from empty → non-empty. Records is exempt — its chip
-// strip is per-sObject and resets on subtab change anyway.
 func (m *Model) compensateChipCursorsForPrepend(d *orgData, prev, next *orgproject.Scope) {
 	if d == nil || next == nil {
 		return
@@ -153,12 +117,6 @@ func (m *Model) compensateChipCursorsForPrepend(d *orgData, prev, next *orgproje
 			surf.SetChipIdx(m, surf.ChipIdx(*m)+1)
 		}
 	}
-	// Re-apply the matcher for the active surface so the cursor's
-	// new position (potentially the freshly-prepended project chip)
-	// drives a fresh predicate. Without this the cursor visually
-	// lands on the project chip but the underlying ListView.Extra
-	// still holds whatever matcher the user had before — manifesting
-	// as "project chip selected, but list shows All."
 	m.applySelectedChipMatcher(d)
 }
 
@@ -188,13 +146,9 @@ func (m *Model) hydrateLoadedProjectFromSettings(d *orgData, orgUser string) {
 			"project": id,
 			"org":     orgUser,
 		})
-		// Keep id around so the user can re-load explicitly to
-		// clear / repair; only Scope is dropped.
 		return
 	}
 	if !scope.Loaded() {
-		// Stale id — project was deleted between sessions. Drop the
-		// settings entry so the next render doesn't re-attempt.
 		d.LoadedDevProjectID = ""
 		m.settings.SetLoadedDevProjectForOrg(orgUser, "")
 		m.saveSettings("")
@@ -203,12 +157,6 @@ func (m *Model) hydrateLoadedProjectFromSettings(d *orgData, orgUser string) {
 	d.LoadedScope = scope
 }
 
-// toggleLoadDevProject is the `_` keypress handler on /dev-projects.
-// Loads the cursored project for the active org, or unloads if it
-// was already loaded. No-op (with a flash) when nothing's cursored
-// or the dev-project store isn't open.
-//
-// Returns the (Model, tea.Cmd) pair the dispatcher expects.
 func (m Model) toggleLoadDevProject() (Model, tea.Cmd) {
 	if len(m.orgs) == 0 || m.devProjects == nil {
 		m.flash("can't load: no org or store")
@@ -221,7 +169,6 @@ func (m Model) toggleLoadDevProject() (Model, tea.Cmd) {
 	}
 	orgUser := m.orgs[m.selected].Username
 	d := m.ensureOrgData(orgUser)
-	// Toggle: pressing _ on the already-loaded project unloads it.
 	if d.LoadedDevProjectID == p.ID {
 		m.loadDevProject(orgUser, "", "")
 		m.flash("unloaded project")
@@ -237,11 +184,6 @@ func (m Model) toggleLoadDevProject() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// toggleReportsProjectMode flips the /reports surface's project-pin
-// activation. When ON: the report list shows only the loaded
-// project's reports, ignoring the folder breadcrumb. When OFF: the
-// strip's "All" / breadcrumb folders take over again. No-op when no
-// project is loaded — flashes a hint instead.
 func (m Model) toggleReportsProjectMode() (Model, tea.Cmd) {
 	if len(m.orgs) == 0 {
 		return m, nil
@@ -254,8 +196,6 @@ func (m Model) toggleReportsProjectMode() (Model, tea.Cmd) {
 	}
 	d.ReportsProjectMode = !d.ReportsProjectMode
 	if d.ReportsProjectMode {
-		// Reset the report-row cursor so we don't index past the new
-		// (smaller) list.
 		d.Cursors.Reset(cursorKindReportRow, "__project__")
 		m.flash("📁 " + scope.ProjectName)
 	} else {
@@ -264,11 +204,6 @@ func (m Model) toggleReportsProjectMode() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// projectRecordsChip synthesises a qchip.Chip whose Query selects
-// the records currently in the loaded project for the given sObject.
-// Returns ok=false when no project is loaded or the project has no
-// records for that sObject — caller should not fire a fetch in that
-// case (the strip wouldn't show the chip either; this is defensive).
 func (m Model) projectRecordsChip(d *orgData, sobject string) (qchip.Chip, bool) {
 	scope := m.activeScope()
 	if !scope.Loaded() {
@@ -291,14 +226,6 @@ func (m Model) projectRecordsChip(d *orgData, sobject string) (qchip.Chip, bool)
 	}, true
 }
 
-// visitedRecordsChip synthesises a qchip.Chip whose Query selects
-// the records the user has recently visited for the given sObject —
-// pulled from the merged sf-deck + Salesforce stream. Same shape
-// as projectRecordsChip; the visited-set IDs become a SOQL
-// `WHERE Id IN (...)` clause.
-//
-// Returns ok=false when there are no visited records for this
-// sObject, in which case callers don't fire a fetch.
 func (m Model) visitedRecordsChip(d *orgData, sobject string, orgUser string) (qchip.Chip, bool) {
 	visited := m.recentVisitedRecordIDs(orgUser, sobject)
 	if len(visited) == 0 {
@@ -317,17 +244,6 @@ func (m Model) visitedRecordsChip(d *orgData, sobject string, orgUser string) (q
 	}, true
 }
 
-// salesforceVisitedRecordsChip is the SF-mode counterpart of
-// visitedRecordsChip — produces a chip whose query selects the
-// records Salesforce considers recently viewed for this sObject.
-// Sources IDs from d.RecentlyViewed (the server-side payload)
-// only — does NOT include sf-deck's local visit log — so the
-// SF-mode chip reflects exactly what Lightning would show at
-// `/lightning/o/<X>/list?filterName=Recent`.
-//
-// Returns ok=false when SF reports no recently-viewed records for
-// this sObject (callers render an empty-state hint instead of
-// firing a doomed fetch).
 func (m Model) salesforceVisitedRecordsChip(d *orgData, sobject string, orgUser string) (qchip.Chip, bool) {
 	visited := m.salesforceVisitedRecordIDs(orgUser, sobject)
 	if len(visited) == 0 {
@@ -346,9 +262,6 @@ func (m Model) salesforceVisitedRecordsChip(d *orgData, sobject string, orgUser 
 	}, true
 }
 
-// loadedProjectLabel resolves the user-visible label for a dev
-// project: just the DevProject name. Used both at startup-hydrate
-// and load-toggle so the Scope's ProjectName is consistent.
 func loadedProjectLabel(store *devproject.Store, devProjectID string) string {
 	if store == nil || devProjectID == "" {
 		return ""

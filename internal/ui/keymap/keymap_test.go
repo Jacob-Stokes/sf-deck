@@ -44,7 +44,6 @@ func TestCollectKeysSplit(t *testing.T) {
 }
 
 func TestKeymapOverrideMerges(t *testing.T) {
-	// Write a temp config file; override only open_default + quit.
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "keybindings.toml")
 	body := `open_default = ["b"]
@@ -54,7 +53,6 @@ quit = ["Q"]
 		t.Fatal(err)
 	}
 
-	// Point the loader at tmp by swapping HOME.
 	originalHome := os.Getenv("HOME")
 	t.Cleanup(func() { os.Setenv("HOME", originalHome) })
 	os.Setenv("HOME", tmp)
@@ -78,7 +76,6 @@ quit = ["Q"]
 	if !keymap.Matches("Q", km.Quit) {
 		t.Errorf("override should have rebound quit to 'Q', got %v", km.Quit)
 	}
-	// Unmodified fields stay default.
 	if !keymap.Matches("ctrl+o", km.OpenMenu) {
 		t.Errorf("untouched open_menu should stay default, got %v", km.OpenMenu)
 	}
@@ -103,7 +100,6 @@ func TestKeymapMalformedFileWarns(t *testing.T) {
 	if !strings.Contains(warn, "parse") {
 		t.Errorf("warning should mention parse: %q", warn)
 	}
-	// Defaults should still be usable.
 	if !keymap.Matches("o", km.OpenDefault) {
 		t.Error("on parse failure defaults should remain")
 	}

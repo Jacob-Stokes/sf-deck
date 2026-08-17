@@ -23,7 +23,6 @@ func TestAsyncJobDrillSetsReturnTab(t *testing.T) {
 	m.orgs = []sf.Org{{Alias: "d", Username: "d@d.test", InstanceURL: "https://d.my.salesforce.com", Status: "Connected", LastUsed: time.Now().Format(time.RFC3339)}}
 	d := m.ensureOrgData("d@d.test")
 	m.setTab(TabSystem)
-	// Land on the Async Jobs subtab.
 	subs := systemSubtabs()
 	for i, s := range subs {
 		if s.ID == SubtabSystemAsyncJobs {
@@ -32,7 +31,6 @@ func TestAsyncJobDrillSetsReturnTab(t *testing.T) {
 	}
 	subBefore := m.systemSubtab()
 
-	// Seed one async job WITH an apex class under the cursor.
 	d.AsyncJobList.Set([]sf.AsyncJobRow{{ID: "707x", Status: "Completed", ApexClassID: "01px", ApexClassName: "MyBatch"}})
 
 	(&m).activateAsyncJob()
@@ -46,8 +44,6 @@ func TestAsyncJobDrillSetsReturnTab(t *testing.T) {
 	if back := d.DrillReturnTab[TabApexDetail]; back != TabSystem {
 		t.Errorf("expected DrillReturnTab[TabApexDetail]=TabSystem for esc-back, got %v", back)
 	}
-	// The subtab index is untouched → esc returning to /system lands on
-	// the same (Async Jobs) subtab.
 	if m.systemSubtab() != subBefore {
 		t.Errorf("drill must not change the system subtab index (was %d, now %d)", subBefore, m.systemSubtab())
 	}

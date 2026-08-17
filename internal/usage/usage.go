@@ -1,14 +1,5 @@
 package usage
 
-// Local API-call counter. Tracks how many times sf-deck has shelled out
-// to the sf CLI, broken down by day (local time). The TUI reads the
-// today-total from Today() and displays it in the header. Persisted to
-// SQLite so it survives restarts.
-//
-// Scope: this is sf-deck's *self-reported* call count. It isn't the same
-// as the org's DailyApiRequests (Salesforce-side), which counts every
-// API call across every tool/user against the org.
-
 import (
 	"database/sql"
 	"os"
@@ -20,8 +11,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// isRESTVerb reports whether the command tag is one of the HTTP verbs
-// the REST client emits (vs the sf CLI subcommand shape).
 func isRESTVerb(s string) bool {
 	switch s {
 	case "GET", "POST", "PATCH", "DELETE", "PUT":
@@ -30,36 +19,19 @@ func isRESTVerb(s string) bool {
 	return false
 }
 
-// bucketPath reduces a Salesforce REST path to a stable, low-cardinality
-// string so the calls table groups by endpoint shape rather than per-Id.
-// Examples:
-//
-//	/services/data/v62.0/sobjects/Account/describe
-//	  → sobjects/Account/describe
-//	/services/data/v62.0/tooling/query?q=…
-//	  → tooling/query
-//	/services/data/v62.0/sobjects/Account/listviews/00B…/results
-//	  → sobjects/Account/listviews/<id>/results
-//
-// The (sobject, listview-id, record-id) variants get squashed to "<id>"
-// so a screen that hammers one ID isn't double-counted across two
-// distinct rows.
 func bucketPath(p string) string {
 	q := strings.IndexByte(p, '?')
 	if q >= 0 {
 		p = p[:q]
 	}
-	// Strip the /services/data/vXX.0/ prefix.
 	if i := strings.Index(p, "/services/data/"); i >= 0 {
 		rest := p[i+len("/services/data/"):]
-		// rest = "v62.0/sobjects/..."
 		if j := strings.IndexByte(rest, '/'); j >= 0 {
 			rest = rest[j+1:]
 		}
 		p = rest
 	}
 	p = strings.TrimPrefix(p, "/")
-	// Replace 15/18-char Salesforce IDs with <id>.
 	parts := strings.Split(p, "/")
 	for i, seg := range parts {
 		if isSalesforceID(seg) {
@@ -69,7 +41,6 @@ func bucketPath(p string) string {
 	return strings.Join(parts, "/")
 }
 
-// isSalesforceID reports whether s looks like a 15/18-char SF Id.
 func isSalesforceID(s string) bool {
 	if len(s) != 15 && len(s) != 18 {
 		return false
@@ -93,21 +64,10 @@ type Call struct {
 	Args    []string // full argv, trimmed to something renderable
 	OK      bool
 	Err     string // err.Error() when OK=false
-	// Caller is the short "pkg.func" tag of the highest-level project
-	// frame that triggered the call (e.g. "sf.fetchHome",
-	// "ui.ensureActiveUsersChip"). Captured from the goroutine stack at
-	// Bump time; "" when no useful frame was found. Used by the API
-	// Call Log modal to attribute API traffic to fetchers / UI actions.
-	Caller string
-	// Dur is wall-clock latency from request start to fireOnCall, as
-	// measured at the REST/CLI call site. Zero when the call site
-	// didn't supply a duration.
-	Dur time.Duration
+	Caller  string
+	Dur     time.Duration
 }
 
-// recentBufferSize caps the ring-buffer length for the debug view.
-// 500 is enough to cover "what did the app just do" without eating
-// memory.
 const recentBufferSize = 500
 
 // Tracker is the on-disk counter. Safe for concurrent Bump() calls.
@@ -131,8 +91,6 @@ func Open() (*Tracker, error) {
 	return openAt(filepath.Join(dir, "usage.db"))
 }
 
-// openAt opens (or creates) a tracker DB at an explicit path. Used by
-// Open() with the default location and by tests with a temp file.
 func openAt(path string) (*Tracker, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -183,7 +141,6 @@ func migrate(db *sql.DB) error {
 		if name == "alias" {
 			hasAlias = true
 			if pk > 0 {
-				// Column exists AND is part of PK — current schema.
 				rows.Close()
 				return nil
 			}
@@ -267,12 +224,6 @@ func (t *Tracker) Bump(alias string, args []string, callErr error, dur time.Dura
 	if len(args) > 0 {
 		cmd = args[0]
 	}
-	// For REST calls (GET / POST / PATCH / DELETE) the second arg is
-	// the request path. We bucket the path down to a stable shape
-	// ("sobjects/Account/describe", "tooling/query", …) so the calls
-	// table groups by endpoint, which is the diagnosis question we
-	// keep needing to answer ("which surface is hammering?"). Falls
-	// back to the bare verb when args don't fit the REST shape.
 	if len(args) >= 2 && isRESTVerb(cmd) {
 		cmd = cmd + " " + bucketPath(args[1])
 	}
@@ -285,8 +236,6 @@ func (t *Tracker) Bump(alias string, args []string, callErr error, dur time.Dura
 		ON CONFLICT(day, alias, command, ok) DO UPDATE SET count = count + 1`,
 		day, alias, cmd, ok)
 
-	// Ring buffer for the recent-calls debug view. Memory only; fine
-	// to drop on process exit since this is a diagnostic aid.
 	entry := Call{
 		At:      time.Now(),
 		Alias:   alias,
@@ -317,7 +266,6 @@ func (t *Tracker) Recent() []Call {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	out := make([]Call, len(t.recent))
-	// Reverse-copy so index 0 is the newest call.
 	for i, c := range t.recent {
 		out[len(t.recent)-1-i] = c
 	}

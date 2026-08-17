@@ -28,7 +28,6 @@ func TestSystemSubtabDispatch(t *testing.T) {
 	m.width, m.height = 200, 60
 	m.setTab(TabSystem)
 
-	// subtab ID → a title fragment unique to that subtab's renderer.
 	wantTitle := map[Subtab]string{
 		SubtabSystemLogs:       "APEX LOGS",
 		SubtabSystemAudit:      "SETUP AUDIT",

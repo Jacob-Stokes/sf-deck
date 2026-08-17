@@ -29,7 +29,6 @@ func TestRecentlyViewedUniversalFiltersNoise(t *testing.T) {
 	if !strings.Contains(got, "WHERE Type NOT IN (") {
 		t.Fatalf("universal query should exclude noise types, got %q", got)
 	}
-	// Spot-check the headline offenders are in the exclusion list.
 	for _, noise := range []string{"FlowRecordElement", "OmniProcessElement", "FlowRecordVersion"} {
 		if !strings.Contains(got, "'"+noise+"'") {
 			t.Errorf("noise type %q should be excluded, got %q", noise, got)

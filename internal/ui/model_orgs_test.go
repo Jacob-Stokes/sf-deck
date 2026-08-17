@@ -59,15 +59,11 @@ func TestSelectedUsernameSurvivesReorder(t *testing.T) {
 		t.Fatalf("setup: want u@b, got %q", m.selectedUsername)
 	}
 
-	// Simulate a refetch where 'sf org list' returned a different order
-	// (e.g. LastUsed-driven shuffle in the old behaviour, or any future
-	// stable-but-different sort).
 	m.orgs = []sf.Org{
 		{Username: "u@c"},
 		{Username: "u@a"},
 		{Username: "u@b"}, // u@b moved from index 1 -> 2
 	}
-	// Re-anchor logic mirrors update.go's orgs Apply branch.
 	for i, o := range m.orgs {
 		if o.Username == m.selectedUsername {
 			m.selected = i

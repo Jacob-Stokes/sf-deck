@@ -1,16 +1,5 @@
 package ui
 
-// Keyboard dispatch. Three modes routed first-come-first-served:
-//
-//   1. Open-menu overlay visible → handleOpenMenuKey (see menu.go)
-//   2. SOQL editor active        → handleSOQLKey
-//   3. Search input active        → handleSearchInput
-//   4. Default                    → the big matches(key, Keys.X) switch
-//
-// Every shortcut resolves through the Keys struct (keymap.go), so user
-// overrides in ~/.sf-deck/keybindings.toml take effect without any
-// changes to this file.
-
 import (
 	"time"
 
@@ -38,36 +27,21 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	key := msg.String()
 
-	// /compare inventory side-panel preview keys (n/N hunk nav, f fetch a
-	// dropped body). Intercepted before the main switch so they win on the
-	// Result subtab when the preview is showing.
 	if next, cmd, handled := m.handleComparePreviewKey(key); handled {
 		return next, cmd
 	}
 
-	// Org quick-jump ultra-shortcut. While orgQuickJumpActive is set
-	// (the overlay is showing QWERTY letters next to each org row),
-	// the next keystroke is either:
-	//   - a quick-jump letter → select that org + return focus to
-	//     main + dismiss the overlay, all in one gesture; OR
-	//   - anything else → dismiss the overlay and fall through to
-	//     normal key handling so the user's gesture (j/k, esc,
-	//     scroll, etc.) does its usual thing.
-	// Either way, the overlay only lives until the next keystroke.
 	if m.orgQuickJumpActive {
 		m.orgQuickJumpActive = false
 		if idx := orgQuickJumpIndexFor(key); idx >= 0 && idx < len(m.orgs) {
 			(&m).setSelectedOrg(idx)
 			m.syncOrgRailCursorToSelected()
 			m.focus = focusMain
-			// Quick-jump picked an org and returned to main — collapse
-			// the transient rail like Enter-on-org does (unless pinned).
 			if !m.leftPinned {
 				m.leftOpen = false
 			}
 			return m, m.onOrgChanged()
 		}
-		// Fall through — normal dispatch handles this key.
 	}
 
 	// Leader key: q in normal-nav mode enters chord mode. This must run
@@ -93,12 +67,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// SOQL run cancel: ctrl+c while a SOQL is in flight aborts the
-	// HTTP request via the stored context-cancel func and bumps the
-	// run generation so any late-arriving result gets dropped.
-	// Modal returns to idle immediately; the server may keep
-	// running the query for a fraction of a second (REST path) or
-	// be cancelled cleanly (Bulk path's job-delete).
 	if m.soqlRunning && m.soqlCancel != nil && key == "ctrl+c" {
 		m.soqlCancel()
 		m.soqlCancel = nil
@@ -108,11 +76,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Bulk-export cancel: ctrl+c during a running Bulk-API job sends
-	// a cancel msg. The dispatcher calls the stored cancel func,
-	// which propagates to sf.BulkQuery and aborts the SF job. When
-	// no export is running this falls through to the global handlers
-	// below (so ctrl+c keeps its normal meaning elsewhere).
 	if (&m).Flight() != nil && key == "ctrl+c" {
 		return m, func() tea.Msg { return bulk.CancelMsg{} }
 	}
@@ -127,16 +90,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case matches(key, Keys.FocusOrgs):
-		// Jump to the Orgs utility in the left rail. If another utility
-		// is currently shown, switch to Orgs; if the widget pane is
-		// closed, open it. Focus moves to the left rail either way so
-		// j/k immediately move the org cursor.
-		//
-		// orgQuickJumpActive: arms the QWERTY ultra-shortcut overlay so
-		// the next keypress can be "q/w/e/…" to select an org directly
-		// AND return focus to main in one gesture. Cleared by any
-		// nav action below (move, page, scroll) and by the quick-jump
-		// dispatch itself.
 		m.focus = focusOrgs
 		m.leftUtilityIdx = orgsUtilityIdx()
 		m.leftOpen = true
@@ -181,8 +134,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.clearAllZenFlags()
 			return m, nil
 		}
-		// /compare Result Esc steps back within the results view:
-		// body-diff → inventory, inventory → New subtab (the setup form).
 		if m.tab() == TabCompare && m.currentSubtab() == SubtabCompareResult {
 			if d := m.activeOrgData(); d != nil && d.Run != nil {
 				if d.Diff != nil {
@@ -195,9 +146,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		// /reports has its own Esc semantics: when there's a folder
-		// path, pop one level. Only when AT root does Esc actually
-		// leave the tab (handled below via focus-fallback).
 		if m.onReportsBrowser() && len(m.orgs) > 0 {
 			d := m.ensureOrgData(m.orgs[m.selected].Username)
 			if d.ReportFolders != nil && d.ReportFolders.Path().Depth() > 0 {
@@ -205,11 +153,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		// Dynamic return-tab first: drillByKind stamps the originator
-		// onto d.DrillReturnTab so a drill from /home Recent (or
-		// future global search) returns to the originator instead of
-		// the detail tab's static stem.  Falls through to the static
-		// EscBack below when no dynamic return is recorded.
 		if d := m.activeOrgData(); d != nil && d.DrillReturnTab != nil {
 			if back, ok := d.DrillReturnTab[m.tab()]; ok && back != m.tab() {
 				delete(d.DrillReturnTab, m.tab())
@@ -217,11 +160,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.onTabChanged()
 			}
 		}
-		// Registry-first: tabs that declare an EscBack target in their
-		// TabSpec route here. Idiosyncratic tabs (TabRecords' picker/
-		// list duality, TabRecordDetail's per-context recordDetailReturnTab,
-		// TabPermParentDetail's FLS-drill nuance) keep their own logic
-		// below. New drill tabs only need EscBack populated.
 		if spec := lookupTabSpec(m.tab()); spec != nil && spec.EscBack != 0 {
 			m.setTab(spec.EscBack)
 			return m, m.onTabChanged()
@@ -247,24 +185,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.onTabChanged()
 		}
 		if m.tab() == TabRecordDetail {
-			// Drill-stack pop: when the user drilled record-to-record
-			// via Enter on a reference field, esc unwinds one level
-			// at a time. Once the stack is empty we fall through to
-			// the original returnTab.
 			if frame, ok := (&m).popRecordDrillStack(); ok {
 				d := m.activeOrgData()
 				if d != nil {
 					d.RecordDetailCur = frame.SObject + ":" + frame.ID
-					// Don't re-Ensure — the parent record is already
-					// cached from the original drill. Renderer reads
-					// from d.RecordDetails[…] directly.
 				}
 				return m, nil
 			}
 			back := m.recordDetailReturnTab
 			if back == TabRecordDetail {
-				// Defensive: don't loop back into the same tab.
-				// TabHome (== iota 0) is a valid return target.
 				back = TabRecords
 			}
 			m.setTab(back)
@@ -284,9 +213,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setTab(TabPerms)
 			return m, m.onTabChanged()
 		}
-		// /records has two modes (sObject picker → record list). Esc
-		// from the record list pops back to the picker; esc from the
-		// picker itself is a no-op (top level of the tab).
 		if m.tab() == TabRecords && len(m.orgs) > 0 {
 			d := m.ensureOrgData(m.orgs[m.selected].Username)
 			if d.RecordsSObjectCur != "" {
@@ -294,12 +220,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		// Top-level fallback: nothing to back out of. If a committed
-		// search is narrowing the current view, treat Esc as a clear —
-		// matches what users expect from VS Code / IntelliJ. Drill-in
-		// surfaces handled their own Esc above; this only fires when
-		// the user is already at the top of a tab. `C` still clears at
-		// any level (see Keys.SearchClear).
 		if cleared := m.clearCommittedSearch(); cleared {
 			return m, nil
 		}
@@ -308,11 +228,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matches(key, Keys.TogglePane):
 		if m.focus == focusOrgs {
 			m.focus = focusMain
-			// Collapse the rail on the way out unless the user pinned
-			// it open with `|`. Matches the auto-collapse on org-pick and
-			// tab-switch — a transient rail shouldn't linger once focus
-			// returns to the main panel. (This was the "opened it, went
-			// to main, it didn't disappear" inconsistency.)
 			if !m.leftPinned {
 				m.leftOpen = false
 			}
@@ -364,10 +279,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.moveCursor(-m.jumpRows())
 
 	case matches(key, Keys.PageDown):
-		// In paginated mode the renderer auto-tracks the cursor's
-		// page; PageDown still does its standard "jump cursor by
-		// pane height" — and the cursor crossing the boundary
-		// flips the page. Same key, no special handling.
 		return m.moveCursor(pageJump(m.height))
 
 	case matches(key, Keys.PageUp):
@@ -413,41 +324,28 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.triggerExportProject()
 
 	case matches(key, Keys.OpenBundles) && m.tab() == TabDevProjectDetail:
-		// Jump straight to the Bundles subtab on the per-project
-		// detail view — saves navigating with [/] when you already
-		// know that's where you want to be.
 		m.setDevProjectDetailSubtab(1)
 		return m, nil
 	case matches(key, Keys.OpenBundles) && m.tab() == TabDevProjects:
-		// Top-level /dev-projects: jump to the all-bundles subtab.
 		m.setDevProjectsSubtab(1)
 		return m, nil
 
 	case matches(key, Keys.CollectItem):
-		// ctrl+k: quick-collect to the loaded project (toggle), picker
-		// fallback when nothing is loaded.
 		return m, m.triggerCollect(false)
 
 	case matches(key, Keys.CollectItemPick):
-		// K: always open the picker to choose a project.
 		return m, m.triggerCollect(true)
 
 	case matches(key, Keys.OpenDevProjects):
-		// `-` opens the master dev-projects list. Right-rail nav pill
-		// always offers this affordance; pressing the key is the
-		// keyboard equivalent.
 		m.setTab(TabDevProjects)
 		m.focus = focusMain
 		return m, m.onTabChanged()
 
 	case matches(key, Keys.OpenTags):
-		// `#` opens the tag manager. Always available since the right-
-		// rail Tags pill is always present.
 		m.setTab(TabTags)
 		m.focus = focusMain
 		return m, m.onTabChanged()
 
-	// Tag manager actions — only on TabTags.
 	case matches(key, Keys.NewProject) && m.tab() == TabTags:
 		return m, m.triggerTagNew()
 	// Edit the cursored tag (name / colour / icon). Bound to `e`, NOT
@@ -461,16 +359,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.triggerTagDelete()
 
 	case matches(key, Keys.LoadOrgProject) && m.tab() == TabDevProjects:
-		// On the master list, `_` toggles load/unload for the cursored
-		// project — the only place where it makes sense to bind a
-		// project as the active org's loaded slot.
 		return m.toggleLoadDevProject()
 	case matches(key, Keys.LoadOrgProject):
-		// Anywhere else: jump to the loaded project's detail. The
-		// right-rail "_ <project-name>" pill is the visible affordance
-		// for this; pressing the key is the keyboard equivalent. No-op
-		// (with a flash) when nothing's loaded — the pill wouldn't be
-		// visible to suggest the binding in that state.
 		if scope := m.activeScope(); scope.Loaded() {
 			d := m.activeOrgData()
 			if d != nil && d.LoadedDevProjectID != "" {
@@ -540,9 +430,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return mm, cmd
 		}
 
-	// Shift+1..9: jump to subtab N-1 of the current tab. No-op when
-	// the current tab has ≤1 subtab — falls through (the typed shifted
-	// character won't match any later case for a list-shaped tab).
 	case matches(key, Keys.Subtab1):
 		return m.switchToSubtabIndex(0)
 	case matches(key, Keys.Subtab2):
@@ -605,9 +492,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// inline field editor would never fire.
 		return m.handleRecordEditEnter()
 
-	// /compare: `R` on an opened SAVED comparison's inventory re-runs it
-	// (fresh fetch) — the staleness banner's action. Live runs (no
-	// OpenedSavedAt) ignore it.
 	case key == "R" && m.tab() == TabCompare && m.currentSubtab() == SubtabCompareResult:
 		if d := m.activeOrgData(); d != nil && d.Run != nil &&
 			d.Run.Phase == comparePhaseInventory && d.Diff == nil && !d.Run.OpenedSavedAt.IsZero() {
@@ -616,9 +500,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// /compare: `e` on a loaded inventory (e.g. an opened saved
-	// comparison) drops to the prefilled setup form to edit + re-run.
-	// Placed before EditCurrentView (also `e`, When=list-table).
 	case key == "e" && m.tab() == TabCompare && m.currentSubtab() == SubtabCompareResult:
 		if d := m.activeOrgData(); d != nil && d.Run != nil &&
 			d.Run.Phase == comparePhaseInventory && d.Diff == nil {
@@ -626,10 +507,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// /compare Saved-subtab row actions — placed BEFORE EditCurrentView
-	// (also `e`, When=list-table) so they win on the compare Saved
-	// subtab, which is itself a list-table. ↵ open · e rerun/edit · d
-	// delete · t →template · rename (existing key).
 	case key == "e" && m.tab() == TabCompare && m.currentSubtab() == SubtabCompareSaved:
 		if d := m.activeOrgData(); d != nil {
 			return m, (&m).rerunEditSelected(d)
@@ -652,15 +529,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matches(key, Keys.EditCurrentView):
-		// `e` edits the underlying view definition — but only when
-		// the user has explicitly entered column-mode (`c`). Column-
-		// mode signals "I'm working on the table's structure", and
-		// editing the SOQL fits naturally there. Outside column-mode
-		// `e` falls through to its other surface-scoped meanings
-		// (SOQLEdit on /soql, ReportExport on /reports).
-		// e on a list-table edits the active chip's view definition.
-		// Falls through to SOQLEdit / ReportExport when no list-
-		// table is active OR no chip is editable on this surface.
 		if state := (&m).activeListTableState(); state != nil {
 			if cmd, handled := m.editActiveChip(); handled {
 				return m, cmd
@@ -672,16 +540,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.tab() == TabSOQL {
 			m.soqlEditing = true
 			m.soqlInput.Focus()
-			// Populate suggestions immediately so the popup isn't
-			// empty on first paint after entering edit mode.
 			m.autocompleteRefresh(&m.soqlSession)
 		}
 
 	case matches(key, Keys.SOQLToggleTooling) && m.tab() == TabSOQL:
 		m.soqlTooling = !m.soqlTooling
 		if m.soqlTooling && m.soqlBulk {
-			// Bulk API doesn't support Tooling queries — flip the
-			// other flag off so the next run resolves cleanly.
 			m.soqlBulk = false
 			m.flash("tooling api: on (bulk off — bulk doesn't support tooling)")
 		} else {
@@ -729,8 +593,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matches(key, Keys.ExecRename) && m.tab() == TabExec && m.currentSubtab() == SubtabExecSaved:
 		return m.handleExecRename()
 
-	// --- /compare contextual keys (placed before the generic subtab-
-	// cycle cases so they intercept [ / ] while the body diff is open) ---
 	case key == "u" && m.tab() == TabCompare && m.compareDiffOpen():
 		if d := m.activeOrgData(); d != nil && d.Diff != nil {
 			d.Diff.Unified = !d.Diff.Unified
@@ -747,65 +609,42 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case key == "ctrl+s" && m.tab() == TabCompare && m.currentSubtab() == SubtabCompareResult:
-		// On the Result subtab ctrl+s saves the whole comparison WITH its
-		// data (the result is shown there).
 		if d := m.activeOrgData(); d != nil && d.Run != nil &&
 			d.Run.Phase == comparePhaseInventory && d.Diff == nil {
 			return m, (&m).saveCurrentComparison(d)
 		}
 		return m, nil
 	case key == "ctrl+s" && m.tab() == TabCompare && m.currentSubtab() == SubtabCompareNew:
-		// On the setup form ctrl+s saves a data-less template (recipe).
 		if d := m.activeOrgData(); d != nil {
 			return m, (&m).saveCurrentCompareAsTemplate(d)
 		}
 		return m, nil
 
 	case matches(key, Keys.SOQLSave) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLEditor:
-		// Save the current editor body as a SavedQuery. Only on the
-		// Editor subtab — on Saved/History the same key would
-		// silently save the EDITOR's body while the user thinks
-		// they're acting on the cursored row.
-		// Uses the
-		// query body itself as the default name (collapsed) — the
-		// user can rename via the Library later. Future: open a
-		// modal to capture name + description before saving.
 		return m.handleSOQLSave()
 
 	case matches(key, Keys.SOQLDelete) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLSaved:
-		// Delete the cursored Saved query.
 		return m.handleSOQLLibraryDelete()
 
 	case matches(key, Keys.SOQLDuplicate) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLSaved:
-		// Duplicate the cursored Saved query as "Copy of …".
 		return m.handleSOQLDuplicate()
 
 	case matches(key, Keys.SOQLRename) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLSaved:
-		// R — rename / edit description of the cursored Saved query.
 		return m.handleSOQLRename()
 
 	case matches(key, Keys.FlowRename) && m.tab() == TabFlowDetail:
-		// e — rename the flow's display label (metadata write).
 		return m.handleFlowRename()
 
 	case matches(key, Keys.FlowVersionDelete) && m.tab() == TabFlowDetail:
-		// D — delete the cursored inactive flow version (metadata write).
 		return m.handleFlowVersionDelete()
 
 	case matches(key, Keys.SOQLSaveAs) && m.tab() == TabSOQL:
-		// shift+S — always save as new, even if editor holds a
-		// loaded saved query. The duplicate-then-modify flow.
 		return m.handleSOQLSaveAs()
 
 	case matches(key, Keys.SOQLExport) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLEditor:
-		// x — export current results. Only valid on the Editor
-		// subtab where soqlResult holds the rows.
 		return m.triggerSOQLExport()
 
 	case matches(key, Keys.RecordsExport) && m.recordsExportSurfaceActive():
-		// x on a records-shaped surface (TabRecords list mode,
-		// TabObjectDetail records subtab, TabUsers · All users)
-		// — opens the format/path picker for the active list.
 		return m.triggerRecordsExport()
 
 	case matches(key, Keys.SOQLYankCell) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLEditor:
@@ -814,11 +653,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSOQLYankCell()
 
 	case matches(key, Keys.SOQLYankRow) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLEditor:
-		// Y — copy cursored row as TSV.
 		return m.handleSOQLYankRow()
 
 	case matches(key, Keys.SOQLYankColumn) && m.tab() == TabSOQL && m.currentSubtab() == SubtabSOQLEditor:
-		// ctrl+y — copy column as ('id1',…) IN-clause-ready string.
 		return m.handleSOQLYankColumn()
 
 	case matches(key, Keys.FilterCycle):
@@ -827,9 +664,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.cycleChip(+1)
 
 	case matches(key, Keys.NextView):
-		// Dev-project detail's Items subtab has its own kind-filter
-		// chip strip — intercept before falling through to the
-		// generic chip-system cycler.
 		if m.tab() == TabDevProjectDetail && m.currentSubtab() == SubtabDevProjectItems {
 			return m.cycleDevProjectKindChip(+1)
 		}
@@ -856,9 +690,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.cycleChip(-1)
 
 	case matches(key, Keys.NextSubtab):
-		// SidebarFocusable tabs have no subtab strip; Tab swaps focus
-		// between the main pane and the sidebar action menu so j/k/
-		// Enter route to whichever pane is active.
 		if spec := lookupTabSpec(m.tab()); spec != nil && spec.SidebarFocusable {
 			m.bodyFocus = !m.bodyFocus
 			return m, nil
@@ -872,11 +703,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.cycleSubtab(-1)
 
 	case matches(key, Keys.ToggleProjectScope) && m.tab() == TabDevProjectDetail:
-		// Toggle "this org / all orgs" view of the project's items.
 		m.devProjectShowAllOrgs = !m.devProjectShowAllOrgs
-		// Kind-chip filter reset — the visible item set just shifted
-		// (different orgs contribute different kinds), so the cursor
-		// could be pointing at a now-empty chip.
 		m.devProjectKindChip = ""
 		m.devProjectKindChipCursor = 0
 		m.reloadDevProjectItems()
@@ -889,9 +716,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.queryLineHidden = !m.queryLineHidden
 
 	case matches(key, Keys.CommandPalette):
-		// Global fuzzy-find. Walks tabSpecs() + paletteCommands to
-		// build the entry list — new tabs/commands appear here for
-		// free without per-feature wiring.
 		mm := m
 		cmd := mm.openCommandPalette()
 		return mm, cmd
@@ -908,16 +732,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matches(key, Keys.LensModeToggle): // historical name; toggles ChipMode
-		// Toggle sf-deck lenses ↔ Salesforce list-views on the active
-		// records-shaped surface. No-op on other tabs.
 		return m.toggleChipMode()
 
 	case matches(key, Keys.OpenLensManager):
-		// V opens the unified chip manager. Resolves the domain +
-		// title via the active chipSurface (registry-driven) so new
-		// chip-bearing tabs don't need a hardcoded case here.
-		// Records is the only bespoke fallback — its scope is
-		// per-sObject and doesn't fit the standard surface contract.
 		if surf := m.resolveChipSurface(); surf != nil {
 			return m, m.openChipManagerFor(
 				surf.Domain,
@@ -940,10 +757,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.tab() == TabObjectDetail && m.currentSubtab() == SubtabSchema {
 			return m, m.openSchemaChipOverflow()
 		}
-		// M opens the "+ N more…" chip picker — every non-favourite
-		// chip applicable to the active surface. Picks land on the
-		// strip as a transient (distinct style); F pins to favourites.
-		// Same registry-driven resolution as V; same Records fallback.
 		if surf := m.resolveChipSurface(); surf != nil {
 			return m, m.openChipOverflowFor(surf.Domain, surfaceManagerScope(*surf, m))
 		}
@@ -984,10 +797,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matches(key, Keys.SearchStart):
 		if m.focus == focusMain {
 			if s := m.currentSearch(); s != nil {
-				// Anchor the pre-search cursor BEFORE flipping flags —
-				// only on the not-applied → active transition, so re-
-				// pressing / while a filter is up doesn't trample the
-				// original anchor with the filtered cursor.
 				if !s.Applied() {
 					m.captureRecordsCursorAnchor()
 				}
@@ -1008,10 +817,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sidebarOpen = !m.sidebarOpen
 
 	case matches(key, Keys.ToggleSidebarStacked):
-		// Stacked mode only makes sense when the sidebar is OPEN —
-		// flipping the flag while the sidebar is hidden does nothing
-		// visible. Auto-open the sidebar on the first toggle so the
-		// gesture always has visible effect.
 		if !m.sidebarOpen {
 			m.sidebarOpen = true
 		}
@@ -1025,23 +830,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, (&m).openKeybindingsModal()
 
 	case matches(key, Keys.InspectPanel):
-		// Full sidebar/context info in a modal — the escape hatch
-		// behind the "⚠ truncated" warning when the panel is too short.
 		if modal, ok := m.inspectModalForCurrentView(); ok {
 			m.showInfoModal(modal)
 		}
 
 	case matches(key, Keys.ToggleLeft):
 		m.leftOpen = !m.leftOpen
-		// `|` is the explicit pin/unpin toggle. When opening, mark
-		// pinned so transient close-on-action paths (org-pick,
-		// tab-switch) leave the rail alone. When closing, clear
-		// the pin so the next transient open isn't sticky.
 		m.leftPinned = m.leftOpen
 		if !m.leftOpen && m.focus == focusOrgs {
-			// Closing the widget pane while focused on it kicks focus
-			// back to main so j/k doesn't keep eating keystrokes
-			// invisibly. The icon strip is still visible either way.
 			m.focus = focusMain
 		}
 
@@ -1052,14 +848,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.requestOpenMenu(menuOpen)
 
 	case matches(key, Keys.YankDefault) && m.tab() == TabFlowVersionDetail:
-		// On the flow-version viewer y yanks the definition JSON, not
-		// the record URL (that's what o / the open menu are for).
 		return m, m.yankFlowVersionDefinition()
 
 	case matches(key, Keys.YankDefault) && m.tab() == TabFieldDetail:
-		// On a picklist VALUE row, plain y yanks that single value.
-		// Elsewhere on the field detail, fall through to the normal
-		// URL yank (ctrl+y still offers the whole value sub-menu).
 		if v, ok := m.cursoredFieldDetailYankValue(); ok {
 			m.flash("copied: " + ansiTrunc(v, 40))
 			return m, yankValueCmd(v)
@@ -1073,9 +864,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.requestOpenMenu(menuYank)
 
 	case matches(key, Keys.ColScrollL):
-		// /dev-project-detail tree uses ←/h to collapse the cursored
-		// row. No list-table on that surface, so ColScroll falls
-		// through to the tree-collapse handler instead of no-op.
 		if m.tab() == TabDevProjectDetail {
 			if mm, handled := m.collapseCursoredDevProjectRow(); handled {
 				return mm, nil
@@ -1113,20 +901,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd := m.openTagPickerForCursored(); cmd != nil {
 			return m, cmd
 		}
-		// Modal is non-cmd-returning; the open call mutates state.
 		return m, nil
 	case matches(key, Keys.TagAll):
-		// Bulk: tag every row of the current filtered view. Only on
-		// surfaces that expose per-row identities; the rest flash a
-		// hint instead of silently doing nothing.
 		return m.openBulkTagPickerForVisible()
 	case matches(key, Keys.TagColumn):
 		if m.settings == nil {
 			return m, nil
 		}
-		// 3-state cycle: compact (dots) → expanded (pills) → hidden →
-		// back to compact. Flash messages so the user sees what they
-		// just landed on.
 		var next, msg string
 		switch m.settings.TagColumnDisplayMode() {
 		case settings.TagColumnModeCompact:
@@ -1158,7 +939,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.settings == nil {
 			return m, nil
 		}
-		// 3-state cycle: letter → full → hidden → letter.
 		var next, msg string
 		switch m.settings.FlagColumnDisplayMode() {
 		case settings.FlagColumnModeLetter:

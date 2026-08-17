@@ -1,30 +1,6 @@
 package ui
 
 // Generic action-registry core.
-//
-// Five TabXxxDetail surfaces (field / object / validation rule /
-// record type / trigger) share the same UX: a right-sidebar menu of
-// actions on the drilled-in entity; selecting one opens an edit or
-// choice modal; save commits via the sf package. The plumbing is
-// almost identical per entity — only the entity identity + the
-// underlying PATCH/deploy helper change.
-//
-// This file owns the generic half of that pattern. Each entity file
-// only needs to:
-//
-//   1. Define a Ctx struct (the per-selection snapshot — alias,
-//      sobject, drilled entity, parent Resource, cache).
-//   2. Implement a ContextBuilder that resolves the current Model
-//      state into a Ctx (with safety gate + flash reasons baked in).
-//   3. Declare its actions as Action[Ctx] values using NewTextAction,
-//      NewBooleanAction, or inline Start closures for one-off cases
-//      (delete, complex confirmations).
-//   4. Call StartAction(m, registry, index) from its update_nav
-//      activate branch.
-//
-// No more "per-entity variants of newTextAction + savePatch +
-// loadCurrent + refreshX" — the helpers below close over the Ctx
-// type via generics.
 
 import (
 	"context"
@@ -45,12 +21,9 @@ type Action[Ctx any] struct {
 	// ID is a stable string used for debugging and (eventually)
 	// user-configurable action pinning. Must be unique within one
 	// entity's action list.
-	ID string
-	// Label is the left-side text shown in the sidebar menu.
+	ID    string
 	Label string
-	// Hint is the one-line subtitle rendered under the label when
-	// the cursor is on this action + reused as the modal subtitle.
-	Hint string
+	Hint  string
 	// Kind is the safety-level this action writes under. The
 	// sidebar dims + unclickable for actions the org's safety
 	// policy blocks.
@@ -60,24 +33,15 @@ type Action[Ctx any] struct {
 	// to the safety gate). Typical use: "only on custom entities",
 	// "needs a drill-in target first", etc.
 	Disabled func(Ctx) (bool, string)
-	// Start opens whatever modal the action needs and returns the
-	// tea.Cmd to fire. Nil = no-op (placeholder actions).
-	Start func(m *Model, ctx Ctx) tea.Cmd
+	Start    func(m *Model, ctx Ctx) tea.Cmd
 }
 
 // ActionRegistry is the entity-specific bundle that update_nav's
 // activate path calls into. All five entities implement this shape
 // with their own Ctx.
 type ActionRegistry[Ctx any] struct {
-	// BuildContext resolves the Model into a typed Ctx, or returns
-	// (_, false, reason) if preconditions aren't met. Reason is
-	// flashed to the user. Lets each entity own "do we have a
-	// drilled thing + cached state + …" checks.
 	BuildContext func(m Model) (Ctx, bool, string)
-	// Actions returns the action list for the current Ctx. Called
-	// during both sidebar rendering (to show the menu) and
-	// activation (to fire the selected action).
-	Actions func(ctx Ctx) []Action[Ctx]
+	Actions      func(ctx Ctx) []Action[Ctx]
 }
 
 // StartAction is the single dispatcher used by every drill tab's
@@ -154,36 +118,18 @@ func RegistryRows[Ctx any](m Model, reg ActionRegistry[Ctx]) []actionRow {
 // common shapes (string-field edit, boolean toggle) are generic over
 // Ctx so each entity gets them for free.
 type TextActionSpec[Ctx any] struct {
-	ID        string
-	Label     string
-	Hint      string
-	Multiline bool
-	// Title builds the modal title for a given ctx (e.g.
-	// "Account.Name  —  Edit label").
-	Title func(ctx Ctx) string
-	// SuccessFlash is the banner shown after a successful commit.
+	ID           string
+	Label        string
+	Hint         string
+	Multiline    bool
+	Title        func(ctx Ctx) string
 	SuccessFlash func(ctx Ctx) string
-	// InitialBody synchronously returns the current value to
-	// pre-populate the editor. nil means "use LoadCurrent".
-	InitialBody func(ctx Ctx) string
-	// LoadCurrent is the async loader fired when the modal opens;
-	// used for entities whose current value isn't in the describe
-	// (e.g. CustomField.description). Ignored when InitialBody is
-	// non-nil.
-	LoadCurrent func(ctx Ctx) func() (string, error)
-	// Save commits the new value. Returns an error the modal
-	// renders; nil = success. Preview/baseline arg is passed
-	// through from the editModalState contract.
-	Save func(ctx Ctx, val string, baseline any) error
-	// Preview, if set, shows a diff before commit (Metadata API
-	// flow). nil = commit directly.
-	Preview func(ctx Ctx, val string) (PreviewResult, error)
-	// OnSuccess is the post-save refresh — typically the relevant
-	// Resource.Refresh + detail-refresh cmd.
-	OnSuccess func(ctx Ctx) tea.Cmd
-	// Disabled mirrors Action.Disabled but is baked into the spec
-	// for declaration-site convenience.
-	Disabled func(Ctx) (bool, string)
+	InitialBody  func(ctx Ctx) string
+	LoadCurrent  func(ctx Ctx) func() (string, error)
+	Save         func(ctx Ctx, val string, baseline any) error
+	Preview      func(ctx Ctx, val string) (PreviewResult, error)
+	OnSuccess    func(ctx Ctx) tea.Cmd
+	Disabled     func(Ctx) (bool, string)
 	// Kind defaults to WriteMetadata; override for destructive
 	// actions.
 	Kind settings.WriteKind
@@ -247,18 +193,13 @@ func NewTextAction[Ctx any](spec TextActionSpec[Ctx]) Action[Ctx] {
 // any so entities can pass bool OR string — some Salesforce
 // attributes take "Active"/"Inactive" strings, not booleans.
 type BooleanActionSpec[Ctx any] struct {
-	ID    string
-	Label string
-	Hint  string
-	Title func(ctx Ctx) string
-	// TrueOption / FalseOption describe the two choice rows.
-	TrueOption  ChoiceOpt
-	FalseOption ChoiceOpt
-	// Current returns the current state — drives the default
-	// cursor position. nil = default to False.
-	Current func(ctx Ctx) bool
-	// Save commits the picked option's Value. Callers typically
-	// dispatch on val.(bool) or val.(string).
+	ID           string
+	Label        string
+	Hint         string
+	Title        func(ctx Ctx) string
+	TrueOption   ChoiceOpt
+	FalseOption  ChoiceOpt
+	Current      func(ctx Ctx) bool
 	Save         func(ctx Ctx, val any) error
 	SuccessFlash func(ctx Ctx) string
 	OnSuccess    func(ctx Ctx) tea.Cmd
@@ -335,13 +276,9 @@ type DestructiveActionSpec[Ctx any] struct {
 	Title        func(ctx Ctx) string
 	ConfirmHint  string // rendered next to the "Delete permanently" row
 	SuccessFlash func(ctx Ctx) string
-	// Save is the destroy call. Returns non-nil error = modal stays
-	// open with the error.
-	Save func(ctx Ctx) error
-	// OnSuccess is the post-delete pop-back + list refresh. Almost
-	// always a xxxPoppedMsg that Update handles.
-	OnSuccess func(ctx Ctx) tea.Cmd
-	Disabled  func(Ctx) (bool, string)
+	Save         func(ctx Ctx) error
+	OnSuccess    func(ctx Ctx) tea.Cmd
+	Disabled     func(Ctx) (bool, string)
 }
 
 // NewDestructiveAction builds an Action that opens a "cancel or
@@ -463,10 +400,6 @@ func ToolingDelete[Ctx any](
 	}
 }
 
-// actionTitleFor is a tiny helper entity files use to build
-// "<sobject>/<entity>  —  <label>" titles without string-fragment
-// repetition. Sobject + EntityLabel become the left side;
-// actionLabel becomes the right.
 func actionTitleFor(sobject, entityLabel, actionLabel string) string {
 	left := sobject
 	if entityLabel != "" {

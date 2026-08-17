@@ -6,14 +6,12 @@ import (
 )
 
 func TestPrettyXMLReflowsSingleLine(t *testing.T) {
-	// A field def as readMetadata returns it: all on one line.
 	in := `<fullName>Destination_Risk_Rating__c</fullName><label>Destination Risk Rating</label><required>false</required><type>Picklist</type>`
 	out := PrettyXML(in)
 	lines := strings.Split(out, "\n")
 	if len(lines) != 4 {
 		t.Fatalf("expected 4 leaf lines, got %d:\n%s", len(lines), out)
 	}
-	// Each leaf on its own line, content intact.
 	wantContain := []string{"<fullName>Destination_Risk_Rating__c</fullName>",
 		"<label>Destination Risk Rating</label>", "<type>Picklist</type>"}
 	for _, w := range wantContain {
@@ -33,8 +31,6 @@ func TestPrettyXMLIndentsContainers(t *testing.T) {
 	in := `<records><fullName>X</fullName><fields><fullName>F</fullName><type>Text</type></fields></records>`
 	out := PrettyXML(in)
 	lines := strings.Split(out, "\n")
-	// <records> opens (depth 0), children indented (depth 1), nested
-	// <fields> opens (depth 1) with its children at depth 2.
 	var fieldLine, fIndent string
 	for _, l := range lines {
 		if strings.Contains(l, "<fields>") {
@@ -60,8 +56,6 @@ func TestPrettyXMLLeavesMultilineAlone(t *testing.T) {
 }
 
 func TestPrettyXMLMakesDiffAlign(t *testing.T) {
-	// Two field defs differing only in <label> — pretty-printed, the
-	// diff should be ONE changed line, not whole-component.
 	a := `<fullName>F</fullName><label>Old</label><type>Text</type>`
 	b := `<fullName>F</fullName><label>New</label><type>Text</type>`
 	res := Text(PrettyXML(a), PrettyXML(b))

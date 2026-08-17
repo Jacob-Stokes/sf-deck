@@ -1,13 +1,5 @@
 package ui
 
-// Saved-comparison serialization — converts an in-memory compareRun
-// (snapshots + inventory) to/from the gzipped-JSON blob stored in
-// devprojects.db (see internal/devproject/saved_comparisons.go).
-//
-// The store keeps the blob opaque; this is where the diff-domain types
-// get marshalled. diff.Inventory.Errors carries a non-serializable
-// `error`, so we project to a string-only persisted shape.
-
 import (
 	"bytes"
 	"compress/gzip"
@@ -20,10 +12,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/diff"
 )
 
-// comparePayload is the JSON shape inside the gzipped blob. snapA/snapB
-// are the retrieved source (type → name → XML); Rows is the inventory.
-// Errors are flattened to strings (the live error values don't persist
-// and aren't needed once retrieval is done).
 type comparePayload struct {
 	Version int           `json:"version"`
 	SnapA   diff.Snapshot `json:"snapA"`
@@ -34,8 +22,6 @@ type comparePayload struct {
 
 const comparePayloadVersion = 1
 
-// serializeCompareRun gzips the run's snapshots + inventory into the
-// blob stored alongside the scalar columns.
 func serializeCompareRun(run *compareRun) ([]byte, error) {
 	var errs []string
 	for _, e := range run.Inv.Errors {
@@ -63,9 +49,6 @@ func serializeCompareRun(run *compareRun) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// deserializeCompareRun rebuilds a compareRun (inventory phase, ready to
-// browse offline) from a stored SavedComparison. The reconstructed run
-// has snapA/snapB so drill-in diffs work with no API calls.
 func deserializeCompareRun(sc devproject.SavedComparison) (*compareRun, error) {
 	gz, err := gzip.NewReader(bytes.NewReader(sc.Blob))
 	if err != nil {
@@ -93,7 +76,6 @@ func deserializeCompareRun(sc devproject.SavedComparison) (*compareRun, error) {
 	return run, nil
 }
 
-// splitScope parses the comma-joined scope column back to a slice.
 func splitScope(s string) []string {
 	if strings.TrimSpace(s) == "" {
 		return nil

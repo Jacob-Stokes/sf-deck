@@ -1,26 +1,11 @@
 package ui
 
-// Info panels using the shared sidebar shape: kv-panel, tag/project sections
-// where collectable, and a footer hint.
-//
-// Covered here:
-//   /users              (TabUsers)              — sidebarUsers
-//   /components          (TabLWC)               — sidebarComponents (LWC / Aura)
-//   /component detail    (TabLWCDetail)         — sidebarComponentsDetail
-//   /meta hub            (TabMeta)              — sidebarMetaHub
-//   /meta-type detail    (TabMetaTypeDetail)    — sidebarMetaTypeDetail
-//   /queue detail        (TabQueueDetail)       — sidebarQueueDetail
-//   /public-group detail (TabPublicGroupDetail) — sidebarPublicGroupDetail
-
 import (
 	"fmt"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 )
 
-// ---- /users -----------------------------------------------------------
-
-// sidebarUsers renders the cursored user's card in the right pane.
 func (m Model) sidebarUsers(inner int) string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -53,10 +38,6 @@ func (m Model) sidebarUsers(inner int) string {
 	return renderKVPanel(inner, u.Name, rows, extra...)
 }
 
-// ---- /apex-class detail -----------------------------------------------
-
-// sidebarApexDetail shows the drilled Apex class's metadata — same card
-// as the /apex list sidebar, resolved from the drilled ApexCur id.
 func (m Model) sidebarApexDetail(inner int) string {
 	d := m.activeOrgData()
 	if d == nil || d.ApexCur == "" {
@@ -64,8 +45,6 @@ func (m Model) sidebarApexDetail(inner int) string {
 	}
 	a, ok := apexListRowFor(d, d.ApexCur)
 	if !ok {
-		// Row not in the list cache (e.g. drilled from search) — show
-		// what we have.
 		return renderKVPanel(inner, d.ApexCur,
 			[]kv{{"id", d.ApexCur}},
 			"", sideDim("  ↵ open body · esc back", inner))
@@ -82,9 +61,6 @@ func (m Model) sidebarApexDetail(inner int) string {
 		rows = append(rows, kv{"api version", fmt.Sprintf("v%.1f", a.ApiVersion)})
 	}
 	if a.LengthNoComments > 0 {
-		// LengthWithoutComments is a CHARACTER count (body minus
-		// comments), not a line count — show it as a size, with the
-		// exact figure alongside the compact form.
 		rows = append(rows, kv{"size", fmt.Sprintf("%s (%d chars)", compactChars(a.LengthNoComments), a.LengthNoComments)})
 	}
 	if a.LastModifiedDate != "" {
@@ -99,10 +75,6 @@ func (m Model) sidebarApexDetail(inner int) string {
 		devproject.KindApexClass, a.ID, o.Username, rows, extra...)
 }
 
-// ---- /components (LWC + Aura) -----------------------------------------
-
-// sidebarComponents dispatches to the LWC or Aura sidebar based on the
-// active subtab.
 func (m Model) sidebarComponents(inner int) string {
 	switch m.currentSubtab() {
 	case SubtabComponentsAura:
@@ -189,8 +161,6 @@ func (m Model) sidebarAuraBundle(inner int) string {
 		devproject.KindAura, b.ID, o.Username, rows, extra...)
 }
 
-// componentExtra builds the shared tag/project sections + footer hint
-// for LWC/Aura bundle sidebars.
 func (m Model) componentExtra(kind devproject.ItemKind, id, orgUser string, inner int, drillNoun string) []string {
 	var extra []string
 	extra = append(extra, m.sidebarTagsProjectsExtra(kind, id, orgUser, inner)...)
@@ -199,16 +169,11 @@ func (m Model) componentExtra(kind devproject.ItemKind, id, orgUser string, inne
 	return extra
 }
 
-// ---- /component detail ------------------------------------------------
-
-// sidebarComponentsDetail shows the drilled bundle's resource count +
-// metadata. Reads whichever of LWC/Aura detail is loaded for LWCCur.
 func (m Model) sidebarComponentsDetail(inner int) string {
 	d := m.activeOrgData()
 	if d == nil || d.LWCCur == "" {
 		return sideEmpty("no component drilled in")
 	}
-	// Aura detail wins when present for this id, else LWC.
 	if d.AuraDetail != nil {
 		if det, ok := d.AuraDetail[d.LWCCur]; ok && det != nil {
 			v := det.Value()
@@ -255,9 +220,6 @@ func (m Model) sidebarComponentsDetail(inner int) string {
 	return sideEmpty("loading…")
 }
 
-// ---- /meta hub --------------------------------------------------------
-
-// sidebarMetaHub shows the cursored metadata type's describe info.
 func (m Model) sidebarMetaHub(inner int) string {
 	d := m.activeOrgData()
 	if d == nil {
@@ -281,10 +243,6 @@ func (m Model) sidebarMetaHub(inner int) string {
 	return renderKVPanel(inner, t.XMLName, rows, extra...)
 }
 
-// ---- /meta-type detail ------------------------------------------------
-
-// sidebarMetaTypeDetail shows the drilled metadata type + its component
-// count.
 func (m Model) sidebarMetaTypeDetail(inner int) string {
 	d := m.activeOrgData()
 	if d == nil || d.MetaTypeCur == "" {
@@ -302,10 +260,6 @@ func (m Model) sidebarMetaTypeDetail(inner int) string {
 	return renderKVPanel(inner, d.MetaTypeCur, rows, extra...)
 }
 
-// ---- /queue + /public-group detail ------------------------------------
-
-// sidebarQueueDetail / sidebarPublicGroupDetail render the drilled
-// group's metadata + resolved member count.
 func (m Model) sidebarQueueDetail(inner int) string {
 	return m.sidebarGroupDetail(inner, "Queue")
 }
@@ -328,11 +282,9 @@ func (m Model) sidebarGroupDetail(inner int, parentLabel string) string {
 		{"id", id},
 		{"type", parentLabel},
 	}
-	// Resolved member count from the loaded members resource.
 	if res := d.GroupMembers[id]; res != nil && !res.FetchedAt().IsZero() {
 		rows = append(rows, kv{"members", fmt.Sprintf("%d", len(res.Value()))})
 	}
-	// Queue-specific extras from the parent list row.
 	if d.GroupMemberKind == "queue" {
 		for _, q := range d.QueueList.Items() {
 			if q.ID == id {

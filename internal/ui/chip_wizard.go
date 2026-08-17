@@ -3,21 +3,6 @@ package ui
 // Chip wizard — multi-field form modal that produces a query.Query
 // directly. Replaces the old filter wizard (which authored a flat
 // filter.Spec).
-//
-// Two modes share the same modal:
-//
-//	Simple   — flat row-per-field form. Each filled row becomes an
-//	           AND clause. This is what most users want most of the time.
-//	Advanced — a SOQL WHERE editor. Lets the user write a freeform
-//	           predicate (date literals, OR groups, parens, NOT…)
-//	           which we round-trip through query.Parse on save.
-//
-// Toggle between modes with `a`. Both modes write the same Chip; the
-// underlying query.Query is the storage format regardless of which
-// authoring path was used.
-//
-// Per-domain field catalogues live in chip_wizard_fields.go so adding
-// a new surface (perm sets, profiles…) is just one new catalogue.
 
 import (
 	"fmt"
@@ -38,21 +23,12 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/qchip"
 )
 
-// cwField is one editable row in the wizard.
 type cwField struct {
-	// Field is the AST column name. CompareNodes built from this row
-	// use it verbatim; SOQL emits it verbatim.
-	Field string
-	// Label is the left-column human label.
-	Label string
-	// Hint is the dim sub-line shown when the row is focused.
-	Hint string
-	// Op is the operator the row's value comparator uses (Contains for
-	// string fields, Equals for enums, GTE for numeric, etc.).
-	Op query.Op
-	// Kind drives input mode: text, int, tristate, datestr.
-	Kind cwKind
-	// runtime state
+	Field    string
+	Label    string
+	Hint     string
+	Op       query.Op
+	Kind     cwKind
 	input    textinput.Model
 	triValue *bool
 }
@@ -64,44 +40,21 @@ const (
 	cwInt
 	cwTri
 	cwDate
-	// cwLimit is the special-case row used by the pinned chipLimit
-	// row. Combines a toggle (auto / manual) with a numeric input.
-	// Auto mode shows the global default in dim text and disables
-	// the input; manual lets the user pin a value or clear it for
-	// unbounded.
 	cwLimit
 )
 
-// chipWizardState is the live state of the wizard.
-//
-// Cursor convention:
-//
-//	-1   → label input is focused
-//	 0..N-1 → criteria[i] is focused (a previously-added row)
-//	 N    → "+ Add criterion…" affordance is focused
-//
-// where N == len(criteria). So Cursor == len(criteria) is the
-// add-row position; pressing enter there opens the field picker.
 type chipWizardState struct {
 	Title  string
 	Domain chipDomain // which surface this chip targets
 	Scope  string
 
-	// heightFloor pins the modal body's rendered line count so the
-	// box doesn't resize as focus moves (focused rows add hint lines,
-	// the empty state toggles). Grows monotonically per wizard
-	// session; render pads with blank lines up to it.
 	heightFloor int
 
-	// existingID is "" for new chips. When set, save updates in place.
 	existingID                                         string
 	existingLbl                                        string
 	existingOrigin                                     qchip.Origin
 	existingSrcID, existingSrcName, existingImportedAt string
-	// existingFavourite preserves the on-strip pin state across
-	// edits — without it, the Save() round-trip would clobber any
-	// F-toggles the user made between create and edit.
-	existingFavourite bool
+	existingFavourite                                  bool
 	// existingOrgUser preserves the legacy per-org scope across edits so
 	// a chip authored in org A doesn't silently get re-stamped to org B
 	// if the user happens to be on B when they Save the edit. Superseded
@@ -122,14 +75,9 @@ type chipWizardState struct {
 	// from when the user adds a criterion.
 	catalogue []cwField
 
-	// criteria is the list of CompareNodes the user has added. Each
-	// renders as one row in the wizard. Edits happen in place via
-	// the row's input / triValue.
 	criteria []cwField
 	Cursor   int
 
-	// Advanced mode toggles to a single SOQL WHERE editor. Buffer is
-	// pre-filled from the chip's current Query (ToSOQLWhere).
 	Advanced     bool
 	advancedText textinput.Model
 
@@ -146,10 +94,8 @@ type chipWizardState struct {
 	// is a no-op while this is true.
 	modeLocked bool
 
-	// Label input — always available regardless of mode.
 	labelInput textinput.Model
 
-	// Result lifecycle.
 	Saving bool
 	Err    string
 }
@@ -171,12 +117,8 @@ func (m *Model) openChipWizard(d chipDomain, existing qchip.Chip) tea.Cmd {
 		existingImportedAt: existing.ImportedAt,
 		existingFavourite:  existing.Favourite,
 		existingOrgUser:    existing.OrgUser,
-		// Seed Share: edits start from the chip's current share (which
-		// EffectiveShape on the config side already normalised); new
-		// chips start as single-org for the active org. Empty active
-		// org leaves Share zero; the save guard catches that.
-		Share:     chipWizardInitialShare(m, existing),
-		catalogue: m.wizardFieldsFor(d, scope),
+		Share:              chipWizardInitialShare(m, existing),
+		catalogue:          m.wizardFieldsFor(d, scope),
 		// Existing chips lock their mode immediately — toggling
 		// would silently lose AST shapes simple mode can't
 		// express. New chips stay unlocked until first save so the
@@ -184,12 +126,6 @@ func (m *Model) openChipWizard(d chipDomain, existing qchip.Chip) tea.Cmd {
 		modeLocked: existing.ID != "",
 	}
 
-	// Pre-fill from the existing chip's AST. Each top-level And child
-	// (or a single CompareNode) becomes one criterion row, looked up
-	// against the catalogue so the row's Kind / Op / Hint match what
-	// the picker would have configured. CompareNodes whose Field
-	// isn't in the catalogue still appear — the wizard isn't a
-	// blocker, just less informative for those rows.
 	advanced, prefill, reason := splitForWizard(existing.Query.Where)
 	state.Advanced = advanced
 	if advanced && reason != "" {
@@ -198,21 +134,11 @@ func (m *Model) openChipWizard(d chipDomain, existing qchip.Chip) tea.Cmd {
 	if !advanced {
 		state.criteria = criteriaFromCompares(state.catalogue, prefill)
 	}
-	// Always pin a Limit row at the end of the criteria list — gives
-	// users a first-class slot to set per-chip overrides without
-	// digging into the picker. Empty input = inherit settings default
-	// at fetch time. Edit mode seeds the row from the existing chip's
-	// stored Limit.
 	if limitRow := wizardLimitRow(state.catalogue, existing.Query.Limit); limitRow != nil {
 		state.criteria = append(state.criteria, *limitRow)
 	}
 
 	state.labelInput = newWizardInput(existing.Label)
-	// Advanced mode lets the user write the post-FROM clauses
-	// directly: WHERE … ORDER BY … LIMIT N. Seed from the
-	// existing chip — but skip seeding the LIMIT clause when
-	// existing.Query.Limit < 1, since the storage uses -1 to mean
-	// "unbounded" and 0 to mean "auto" (neither valid in raw SOQL).
 	advancedSeed := ""
 	if hasMeaningfulWhere(existing.Query.Where) || len(existing.Query.OrderBy) > 0 || existing.Query.Limit > 0 {
 		seed := existing.Query
@@ -223,9 +149,6 @@ func (m *Model) openChipWizard(d chipDomain, existing qchip.Chip) tea.Cmd {
 	}
 	state.advancedText = newWizardInput(advancedSeed)
 
-	// Cursor on the label by default for new chips so the first
-	// thing the user does is name it; for edits jump straight to
-	// the "+ Add criterion…" row (label already has a value).
 	if existing.ID == "" {
 		state.Cursor = -1
 		state.labelInput.Focus()
@@ -263,9 +186,6 @@ func (m *Model) openCriterionFieldPicker() tea.Cmd {
 	// approximation; the frame compositor clamps the picker to fit.
 	wW := modalWidth(m.width, 80, 160)
 	wX := (m.width - wW) / 2
-	// Picker is roughly 2/3 of the wizard width — wide enough to show
-	// the field name + meta column comfortably, narrow enough that it
-	// doesn't look like another modal stacked on top.
 	pickerW := wW * 2 / 3
 	if pickerW < 48 {
 		pickerW = 48
@@ -320,23 +240,15 @@ func (m *Model) openCriterionFieldPicker() tea.Cmd {
 	})
 }
 
-// criterionPickedMsg lands on the main loop after the user picks a
-// field. We route through a tea.Msg rather than mutating Model
-// inside OnPick so the model copy in the picker's closure is the
-// live one.
 type criterionPickedMsg struct {
 	field cwField
 }
 
-// applyCriterionPicked inserts a fresh criterion row into the wizard
-// and focuses it so the user can immediately type the value.
 func (m Model) applyCriterionPicked(msg criterionPickedMsg) (Model, tea.Cmd) {
 	st := m.chipWizard
 	if st == nil {
 		return m, nil
 	}
-	// Clone the catalogue entry so each criterion has its own
-	// textinput + triValue independent of subsequent picks.
 	row := msg.field
 	if row.Kind != cwTri {
 		row.input = newWizardInput("")
@@ -347,10 +259,6 @@ func (m Model) applyCriterionPicked(msg criterionPickedMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// opLabelFor renders an Op as a short user-facing label for the
-// criterion summary line. ("contains", "equals", ">=", etc.)
-// sectionHeading renders a small bold uppercase section label used
-// to break the wizard body into visual groups (Filters, Examples).
 func sectionHeading(label string) string {
 	return lipgloss.NewStyle().Foreground(theme.FgDim).Bold(true).Render(strings.ToUpper(label))
 }
@@ -385,20 +293,6 @@ func opLabelFor(op query.Op) string {
 	return string(op)
 }
 
-// wizardLimitRow returns the Limit row entry seeded from the
-// existing chip's Query.Limit. nil when the catalogue doesn't carry
-// a $limit row (defensive — every domain currently appends one via
-// wizardFieldsFor, but a future domain might opt out).
-//
-// Storage convention for chip.Query.Limit:
-//
-//	0  → Auto mode (inherit settings.DefaultChipLimit at fetch time)
-//	-1 → Manual mode, no limit (unbounded fetch via cursor follow)
-//	>0 → Manual mode, pinned to that exact cap
-//
-// We surface those three states via the cwLimit kind: triValue
-// holds the manual toggle (true = manual), input.Value() holds the
-// pinned number when triValue == true.
 func wizardLimitRow(catalogue []cwField, existingLimit int) *cwField {
 	for _, c := range catalogue {
 		if c.Field != chipLimitSentinel {
@@ -418,10 +312,6 @@ func wizardLimitRow(catalogue []cwField, existingLimit int) *cwField {
 	return nil
 }
 
-// criteriaFromCompares maps the CompareNodes from a parsed Query into
-// criterion rows for the wizard. Looks each one up in the catalogue
-// for type / hint info; missing fields fall back to a string-text row
-// so the user can still edit them.
 func criteriaFromCompares(catalogue []cwField, cmps []query.CompareNode) []cwField {
 	out := make([]cwField, 0, len(cmps))
 	for _, c := range cmps {
@@ -434,7 +324,6 @@ func criteriaFromCompares(catalogue []cwField, cmps []query.CompareNode) []cwFie
 				Kind:  cwText,
 			}
 		}
-		// Initialise the row with the criterion's value.
 		fresh := *row
 		switch fresh.Kind {
 		case cwTri:
@@ -459,23 +348,12 @@ func criteriaFromCompares(catalogue []cwField, cmps []query.CompareNode) []cwFie
 	return out
 }
 
-// catalogueLookup returns a pointer to the catalogue entry matching
-// (field, op), or nil. Used both for criterion pre-fill and for the
-// picker's add-flow when it needs to convert a picked field into a
-// criterion row.
 func catalogueLookup(catalogue []cwField, field string, op query.Op) *cwField {
-	// Exact (field, op) match first — preserves the user's intent
-	// when the catalogue offers the same field on multiple ops
-	// (e.g. Name contains vs Name startsWith).
 	for i := range catalogue {
 		if catalogue[i].Field == field && catalogue[i].Op == op {
 			return &catalogue[i]
 		}
 	}
-	// Fall back to any catalogue entry on the same field — the picker
-	// uses the catalogue's default Op, which is the right behaviour
-	// when the user adds via the picker rather than parsing existing
-	// SOQL.
 	for i := range catalogue {
 		if catalogue[i].Field == field {
 			return &catalogue[i]
@@ -508,7 +386,6 @@ func intToString(n int) string {
 	return string(buf[i:])
 }
 
-// styleWizardInput themes a textinput for the wizard.
 func styleWizardInput(ti *textinput.Model) {
 	s := ti.Styles()
 	s.Focused.Text = lipgloss.NewStyle().Foreground(theme.Fg)
@@ -519,10 +396,6 @@ func styleWizardInput(ti *textinput.Model) {
 	ti.SetStyles(s)
 }
 
-// newWizardInput constructs a fully-initialised textinput.Model for
-// the wizard's various fields. Single helper so tweaks to the
-// styling, prompt, char-limit, or initial-cursor behaviour stay in
-// one place.
 func newWizardInput(initial string) textinput.Model {
 	ti := textinput.New()
 	ti.Prompt = ""
@@ -552,15 +425,11 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	subStyle := lipgloss.NewStyle().Foreground(theme.FgDim)
 
 	var lines []string
-	// (cursor position, rendered line index) pairs for click zones.
 	type hitRow struct{ cursor, line int }
 	var hits []hitRow
-	// Hint-height bookkeeping for the stable-height padding below.
 	maxHintLines, curHintLines := 0, 0
 	lines = append(lines, titleStyle.Render(st.Title))
 
-	// Mode line — plain English, with the toggle-key hint surfaced
-	// only when toggling is actually available.
 	mode := "Form"
 	if st.Advanced {
 		mode = "SOQL"
@@ -578,8 +447,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	lines = append(lines, strings.Repeat("─", inner))
 	lines = append(lines, "")
 
-	// Label row — always editable. Wider gap above so the input
-	// breathes; label column is narrower (16) since "Name" is short.
 	const labelCol = 16
 	labelFocused := st.Cursor == -1
 	prefix := "  "
@@ -590,22 +457,11 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	hits = append(hits, hitRow{cursor: -1, line: len(lines)})
 	lines = append(lines, prefix+padRight("Name", labelCol-2)+"["+padRight(st.labelInput.View(), inner-labelCol-2)+"]")
 
-	// Scope row (read-only summary; press S to edit). Kept right under
-	// Name so it's the first thing the user sees after naming the chip.
-	// The "S to change" affordance is rendered in the chip-strip accent
-	// colour rather than the muted footer style so it actually catches
-	// the eye on first glance — without it, users miss the keybind and
-	// assume Scope is fixed.
 	scopeSummary := chipWizardShareSummary(m, st.Share)
 	scopeHint := lipgloss.NewStyle().Foreground(theme.BorderHi).Render("S") +
 		subStyle.Render(" to change")
 	lines = append(lines, "  "+padRight("Scope", labelCol-2)+
 		subStyle.Render(scopeSummary)+"  ["+scopeHint+"]")
-	// Continuation lines: when the scope is multi-org or a group, list
-	// the actual orgs (or the group's members) below the summary so the
-	// user sees exactly what they're committing to before they save.
-	// Single-org and global scopes are already fully described by the
-	// summary line — no continuation needed.
 	for _, detail := range chipWizardShareDetailLines(m, st.Share) {
 		lines = append(lines, "  "+padRight("", labelCol-2)+subStyle.Render(detail))
 	}
@@ -630,15 +486,7 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	} else {
 		lines = append(lines, "")
 		lines = append(lines, sectionHeading("Filters"))
-		// Render every active criterion as a row. The "+ Add
-		// criterion…" affordance sits at index len(criteria) — that
-		// row is also focusable, and pressing enter on it opens the
-		// field picker.
 		valueCol := inner - labelCol
-		// Worst-case hint height across ALL rows: the focused row's
-		// hint renders below it, and hints can wrap. Reserving the
-		// tallest hint keeps the modal height identical no matter
-		// which row holds focus.
 		for _, f := range st.criteria {
 			if n := len(m.wizardHintLines(st, f, inner-labelCol)); n > maxHintLines {
 				maxHintLines = n
@@ -682,11 +530,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 				}
 				value = "(" + s + ")  " + subStyle.Render("space cycles")
 			case cwLimit:
-				// Limit row — plain-English presentation. The mode
-				// pill says "default" or "custom" so the user reads
-				// it as words; the value column shows what'll
-				// actually apply (the inherited number, or the
-				// editable input in custom mode).
 				manual := f.triValue != nil && *f.triValue
 				modeLabel := "default"
 				if manual {
@@ -735,16 +578,11 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 			}
 		}
 
-		// Empty state — show before the +Add affordance so the
-		// user reads "no criteria yet → + Add filter" top-down.
 		addFocused := st.Cursor == len(st.criteria)
 		if len(st.criteria) == 0 && !addFocused {
 			lines = append(lines, subStyle.Italic(true).Render("    no filters yet — pick a field below"))
 		}
 
-		// Visual gap above the +Add row so it reads as a button,
-		// not another criterion. Leading "+" + Enter hint helps
-		// new users recognise it.
 		lines = append(lines, "")
 		addPrefix := "  "
 		addStyle := subStyle
@@ -765,9 +603,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	if st.Saving {
 		lines = append(lines, lipgloss.NewStyle().Foreground(theme.Yellow).Render("saving…"))
 	}
-	// Footer split into two lines so it doesn't run off narrow
-	// modals. First line covers movement + selection within the
-	// form; second line covers lifecycle (toggle / save / cancel).
 	moveHint := "tab to move · " + firstPretty(Keys.ChipWizardLookup) + " to look up values · " +
 		firstPretty(Keys.ChipWizardDelete) + " to delete the focused row"
 	lifeHint := "S change scope · " + firstPretty(Keys.ChipWizardMode) + " to switch mode · " +
@@ -778,11 +613,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	lines = append(lines, subStyle.Render(moveHint))
 	lines = append(lines, subStyle.Render(lifeHint))
 
-	// No line may exceed the modal's inner width: modalBox wraps long
-	// lines onto extra physical rows, which both looks broken and
-	// defeats the height floor below (it counts logical lines). Hard-
-	// truncate everything — long hints lose their tail rather than
-	// resizing the box.
 	for i := range lines {
 		if lipgloss.Width(lines[i]) > inner {
 			lines[i] = ansi.Truncate(lines[i], inner, "…")
@@ -817,11 +647,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 
 	box := modalBox(strings.Join(lines, "\n"), w)
 
-	// Hit layers: repaint each focusable row, tagged with its wizrow
-	// zone id, as a child of the modal layer. Rows are located by
-	// ANSI-stripped content search in the FINAL box (monotonic scan)
-	// rather than by computed line index — long rows can wrap inside
-	// modalBox, which would shift arithmetic offsets.
 	boxRows := strings.Split(box, "\n")
 	layers := make([]*lipgloss.Layer, 0, len(hits))
 	next := 0
@@ -833,8 +658,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 		if needle == "" {
 			continue
 		}
-		// Match on a prefix chunk: a wrapped row keeps its head on
-		// the first physical line, which is the one users click.
 		if len(needle) > 24 {
 			needle = needle[:24]
 		}
@@ -850,10 +673,6 @@ func (m Model) renderChipWizardLayers() (string, []*lipgloss.Layer) {
 	return box, layers
 }
 
-// clickChipWizardRow focuses the wizard row under a mouse click —
-// the same transitions the keyboard tab-moves perform. Clicking the
-// "+ Add filter" affordance acts like pressing enter on it (opens
-// the field picker).
 func (m Model) clickChipWizardRow(cursor int) (tea.Model, tea.Cmd) {
 	st := m.chipWizard
 	if st == nil || st.Saving {
@@ -879,7 +698,6 @@ func (m Model) clickChipWizardRow(cursor int) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleChipWizardKey is the reducer.
 func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.chipWizard == nil {
 		return m, nil
@@ -908,11 +726,6 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		st.toggleMode()
 		return m, nil
 	case matches(key, Keys.ChipWizardLookup), key == "ctrl+ ", key == "ctrl+@":
-		// Open the value picker for the focused criterion. ctrl+l
-		// for "lookup" is the canonical chord; ctrl+space (which
-		// some terminals send as ctrl+@) is a fallback that matches
-		// IDE autocomplete conventions. No-op when the focused
-		// field has no constrained value source.
 		return m, m.openValuePicker()
 	case key == "S" && !st.textInputFocused():
 		// Capital-S opens the cross-org scope chooser — but ONLY when a
@@ -924,9 +737,6 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, (&m).chipWizardOpenScopeChooser()
 	}
 
-	// Cursor at -1 means the Label input is focused. Same rule as
-	// other text rows: tab / down move to the first field; everything
-	// printable (including j/k/etc.) goes into the buffer.
 	if st.Cursor == -1 {
 		switch key {
 		case "tab", "down":
@@ -957,12 +767,9 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Cursor at len(criteria) is the "+ Add criterion…" affordance.
 	if st.Cursor == len(st.criteria) {
 		switch key {
 		case "tab":
-			// Tab wraps to label (cyclic tab order is the convention
-			// for keyboard form navigation).
 			st.Cursor = -1
 			st.labelInput.Focus()
 			return m, nil
@@ -992,12 +799,6 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 	cur := &st.criteria[st.Cursor]
 
-	// 'x' / delete on a focused criterion removes it (only when the
-	// row isn't a text input that'd consume the key — tristate rows
-	// have no buffer to fight with).
-	// The pinned Limit row is exempt — it has no equivalent picker
-	// entry, so deleting it would orphan the user from setting a
-	// per-chip cap. Clearing the input is the right gesture there.
 	if cur.Kind == cwTri && (key == "x" || key == "delete" || key == "backspace") {
 		if cur.Field == chipLimitSentinel {
 			return m, nil
@@ -1009,8 +810,6 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		st.focusCursorField()
 		return m, nil
 	}
-	// ctrl+x always deletes the focused criterion regardless of row
-	// kind, so users can drop a text-row from inside the buffer.
 	if matches(key, Keys.ChipWizardDelete) {
 		if cur.Field == chipLimitSentinel {
 			cur.input.SetValue("")
@@ -1036,9 +835,6 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 	case cwLimit:
-		// Space toggles auto↔manual. In manual the input takes
-		// keystrokes (digits + backspace + clear); in auto the row
-		// shows the global default in dim text and ignores input.
 		switch key {
 		case "tab", "j", "down":
 			return m.cwMove(+1), nil
@@ -1063,10 +859,8 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		manual := cur.triValue != nil && *cur.triValue
 		if !manual {
-			// Auto mode swallows keystrokes — input is non-editable.
 			return m, nil
 		}
-		// Manual mode: digits + backspace + clear via the input model.
 		if len(key) == 1 && (key[0] < '0' || key[0] > '9') &&
 			key != "backspace" && key != "delete" {
 			return m, nil
@@ -1094,18 +888,8 @@ func (m Model) handleChipWizardKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// cwMove shifts focus by delta, blurring/focusing inputs as needed.
-//
-// Cursor range is [-1, len(criteria)] inclusive:
-//
-//	-1   = label
-//	0..N-1 = criteria[i]
-//	N    = "+ Add criterion…" affordance
 func (m Model) cwMove(delta int) Model {
 	st := m.chipWizard
-	// Blur the currently-focused criterion's textinput before moving.
-	// cwTri rows have no input; cwLimit rows only have one in manual
-	// mode — checking input.Focused() handles both.
 	if st.Cursor >= 0 && st.Cursor < len(st.criteria) {
 		f := &st.criteria[st.Cursor]
 		if f.Kind != cwTri {
@@ -1125,7 +909,6 @@ func (m Model) cwMove(delta int) Model {
 		st.labelInput.Focus()
 	case st.Cursor == addRow:
 		st.labelInput.Blur()
-		// Add row has no input to focus.
 	default:
 		st.labelInput.Blur()
 		st.focusCursorField()
@@ -1141,20 +924,12 @@ func (st *chipWizardState) focusCursorField() {
 	if f.Kind == cwTri {
 		return
 	}
-	// cwLimit only takes input when in manual mode; auto mode shows
-	// a static dim default and shouldn't capture keys.
 	if f.Kind == cwLimit && (f.triValue == nil || !*f.triValue) {
 		return
 	}
 	f.input.Focus()
 }
 
-// textInputFocused reports whether the wizard's current focus is a text
-// buffer the user is typing into — the Label field, the Advanced SOQL
-// editor, or a text/int/date criterion (cwLimit only in manual mode).
-// Used to stop single-letter wizard shortcuts (e.g. capital S) from
-// hijacking a literal keystroke mid-typing. Mirrors focusCursorField's
-// "does this row capture input" rule.
 func (st *chipWizardState) textInputFocused() bool {
 	if st.Cursor == -1 {
 		return true // Label input
@@ -1219,10 +994,7 @@ func (st *chipWizardState) toggleMode() {
 			return
 		}
 		st.advancedLockReason = ""
-		// Replace criteria with what the parsed SOQL describes.
 		st.criteria = criteriaFromCompares(st.catalogue, compares)
-		// Re-pin the Limit row, seeded from the SOQL's LIMIT (or -1
-		// when the user wrote no LIMIT — SOQL semantics: unbounded).
 		seedLimit := parsed.Limit
 		if text != "" && parsed.Limit == 0 {
 			seedLimit = -1
@@ -1237,15 +1009,12 @@ func (st *chipWizardState) toggleMode() {
 	}
 }
 
-// submitChipWizard validates + persists.
 func (m Model) submitChipWizard() (Model, tea.Cmd) {
 	st := m.chipWizard
 	if st == nil {
 		return m, nil
 	}
 	label := strings.TrimSpace(st.labelInput.Value())
-	// Same naming rules as the headless CLI — one validator, two
-	// surfaces (services/chips owns it).
 	if err := chips.ValidateLabel(label); err != nil {
 		st.Err = err.Error()
 		return m, nil
@@ -1258,19 +1027,12 @@ func (m Model) submitChipWizard() (Model, tea.Cmd) {
 			st.Err = "clauses cannot be empty"
 			return m, nil
 		}
-		// User supplies post-FROM clauses (WHERE / ORDER BY / LIMIT).
-		// Prepend SELECT Id FROM X so query.Parse sees a complete
-		// statement; the parser extracts WHERE/ORDER BY/LIMIT and we
-		// keep the parsed Query as-is.
 		parsed, _, err := query.Parse("SELECT Id FROM X " + text)
 		if err != nil {
 			st.Err = err.Error()
 			return m, nil
 		}
 		q = parsed
-		// SOQL semantics: no LIMIT = unbounded. Map that into our
-		// storage (-1) so the fetcher emits SOQL with no LIMIT and
-		// cursor-follows to completion.
 		if q.Limit == 0 {
 			q.Limit = -1
 		}
@@ -1339,10 +1101,6 @@ func (m Model) submitChipWizard() (Model, tea.Cmd) {
 	st.Saving = true
 	st.Err = ""
 
-	// Save runs inline on the Update goroutine. settings.Save is a
-	// small TOML file write; not worth a tea.Cmd round-trip — and the
-	// previous goroutine version mutated settings + the registry off
-	// the main loop, racing renders that read the chip catalog.
 	if m.settings != nil {
 		m.settings.UpsertChip(qchip.ToConfig(c, string(st.Domain)))
 		if err := m.settings.Save(); err != nil {
@@ -1355,13 +1113,11 @@ func (m Model) submitChipWizard() (Model, tea.Cmd) {
 	return m, func() tea.Msg { return chipWizardResultMsg{Label: label} }
 }
 
-// chipWizardResultMsg lands on the main loop after Save returns.
 type chipWizardResultMsg struct {
 	Err   error
 	Label string
 }
 
-// applyChipWizardResult — Update branch.
 func (m Model) applyChipWizardResult(msg chipWizardResultMsg) (Model, tea.Cmd) {
 	if m.chipWizard == nil {
 		return m, nil
@@ -1376,16 +1132,6 @@ func (m Model) applyChipWizardResult(msg chipWizardResultMsg) (Model, tea.Cmd) {
 	return m, m.onTabChanged()
 }
 
-// buildSimpleQuery constructs a query.Query by ANDing every filled
-// row's CompareNode together. Empty rows drop out.
-//
-// The chipLimitSentinel field ("$limit") is special-cased: it's a
-// cwLimit row whose state encodes one of three storage values for
-// Query.Limit (see wizardLimitRow for the full mapping):
-//
-//	Auto (triValue=false)               → 0  (inherit default)
-//	Manual + blank input (triValue=true) → -1 (unbounded)
-//	Manual + N (triValue=true)           → N  (pinned)
 func buildSimpleQuery(fields []cwField) query.Query {
 	var children []query.Node
 	out := query.Query{}
@@ -1476,11 +1222,6 @@ func splitForWizard(n query.Node) (advanced bool, cmps []query.CompareNode, reas
 	return true, nil, "shape can't be flattened"
 }
 
-// hasMeaningfulWhere reports whether a Where node carries any actual
-// constraint. A nil node, an empty AndNode, or an empty OrNode all
-// fall through as "no constraint" — used to decide whether to seed
-// the advanced editor with text or leave it blank when toggling from
-// simple mode.
 func hasMeaningfulWhere(n query.Node) bool {
 	if n == nil {
 		return false
@@ -1509,8 +1250,6 @@ func describeNonFlatNode(n query.Node) string {
 	return "has a nested group"
 }
 
-// populateFromCompareNodes fills each catalogue row from the
-// matching CompareNode in `cmps`. Match by (Field, Op).
 func populateFromCompareNodes(fields []cwField, cmps []query.CompareNode) {
 	for _, c := range cmps {
 		for i := range fields {
@@ -1565,7 +1304,6 @@ func autoChipID(domain chipDomain, label string) string {
 	return string(domain) + "-" + slugify(label) + "-" + stamp
 }
 
-// padRight pads a string to width with spaces. Truncates if wider.
 func padRight(s string, width int) string {
 	if width <= 0 {
 		return s
@@ -1584,7 +1322,6 @@ func valueOr(s, fallback string) string {
 	return s
 }
 
-// wizardTitleFor builds the title row.
 func wizardTitleFor(d chipDomain, existing qchip.Chip) string {
 	verb := "New"
 	if existing.ID != "" {
@@ -1617,10 +1354,6 @@ func chipWizardInitialShare(m *Model, existing qchip.Chip) settings.ChipShare {
 	return settings.ChipShare{}
 }
 
-// chipWizardOpenScopeChooser launches the scope chooser pre-seeded with
-// the wizard's current share and writes the user's choice back into
-// the wizard state. The wizard stays open behind the chooser; the
-// chooser dismisses itself on completion or esc.
 func (m *Model) chipWizardOpenScopeChooser() tea.Cmd {
 	if m.chipWizard == nil {
 		return nil
@@ -1629,9 +1362,6 @@ func (m *Model) chipWizardOpenScopeChooser() tea.Cmd {
 	return m.openChipScopeChooser("Chip scope", st.Share, chipScopeTarget{kind: chipScopeTargetWizard})
 }
 
-// chipWizardShareSummary formats the wizard's current share for the
-// "Scope: …" row in the form (and for hint surfaces). Designed to be
-// short — the form has limited width.
 func chipWizardShareSummary(m Model, s settings.ChipShare) string {
 	if s.IsZero() {
 		return "(no scope yet — press S)"
@@ -1671,21 +1401,9 @@ func chipWizardShareSummary(m Model, s settings.ChipShare) string {
 	}
 }
 
-// chipWizardShareDetailLines returns continuation lines for the wizard's
-// Scope row, expanding multi-org and group scopes into the actual list
-// of orgs the chip will appear for. Returns an empty slice for the
-// scopes the one-line summary already fully describes (single-org,
-// global, zero) — keeps the wizard quiet when there's nothing to add.
-//
-// For "These orgs" we emit one bullet per username (alias-resolved). For
-// a group we list the group's current members the same way, so the user
-// can see who's actually in it without leaving the wizard. Group resolves
-// against settings.OrgGroups so a renamed/edited group reflects live.
 func chipWizardShareDetailLines(m Model, s settings.ChipShare) []string {
 	switch s.Kind {
 	case settings.ChipShareOrgs:
-		// The one-line summary already lists ≤3 orgs inline; only emit
-		// the per-org bullets when the summary collapsed to "N orgs".
 		if len(s.Orgs) <= 3 {
 			return nil
 		}
@@ -1711,15 +1429,11 @@ func chipWizardShareDetailLines(m Model, s settings.ChipShare) []string {
 			}
 			return out
 		}
-		// Group id didn't resolve (deleted / renamed away). Tell the
-		// user so they don't think their chip is silently visible.
 		return []string{"  (group not found — pick another scope)"}
 	}
 	return nil
 }
 
-// chipShareFriendlyOrg formats one org username as alias-or-username,
-// matching chipScopeFriendlyOrgName but callable without a *Model.
 func chipShareFriendlyOrg(m Model, username string) string {
 	for _, o := range m.orgs {
 		if o.Username == username {
@@ -1732,10 +1446,6 @@ func chipShareFriendlyOrg(m Model, username string) string {
 	return username
 }
 
-// wizardHintLines builds the focused-criterion hint and soft-wraps it
-// to the given width. Shared by the renderer (which shows it under
-// the focused row) and the stable-height reservation (which needs the
-// tallest hint across all rows).
 func (m Model) wizardHintLines(st *chipWizardState, f cwField, width int) []string {
 	if f.Op == "" || width < 8 {
 		return nil

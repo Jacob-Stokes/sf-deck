@@ -1,16 +1,5 @@
 package ui
 
-// Tag pill rendering — sidebar + chip-strip visual surface for tags.
-//
-// Tags are theme-colour-named ("blue", "purple", "red", …) rather
-// than hex so they re-tint when the user switches themes. Names map
-// to the seven palette accent colors (Blue/Cyan/Green/Yellow/Red/
-// Magenta/Orange); unknown / empty colors fall through to Border.
-//
-// A pill is a block-coloured background + the tag name (with optional
-// unicode icon prefix). Pills sit in the sidebar TAGS section and
-// appear inline in the chip strip when a tag is filtered on.
-
 import (
 	"fmt"
 	"image/color"
@@ -27,13 +16,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// tagColorFor maps a tag's stored color name to a theme palette
-// entry. Empty / unknown names default to Border so unstyled tags
-// still render cleanly.
-//
-// The palette names match the public theme color vars so the
-// management modal can let the user pick from a small fixed list
-// without us having to maintain a parallel registry.
 func tagColorFor(name string) color.Color {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "blue":
@@ -54,19 +36,8 @@ func tagColorFor(name string) color.Color {
 	return theme.Border
 }
 
-// tagPalette is the ordered list of color names exposed by the tag
-// editor. Used by the tag-management modal so users have a fixed,
-// theme-friendly palette to choose from rather than typing hex.
-//
-// "magenta" / "purple" / "pink" are aliases for the same theme color
-// — the editor exposes "purple" as the user-facing label since it's
-// the most natural reading of the slot.
 var tagPalette = []string{"blue", "cyan", "green", "yellow", "red", "purple", "orange"}
 
-// nextRotatingTagColor picks a default palette colour by position, so
-// tags created inline (where the user doesn't pick a colour) cycle
-// through the palette instead of all being blue. Wraps at the palette
-// length.
 func nextRotatingTagColor(n int) string {
 	if len(tagPalette) == 0 {
 		return "blue"
@@ -97,9 +68,6 @@ func renderTagPill(t devproject.Tag) string {
 	return style.Render(label)
 }
 
-// renderTagPills joins a slice of tags into a single line of pills
-// separated by spaces. Empty input → empty string so callers can
-// emit-or-skip without a length check.
 func renderTagPills(tags []devproject.Tag) string {
 	if len(tags) == 0 {
 		return ""
@@ -111,17 +79,6 @@ func renderTagPills(tags []devproject.Tag) string {
 	return strings.Join(pills, " ")
 }
 
-// sidebarTagSection returns the rendered TAGS block for an item, or
-// "" when the item has no tags / the store is unavailable.
-//
-// inner is the available width; the section wraps pills onto multi-
-// ple lines if a single line wouldn't fit. The header line uses
-// sideSection so it visually matches every other sidebar section.
-//
-// orgUser is the originating org username — passed through directly
-// to the store's per-org binding lookup. Empty string is fine for
-// surfaces that aren't org-scoped (none today, but keeps the API
-// uniform).
 func (m Model) sidebarTagSection(kind devproject.ItemKind, ref, orgUser string, inner int) string {
 	if m.devProjects == nil || ref == "" {
 		return ""
@@ -151,10 +108,6 @@ const TagGutterWidth = 5
 // cells) plus a "+N" suffix when the row carries multiple tags.
 const TagGutterExpandedWidth = 28
 
-// tagGutterWidth returns the effective gutter width for the active
-// 3-state tag-column mode (Ctrl+T cycles): hidden=0, compact=dots,
-// expanded=pills. Width 0 makes the listtable layout skip the
-// gutter entirely.
 func (m Model) tagGutterWidth() int {
 	if m.settings == nil {
 		return TagGutterWidth
@@ -168,28 +121,11 @@ func (m Model) tagGutterWidth() int {
 	return TagGutterWidth
 }
 
-// tagColumnExpanded reports whether the gutter should render full
-// pills rather than coloured dots. Used by the row-cell renderer to
-// pick the right shape.
 func (m Model) tagColumnExpanded() bool {
 	return m.settings != nil &&
 		m.settings.TagColumnDisplayMode() == settings.TagColumnModeExpanded
 }
 
-// listGutters builds the per-render gutter slices for any list-table
-// surface. Returns two slices: the LEFT gutters render before the
-// regular columns (cursor-bar adjacent), the RIGHT gutters render
-// after.
-//
-// Layout policy: TAGS go left (user-curated identity, anchored next
-// to the row name), PROJECTS go right (system-derived membership,
-// less actionable per-row, OK to be the first thing elided when the
-// terminal narrows). Marks live as a regular column inside the
-// surface's own Cols definition — see e.g. sobjectListCols.
-//
-// rowTag and rowProject closures may be nil (passed nil when the
-// list doesn't support that gutter). Width-0 gutters (toggled off)
-// are filtered out so the listtable layout sees clean slices.
 func (m Model) listGutters(rowTag, rowProject func(row int) string) (left, right []uilayout.GutterSpec) {
 	if w := m.tagGutterWidth(); w > 0 && rowTag != nil {
 		left = append(left, uilayout.GutterSpec{
@@ -204,15 +140,6 @@ func (m Model) listGutters(rowTag, rowProject func(row int) string) (left, right
 	return left, right
 }
 
-// kindRefGutters builds the standard TAGS + PROJECTS gutter pair
-// for a generic list of items where each item has a stable (kind,
-// ref) key. The closure converts a row index into its ref string;
-// kind is the same for every row in the list (e.g. KindPermissionSet
-// for the perms surface).
-//
-// Pre-fetches both maps in a single round-trip to TagsForItems and
-// ProjectsForItems so the gutter render is map-lookup, not store-
-// query, per row.
 func (m Model) kindRefGutters(kind devproject.ItemKind, n int, refOf func(row int) string) (left, right []uilayout.GutterSpec) {
 	if m.devProjects == nil || n == 0 {
 		return m.listGutters(nil, nil)
@@ -252,20 +179,6 @@ func (m Model) kindRefGutters(kind devproject.ItemKind, n int, refOf func(row in
 	)
 }
 
-// rowTagGutterFromMap renders one row's tag-gutter cell in COMPACT
-// mode — up to three coloured dots followed by a "+" if the row
-// carries more tags than fit. Returns empty string when the row has
-// no tags so the gutter cell renders blank (still occupying
-// TagGutterWidth so columns to the right stay aligned).
-//
-// Each dot uses the corresponding tag's colour. Multi-tag rows show
-// the first three tags in the order TagsFor returns them
-// (alphabetical) so the same row always shows the same dots across
-// renders.
-//
-// For the expanded (pill) variant, see rowTagGutterPillFromMap. The
-// model-level resolveTagGutterCell picks between the two based on
-// the user's Ctrl+T cycle state.
 func rowTagGutterFromMap(kind devproject.ItemKind, ref string, tags map[string][]devproject.Tag) string {
 	if ref == "" || len(tags) == 0 {
 		return ""
@@ -290,16 +203,6 @@ func rowTagGutterFromMap(kind devproject.ItemKind, ref string, tags map[string][
 	return strings.Join(dots, "")
 }
 
-// rowTagGutterPillFromMap is the EXPANDED-mode variant — renders
-// the first tag as a full coloured pill (Name with background tint),
-// with a "+N" suffix when the row carries more than one tag. Picked
-// by resolveTagGutterCell when the user has cycled the column to
-// expanded via Ctrl+T.
-//
-// Truncates the first tag's name to fit the gutter width minus pill
-// padding (2 cells) minus the worst-case "+N" suffix (3 cells when
-// N ≤ 9, 4 when N ≤ 99). Returns "" for untagged rows so the cell
-// renders blank.
 func rowTagGutterPillFromMap(kind devproject.ItemKind, ref string, tags map[string][]devproject.Tag) string {
 	if ref == "" || len(tags) == 0 {
 		return ""
@@ -335,9 +238,6 @@ func rowTagGutterPillFromMap(kind devproject.ItemKind, ref string, tags map[stri
 	return pill + lipgloss.NewStyle().Foreground(theme.Muted).Render(suffix)
 }
 
-// resolveTagGutterCell renders one row's tag cell in whichever mode
-// the user has cycled the gutter to. Each surface's BuildRenderModel
-// closure delegates here so the per-surface code is mode-agnostic.
 func (m Model) resolveTagGutterCell(kind devproject.ItemKind, ref string, tagMap map[string][]devproject.Tag) string {
 	if m.tagColumnExpanded() {
 		return rowTagGutterPillFromMap(kind, ref, tagMap)
@@ -385,10 +285,6 @@ func (m *Model) openTagPickerForCursored() tea.Cmd {
 	return m.openTagPicker(id.Kind, id.Ref, o.Username, id.Label)
 }
 
-// openBulkTagPickerForVisible opens the tag picker over every row of
-// the active surface's CURRENT filtered view (the T keybind). The
-// workflow is filter-then-tag: narrow the list with / or a chip, hit
-// T, tick tags, enter.
 func (m Model) openBulkTagPickerForVisible() (Model, tea.Cmd) {
 	o, ok := m.currentOrg()
 	if !ok {

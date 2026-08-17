@@ -9,16 +9,12 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
-// mapRow is a tiny query.Row impl backed by a map. Used by every test
-// that wants to evaluate a chip without dragging in the sf package.
 type mapRow map[string]any
 
 func (m mapRow) Field(name string) (any, bool) {
 	v, ok := m[name]
 	return v, ok
 }
-
-// ---- Registry ---------------------------------------------------------
 
 func TestRegistryChipsForScope(t *testing.T) {
 	universal := Chip{ID: "all", Label: "All", Scope: "*", Origin: OriginBuiltIn}
@@ -89,7 +85,6 @@ func TestRegistryLoadFromSettings(t *testing.T) {
 func TestRegistryPersistUserPreservesOtherDomains(t *testing.T) {
 	s := &settings.Settings{}
 	s.SetChips([]settings.ChipConfig{
-		// Pre-existing flow chip — persisting records should leave this alone.
 		{ID: "active-flow", Domain: "flows", Label: "Active"},
 	})
 	rRecords := NewRegistry("records", nil)
@@ -118,8 +113,6 @@ func TestRegistryPersistUserPreservesOtherDomains(t *testing.T) {
 		t.Error("PersistUser didn't write the new records chip")
 	}
 }
-
-// ---- ApplyToSOQL ------------------------------------------------------
 
 func TestApplyToSOQLEmitsValidSOQL(t *testing.T) {
 	c := Chip{
@@ -185,8 +178,6 @@ func TestApplyToSOQLDoesNotMutateInput(t *testing.T) {
 	}
 }
 
-// ---- ApplyToRow -------------------------------------------------------
-
 func TestApplyToRowEvaluatesPredicate(t *testing.T) {
 	c := Chip{
 		Query: query.Query{
@@ -222,7 +213,6 @@ func TestApplyToRowEmptyChipMatchesEverything(t *testing.T) {
 	}
 }
 
-// chipIDs is a tiny helper to keep failure messages readable.
 func chipIDs(cs []Chip) []string {
 	out := make([]string, len(cs))
 	for i, c := range cs {

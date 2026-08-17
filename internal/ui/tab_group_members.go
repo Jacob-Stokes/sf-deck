@@ -1,17 +1,5 @@
 package ui
 
-// tab_group_members.go — TabQueueDetail + TabPublicGroupDetail.
-//
-// Both surfaces show the resolved member list of a Group sObject
-// (Queues are stored as Group rows with Type='Queue'; Public
-// Groups are Group rows with Type='Regular'). The render shape is
-// identical so they share a single body — the only difference is
-// the parent kind label in the title and which list-resource is
-// fed into the renderer.
-//
-// Drill on a member row opens that User or nested Group's
-// Lightning record (handled by GroupMemberRow.Targets).
-
 import (
 	"fmt"
 	"strings"
@@ -24,19 +12,14 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-// renderQueueDetail draws the queue-members detail. Wraps the
-// shared body with a queue-flavoured title.
 func (m Model) renderQueueDetail(w, innerH int) string {
 	return m.renderGroupMembersDetail(w, innerH, "Queue")
 }
 
-// renderPublicGroupDetail draws the public-group-members detail.
 func (m Model) renderPublicGroupDetail(w, innerH int) string {
 	return m.renderGroupMembersDetail(w, innerH, "Public Group")
 }
 
-// renderGroupMembersDetail is the shared body used by both queue
-// and public-group detail surfaces.
 func (m Model) renderGroupMembersDetail(w, innerH int, parentLabel string) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -51,8 +34,6 @@ func (m Model) renderGroupMembersDetail(w, innerH int, parentLabel string) strin
 		return theme.Subtle.Render("  members not loaded — press r")
 	}
 
-	// Title + parent metadata (resolved from the parent list cache,
-	// since member rows themselves don't carry the parent's name).
 	parentName := groupParentName(d, d.GroupMemberKind, d.GroupMemberID)
 	title := parentLabel + " · " + parentName
 	if parentName == "" {
@@ -60,11 +41,6 @@ func (m Model) renderGroupMembersDetail(w, innerH int, parentLabel string) strin
 	}
 
 	var lines []string
-	// Blank top line — the global subtab-strip hit-layer paints
-	// over Y=1 on every tab whose tabSubtabs() returns >1 entries.
-	// We don't have subtabs here, but the layer skips when
-	// len(subs)<=1 so the blank line stays available without
-	// double-up risk.
 	lines = append(lines, "")
 	lines = append(lines, sectionTitle(title))
 
@@ -81,9 +57,6 @@ func (m Model) renderGroupMembersDetail(w, innerH int, parentLabel string) strin
 		return strings.Join(lines, "\n")
 	}
 
-	// Sync the ListView with the latest payload. Set every render
-	// is fine here (cursor is owned by the ListView; the data
-	// rarely changes).
 	lv, ok := d.GroupMemberList[d.GroupMemberID]
 	if !ok {
 		lv = ListView[sf.GroupMemberRow]{}
@@ -157,10 +130,6 @@ func makeGroupMemberMatcher() func(sf.GroupMemberRow, string) bool {
 	})
 }
 
-// groupParentName resolves the parent Queue / PublicGroup's display
-// name from the cached list on /perms. Falls back to "" when the
-// list hasn't been fetched yet (the title renderer falls back to
-// the id in that case).
 func groupParentName(d *orgData, kind, id string) string {
 	switch kind {
 	case "queue":
@@ -179,8 +148,6 @@ func groupParentName(d *orgData, kind, id string) string {
 	return ""
 }
 
-// activateQueue is the drill handler for /perms Queues. Sets the
-// drill-state and switches to TabQueueDetail.
 func (m *Model) activateQueue() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -200,7 +167,6 @@ func (m *Model) activateQueue() tea.Cmd {
 	return m.onTabChanged()
 }
 
-// activatePublicGroup mirrors activateQueue for public groups.
 func (m *Model) activatePublicGroup() tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -220,10 +186,6 @@ func (m *Model) activatePublicGroup() tea.Cmd {
 	return m.onTabChanged()
 }
 
-// ensureGroupMembersData / refreshGroupMembersData serve BOTH
-// TabQueueDetail and TabPublicGroupDetail — the drills share
-// d.GroupMemberID and the members fetch (extracted in the
-// registry-purity pass; the two inline pairs were identical).
 func (m *Model) ensureGroupMembersData(d *orgData, o sf.Org) tea.Cmd {
 	if d.GroupMemberID == "" {
 		return nil
@@ -238,9 +200,6 @@ func (m Model) refreshGroupMembersData(d *orgData) tea.Cmd {
 	return d.EnsureGroupMembers(targetArg(m.orgs[m.selected]), d.GroupMemberID).Refresh(m.cache)
 }
 
-// groupMembersFetchedAt is the header-freshness hook shared by the
-// queue + public-group detail tabs — both render the same per-group
-// members resource.
 func groupMembersFetchedAt(m Model, d *orgData) time.Time {
 	if r, ok := d.GroupMembers[d.GroupMemberID]; ok && r != nil {
 		return r.FetchedAt()

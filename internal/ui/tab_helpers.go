@@ -7,7 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// currentOrg returns the selected org, if any.
 func (m Model) currentOrg() (sf.Org, bool) {
 	if len(m.orgs) == 0 {
 		return sf.Org{}, false
@@ -15,10 +14,6 @@ func (m Model) currentOrg() (sf.Org, bool) {
 	return m.orgs[m.selected], true
 }
 
-// safetyFor returns the effective SafetyLevel for the given org,
-// resolving through the loaded settings file + kind-based defaults.
-// Passes both username and alias so users editing settings.toml by
-// hand can use whichever key is more natural.
 func (m Model) safetyFor(o sf.Org) settings.SafetyLevel {
 	return m.settings.Resolve(o.Username, settings.OrgKind(o.Kind()), o.Alias)
 }
@@ -57,9 +52,6 @@ func (m Model) canWriteCurrent(k settings.WriteKind) (bool, string) {
 	return m.canWriteOrg(o, k)
 }
 
-// ensureOrgDataRef returns the orgData for key, allocating if missing.
-// Kept as a read-side helper for renderers that accept Model by value —
-// Update paths go through ensureOrgData on the pointer receiver first.
 func (m Model) ensureOrgDataRef(key string) *orgData {
 	target := m.targetForUsername(key)
 	d, ok := m.data[key]

@@ -1,11 +1,5 @@
 package ui
 
-// keymap.go — thin wrappers forwarding to the keymap sub-package.
-// All keymap logic now lives in internal/ui/keymap/keymap.go.
-// These package-level aliases allow existing callers in internal/ui/
-// and external callers (cmd/sf-deck/main.go) to keep using the ui
-// package's exported names without any changes.
-
 import "github.com/Jacob-Stokes/sf-deck/internal/ui/keymap"
 
 // Keymap is a package-level alias for keymap.Keymap.
@@ -25,8 +19,6 @@ var Keys = keymap.DefaultKeymap()
 // LoadKeymap reads the user's keybindings file and returns a merged Keymap.
 func LoadKeymap() (Keymap, string) { return keymap.LoadKeymap() }
 
-// matches is the package-internal key-matching helper.
 func matches(key string, slots []string) bool { return keymap.Matches(key, slots) }
 
-// firstPretty returns a display-friendly label for the first binding.
 func firstPretty(slots []string) string { return keymap.FirstPretty(slots) }

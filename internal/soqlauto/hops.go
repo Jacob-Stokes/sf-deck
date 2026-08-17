@@ -72,9 +72,6 @@ func WalkHops(snap Snapshot, root string, hops []string) (current []sf.SObjectDe
 			}
 		}
 		if len(next) == 0 {
-			// Dead-end: hop didn't match any relationship, or all
-			// matching refs are unloaded. Keep `loading` populated
-			// so the caller can show "loading X metadata…".
 			return nil, loading
 		}
 		current = next

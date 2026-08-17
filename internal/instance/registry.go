@@ -1,27 +1,5 @@
 // Package instance manages the per-PID identity sf-deck instances
 // expose to the outside world.
-//
-// The registry lives at ~/.sf-deck/instances.json. Each entry pins
-// one running sf-deck: a stable Number (1..N) used as the instance
-// label, a PID, started_at, and the Socket path (empty when the
-// listener wasn't enabled).
-//
-// Two policies:
-//
-//   - Lowest-free-slot allocation: on Claim() the registry picks the
-//     smallest unused Number ≥ 1. If 1 is occupied and 2 is free, a
-//     new instance becomes 2. This keeps badges stable across the
-//     lifetime of long-running windows — "instance 2" still means
-//     the same sf-deck even if "instance 1" was restarted.
-//
-//   - Dead-PID pruning on every read. Atomic write keeps multiple
-//     concurrent claimers from racing each other into the same slot:
-//     each call reloads, claims, writes back. The file's small, so
-//     full-rewrite-on-every-claim is the simplest correct path.
-//
-// No external dependencies on the rest of sf-deck — this package is
-// imported from cmd/sf-deck before the UI / app layer is built, so
-// it stays focused on the persistence shape and slot policy.
 package instance
 
 import (
@@ -37,28 +15,15 @@ import (
 	"time"
 )
 
-// fileName is the JSON registry file living under ~/.sf-deck/.
 const fileName = "instances.json"
 
 // Entry is one running sf-deck instance.
 type Entry struct {
-	// Number is the user-facing instance label (1..N). Picked as the
-	// lowest free slot at Claim time; stable for the instance's
-	// lifetime.
-	Number int `json:"number"`
-	// PID is the OS process id. Used at registry-read time to prune
-	// entries whose process has died (signal 0 probe).
-	PID int `json:"pid"`
-	// StartedAt is the UTC RFC3339 timestamp at claim time. Cosmetic;
-	// agents can use it to tell apart "old" vs "fresh" instances.
+	Number    int    `json:"number"`
+	PID       int    `json:"pid"`
 	StartedAt string `json:"started_at"`
-	// Socket is the absolute path to the control socket, or "" when
-	// the instance was started without --control. Discovery clients
-	// skip entries with empty Socket.
-	Socket string `json:"socket,omitempty"`
-	// Label is an optional human label (sf-deck --label "main"). May
-	// be empty.
-	Label string `json:"label,omitempty"`
+	Socket    string `json:"socket,omitempty"`
+	Label     string `json:"label,omitempty"`
 }
 
 // File is the on-disk shape — just a list of entries plus a schema
@@ -219,10 +184,6 @@ func Claim(pid int, socket, label string) (Entry, error) {
 		if err != nil {
 			return err
 		}
-		// De-dupe by PID FIRST so a re-claim by the same process can
-		// re-use its previously-held slot. Without this a re-claim would
-		// see its own old entry, pick the next free slot, and the process
-		// would jump from instance 1 → 2 on every restart of the claim.
 		filtered := f.Entries[:0:0]
 		for _, e := range f.Entries {
 			if e.PID == pid {
@@ -274,8 +235,6 @@ func Release(pid int) error {
 	})
 }
 
-// lowestFree picks the smallest positive integer not present in
-// entries. The entries don't have to be sorted.
 func lowestFree(entries []Entry) int {
 	taken := make(map[int]bool, len(entries))
 	for _, e := range entries {
@@ -300,7 +259,6 @@ func writeAtomic(f File) error {
 		return err
 	}
 	f.Version = schemaVersion
-	// Sort by Number so on-disk diffs read cleanly when humans look.
 	sort.Slice(f.Entries, func(i, j int) bool {
 		return f.Entries[i].Number < f.Entries[j].Number
 	})

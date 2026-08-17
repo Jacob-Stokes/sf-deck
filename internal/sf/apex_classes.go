@@ -1,11 +1,5 @@
 package sf
 
-// ApexClass list + drill helpers. Tooling-API read; mirrors the shape
-// of triggers.go since both store Body as a top-level column.
-//
-// Read-only for now — write paths (deploy / save body) come later via
-// the same UpdateToolingMetadata route triggers use.
-
 import (
 	"encoding/json"
 	"fmt"

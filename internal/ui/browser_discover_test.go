@@ -33,7 +33,6 @@ func TestBrowserChoiceOptionsLeadWithDefault(t *testing.T) {
 	if len(opts) == 0 || opts[0].Value != "" {
 		t.Fatal("first browser option should be the empty (system default) value")
 	}
-	// current-selection cursor points at the matching row.
 	if all := discoverBrowsers(); len(all) > 0 {
 		_, cursor := browserChoiceOptions(all[0])
 		if cursor != 1 {

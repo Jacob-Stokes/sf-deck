@@ -1,33 +1,5 @@
 package sf
 
-// recently_viewed.go — generic RecentlyViewed reader.
-//
-// Salesforce tracks "things this user recently viewed" server-side
-// and exposes them via the RecentlyViewed standard sObject. The
-// list is records-only (no flows / apex / setup) but is global —
-// it captures Lightning views, mobile views, sf-deck views (since
-// those open Lightning), API-driven opens, etc.
-//
-// We expose this as a small, generic API rather than baking SOQL
-// strings into the UI layer:
-//
-//	rows, err := sf.ListRecentlyViewed(orgUser, sf.RecentlyViewedOpts{
-//	    Limit: 50,
-//	})
-//
-// or per-sObject:
-//
-//	rows, err := sf.ListRecentlyViewed(orgUser, sf.RecentlyViewedOpts{
-//	    SObject: "Account",
-//	    Limit:   25,
-//	})
-//
-// Per-sObject queries use the `RECENTLY VIEWED` SOQL clause on the
-// target sObject; universal queries hit the `RecentlyViewed`
-// standard sObject directly so a single round-trip returns mixed
-// kinds. Both paths yield the same RecentlyViewedRow shape so
-// callers don't branch.
-
 import (
 	"fmt"
 	"strings"
@@ -51,13 +23,8 @@ type RecentlyViewedRow struct {
 
 // RecentlyViewedOpts controls the query shape.
 type RecentlyViewedOpts struct {
-	// SObject narrows the query to a single sObject. Empty = universal
-	// (cross-sObject) — uses the RecentlyViewed standard object.
 	SObject string
 
-	// Limit caps the number of rows. 0 → 50 (Salesforce-side default
-	// for RECENTLY VIEWED is 200; we surface a smaller default to keep
-	// the rail tight, callers override when they want more).
 	Limit int
 
 	// IncludeName is a hint for per-sObject queries: when true, the
@@ -117,7 +84,6 @@ func recentlyViewedSOQL(opts RecentlyViewedOpts) string {
 	}
 
 	if opts.SObject == "" {
-		// nil → built-in defaults; explicit empty slice → filter nothing.
 		exclude := opts.ExcludeTypes
 		if exclude == nil {
 			exclude = defaultRecentNoiseSFTypes

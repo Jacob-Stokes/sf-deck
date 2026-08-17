@@ -1,18 +1,6 @@
 package devproject
 
 // Saved metadata comparisons — a persisted org-to-org compare RESULT.
-//
-// Unlike a comparison TEMPLATE (just source/target/scope/method, stored
-// in settings.toml), a saved comparison carries the full retrieved
-// snapshots + inventory as an opaque gzipped blob, so the user can
-// reopen it offline and act on the diff list after a restart.
-//
-// The store treats the payload as opaque bytes (Blob) — the UI layer
-// owns the JSON shape (snapshots + inventory), keeping internal/devproject
-// free of any internal/diff dependency. Lives in devprojects.db (not
-// cache.db) so the cache-clear action never destroys saved comparisons.
-//
-// Identifiers: "cmp_" + base32-of-12-random-bytes.
 
 import (
 	"crypto/rand"

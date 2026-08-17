@@ -1,15 +1,5 @@
 // Package cli is the argument parser + dispatcher for sf-deck's
 // headless commands.
-//
-// Layout intentionally flat: a top-level Dispatch routes by noun
-// (chip / project / tag / org / …) into per-noun routers in the same
-// package. Each leaf command writes a *headless.Response and returns
-// the process exit code.
-//
-// The split between cli and headless (the JSON envelope) is
-// deliberate: headless owns the wire contract; cli owns the *argv → wire*
-// translation. Tests for the contract live in headless/; tests for
-// argv parsing live here.
 package cli
 
 import (
@@ -29,19 +19,12 @@ import (
 // detection but doesn't touch noun-specific flags (each subcommand
 // owns its own FlagSet, fed from Args.Rest).
 type Args struct {
-	// JSON forces JSON output. Default text mode.
 	JSON bool
 
-	// Noun is the first positional after global flags ("chip",
-	// "project", …). Empty when no headless command was issued.
 	Noun string
 
-	// Verb is the second positional ("list", "create", …). Optional
-	// for nouns that have a default verb.
 	Verb string
 
-	// Rest is everything after <noun> <verb>; each subcommand parses
-	// its own flags + positional args from here.
 	Rest []string
 }
 
@@ -106,11 +89,8 @@ func Parse(argv []string) Args {
 			i++
 			goto done
 		case strings.HasPrefix(a, "-"):
-			// Unknown global flag — stop top-level parsing and let
-			// the subcommand decide.
 			goto done
 		default:
-			// First positional = noun.
 			out.Noun = a
 			i++
 			goto consumeVerb
@@ -191,19 +171,12 @@ func Dispatch(a *app.App, args Args, stdout, stderr io.Writer) int {
 		return dispatchUpdate(a, args, stdout, mode)
 	}
 
-	// Unknown noun — shouldn't happen if cmd/sf-deck respected
-	// IsHeadless, but render the typed error for symmetry.
 	r := headless.Fail("", "", headless.ErrInvalidArgument,
 		fmt.Sprintf("unknown command %q", args.Noun), nil)
 	_ = r.Write(stdout, mode)
 	return headless.ExitCodeFor(r)
 }
 
-// writeSafetyBlocked renders the safety_blocked JSON envelope.
-// Every write verb calls this when a.CanWrite returns app.BlockedError
-// so the shape (code + details.required_write_kind +
-// details.effective_safety) is identical regardless of which command
-// got blocked. Matches the shape in docs/headless-mode-plan.md.
 func writeSafetyBlocked(command, orgUser string, be app.BlockedError, stdout io.Writer, mode headless.WriteMode) int {
 	r := headless.Fail(command, orgUser, headless.ErrSafetyBlocked,
 		be.Error(),
@@ -216,9 +189,6 @@ func writeSafetyBlocked(command, orgUser string, be app.BlockedError, stdout io.
 	return headless.ExitCodeFor(r)
 }
 
-// writeKindString labels a settings.WriteKind for the error envelope.
-// settings exposes SafetyLevel.String but not a WriteKind labeller,
-// so we mirror the same one app.BlockedError uses internally.
 func writeKindString(k settings.WriteKind) string {
 	switch k {
 	case settings.WriteRecord:
@@ -231,10 +201,6 @@ func writeKindString(k settings.WriteKind) string {
 	return "unknown"
 }
 
-// newFlagSet returns a FlagSet that writes errors into the headless
-// response rather than the default flag.ExitOnError behaviour. Each
-// subcommand uses this so a bad flag becomes invalid_argument on
-// stdout, not a stderr dump + os.Exit(2).
 func newFlagSet(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // we render our own errors

@@ -1,9 +1,5 @@
 package postprocess
 
-// xlsx → csv conversion. Used when the user picked "Details Only · csv"
-// and we've already detail-ified the SF xlsx — we just need to dump
-// the first sheet as csv.
-
 import (
 	"bytes"
 	"encoding/csv"
@@ -31,8 +27,6 @@ func ToCSV(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Pad every row to the widest row's length so a csv.Writer doesn't
-	// emit ragged rows.
 	width := 0
 	for _, r := range rows {
 		if len(r) > width {

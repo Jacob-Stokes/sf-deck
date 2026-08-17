@@ -12,7 +12,6 @@ func TestBuildGlobalSearchSOSL(t *testing.T) {
 		{Sobject: "Case", NameField: "Subject", Fields: []string{"CaseNumber"}, Secondary: "CaseNumber"},
 	}, 50)
 
-	// FIND clause + IN NAME FIELDS structure.
 	if !strings.HasPrefix(got, "FIND {acme} IN NAME FIELDS RETURNING ") {
 		t.Fatalf("missing FIND/RETURNING prefix: %q", got)
 	}
@@ -20,23 +19,18 @@ func TestBuildGlobalSearchSOSL(t *testing.T) {
 		t.Fatalf("missing LIMIT suffix: %q", got)
 	}
 
-	// Each target carries Id implicitly + the requested fields.
 	if !strings.Contains(got, "Account(Id, Name, Industry)") {
 		t.Errorf("expected Account projection, got: %q", got)
 	}
 	if !strings.Contains(got, "Contact(Id, Name, Email)") {
 		t.Errorf("expected Contact projection, got: %q", got)
 	}
-	// Case uses NameField=Subject and explicit Fields=CaseNumber +
-	// Secondary=CaseNumber (deduped).
 	if !strings.Contains(got, "Case(Id, Subject, CaseNumber)") {
 		t.Errorf("expected Case projection, got: %q", got)
 	}
 }
 
 func TestBuildGlobalSearchSOSLEscapesTerm(t *testing.T) {
-	// SOSL braces in the term need escaping or the parser sees
-	// nested {} and the query 400s server-side.
 	got := buildGlobalSearchSOSL("a{b}c", []GlobalSearchTarget{
 		{Sobject: "Account"},
 	}, 10)
@@ -69,7 +63,6 @@ func TestStringifyField(t *testing.T) {
 		{float64(3.14), "3.14"},
 		{true, "true"},
 		{false, "false"},
-		// Nested relationship → prefer .Name.
 		{map[string]any{"Name": "Acme", "Id": "001"}, "Acme"},
 		{map[string]any{"Id": "001"}, "001"},
 		{map[string]any{}, ""},
@@ -90,7 +83,6 @@ func TestSosjectTypeFromAttributes(t *testing.T) {
 		t.Errorf("got %q, want Account", got)
 	}
 
-	// Missing attributes → "".
 	if got := sosjectTypeFromAttributes(map[string]any{"Id": "x"}); got != "" {
 		t.Errorf("missing attrs: got %q, want empty", got)
 	}

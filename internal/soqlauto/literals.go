@@ -1,13 +1,5 @@
 package soqlauto
 
-// Static literal data: SOQL keywords, aggregate/date functions,
-// FIELDS() variants, and the full SOQL date-literal vocabulary.
-//
-// Matches Inspector Reloaded's hardcoded lists verbatim so the
-// vocabulary stays current with what SF accepts.
-
-// soqlKeywords are the bare clause keywords offered at top-level
-// or as "what comes next?" prompts.
 var soqlKeywords = []literal{
 	{Value: "SELECT", Detail: "projection clause"},
 	{Value: "FROM", Detail: "target sObject"},
@@ -38,10 +30,7 @@ var soqlKeywords = []literal{
 	{Value: "USING SCOPE", Detail: "scope filter"},
 }
 
-// soqlFunctions are the aggregate, date, and formatter functions
-// that can appear inside SELECT projections.
 var soqlFunctions = []literal{
-	// Aggregates
 	{Value: "COUNT()", Detail: "row count"},
 	{Value: "COUNT(Id)", Detail: "row count of Id"},
 	{Value: "COUNT_DISTINCT()", Detail: "distinct value count"},
@@ -49,7 +38,6 @@ var soqlFunctions = []literal{
 	{Value: "AVG()", Detail: "mean of numeric field"},
 	{Value: "MIN()", Detail: "min value"},
 	{Value: "MAX()", Detail: "max value"},
-	// Date functions
 	{Value: "CALENDAR_MONTH()", Detail: "month of date field"},
 	{Value: "CALENDAR_QUARTER()", Detail: "quarter of date field"},
 	{Value: "CALENDAR_YEAR()", Detail: "year of date field"},
@@ -63,22 +51,15 @@ var soqlFunctions = []literal{
 	{Value: "HOUR_IN_DAY()", Detail: "hour of datetime"},
 	{Value: "WEEK_IN_MONTH()", Detail: "week of month"},
 	{Value: "WEEK_IN_YEAR()", Detail: "week of year"},
-	// Formatters
 	{Value: "FORMAT()", Detail: "localised format"},
 	{Value: "convertCurrency()", Detail: "convert to corporate currency"},
 	{Value: "toLabel()", Detail: "translated picklist label"},
 	{Value: "convertTimezone()", Detail: "convert datetime tz"},
-	// Field expressions
 	{Value: "FIELDS(ALL)", Detail: "project every field (cap 200)"},
 	{Value: "FIELDS(STANDARD)", Detail: "project standard fields"},
 	{Value: "FIELDS(CUSTOM)", Detail: "project custom fields"},
 }
 
-// soqlDateLiterals are the dynamic-date constants accepted in
-// WHERE/HAVING comparisons against date or datetime fields.
-//
-// The `:n` literals carry a placeholder `:1` so users can quickly
-// edit the count.
 var soqlDateLiterals = []literal{
 	{Value: "TODAY"},
 	{Value: "YESTERDAY"},

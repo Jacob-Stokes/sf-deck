@@ -16,24 +16,9 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderHomeDestinations builds the destinations grid as a list of
-// rendered lines. Cursor highlights the currently-focused row; when
-// no section is focused the cursor sits on the row but the column-
-// header brackets dim to convey "global navigation, type a section
-// letter to focus."
-//
-// Returns the absolute row index (within the returned slice) of the
-// cursored entry, or -1 when the cursor isn't visible — the caller
-// uses it to scroll the landing view so the cursor stays on screen.
 func (m Model) renderHomeDestinations(inner int) ([]string, int) {
 	out := []string{}
 
-	// Header bar with footer-style hint about the interaction model.
-	// The hint is focus-aware: before focusing a section it explains
-	// the two-keystroke model; once a section is focused it explains
-	// that item letters open and esc backs out to unfocused (the only
-	// way to switch between sections whose letters collide with the
-	// focused section's item letters).
 	titleStyle := lipgloss.NewStyle().Foreground(theme.BorderHi).Bold(true)
 	var hint string
 	if m.homeFocusedSectionLetter != "" {
@@ -47,19 +32,12 @@ func (m Model) renderHomeDestinations(inner int) ([]string, int) {
 		Render(strings.Repeat("─", inner)))
 	headerRows := len(out) // rows before the grid body starts
 
-	// Two-column layout when there's room. Section widths are derived
-	// from the longest label + the longest entry per column so the
-	// arrows align cleanly.
 	colW := inner / 2
 	twoColumn := colW >= 38
 	if !twoColumn {
 		colW = inner
 	}
 
-	// Bucket sections into columns (interleaved: section 0 → col 0,
-	// section 1 → col 1, section 2 → col 0, …) so adjacent sections
-	// in the catalog sit side by side and the columns balance in
-	// height across uneven section sizes.
 	var left, right []*homeDestinationSection
 	for i := range homeDestinations {
 		if twoColumn && i%2 == 1 {
@@ -69,7 +47,6 @@ func (m Model) renderHomeDestinations(inner int) ([]string, int) {
 		left = append(left, &homeDestinations[i])
 	}
 	if !twoColumn {
-		// Single column: just concatenate every section.
 		left = nil
 		for i := range homeDestinations {
 			left = append(left, &homeDestinations[i])
@@ -86,8 +63,6 @@ func (m Model) renderHomeDestinations(inner int) ([]string, int) {
 		return out, cur
 	}
 	rightLines, rightCur := m.renderDestinationColumn(right, colW)
-	// Zip the two columns row-by-row, padding the shorter side with
-	// blanks so the join lines up.
 	for i := 0; i < max(len(leftLines), len(rightLines)); i++ {
 		l := ""
 		if i < len(leftLines) {
@@ -97,16 +72,12 @@ func (m Model) renderHomeDestinations(inner int) ([]string, int) {
 		if i < len(rightLines) {
 			r = rightLines[i]
 		}
-		// Pad left column to colW so the right column starts at the
-		// same X offset on every row.
 		pad := colW - ansi.StringWidth(l)
 		if pad > 0 {
 			l += strings.Repeat(" ", pad)
 		}
 		out = append(out, l+r)
 	}
-	// The cursor lives in whichever column reported it; its zip-row is
-	// the column-local row index (both columns share the row index i).
 	colCur := leftCur
 	if colCur < 0 {
 		colCur = rightCur
@@ -158,7 +129,6 @@ func (m Model) renderDestinationColumn(sections []*homeDestinationSection, w int
 				cursorRow = len(out) // this entry's row in this column
 			}
 
-			// Per-section letter — bold only when section is focused.
 			keyStyle := lipgloss.NewStyle().Foreground(theme.Muted)
 			if isFocused {
 				keyStyle = lipgloss.NewStyle().Foreground(theme.Magenta).Bold(true)
@@ -172,7 +142,6 @@ func (m Model) renderDestinationColumn(sections []*homeDestinationSection, w int
 			line := prefix + keyStyle.Render(e.Key) + " " + arrow + " " + label
 			out = append(out, ansi.Truncate(line, w, "…"))
 		}
-		// Section separator (skip after the last section in this column).
 		if sectionIdx < len(sections)-1 {
 			out = append(out, "")
 		}
@@ -180,9 +149,6 @@ func (m Model) renderDestinationColumn(sections []*homeDestinationSection, w int
 	return out, cursorRow
 }
 
-// homeDestFlatIndex returns the flat row count for a given
-// (sectionIdx, entryIdx). Used by section-focus to land the cursor
-// on the first entry of the focused section.
 func homeDestFlatIndex(sectionIdx, entryIdx int) int {
 	row := 0
 	for i, s := range homeDestinations {
@@ -194,8 +160,6 @@ func homeDestFlatIndex(sectionIdx, entryIdx int) int {
 	return row
 }
 
-// homeDestSectionEntryAtIndex returns (section, entry, ok) for a
-// flat row index. Used by Enter handling to fire the cursored row.
 func homeDestSectionEntryAtIndex(idx int) (*homeDestinationSection, *homeDestination, bool) {
 	if idx < 0 {
 		return nil, nil, false

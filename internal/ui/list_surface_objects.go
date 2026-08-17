@@ -1,7 +1,5 @@
 package ui
 
-// /objects list surface — see list_surface.go for the listSurface type.
-
 import (
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"

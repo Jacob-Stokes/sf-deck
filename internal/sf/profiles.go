@@ -1,17 +1,6 @@
 package sf
 
 // Profile listing for the /perms tab.
-//
-// Important quirk: in Salesforce, every Profile is backed by an
-// implicit PermissionSet. ObjectPermissions, FieldPermissions, and
-// system-permission boolean fields live on the implicit PermissionSet
-// — not on the Profile itself. So when an admin "edits FLS on the
-// System Admin profile" they're actually writing FieldPermissions
-// rows whose ParentId = the implicit PermissionSet's Id.
-//
-// We resolve that implicit-permset Id at list time (one extra query)
-// and cache it on the Profile struct so downstream callers don't
-// each have to re-resolve.
 
 import "fmt"
 
@@ -55,9 +44,6 @@ func ListProfiles(target string) ([]Profile, error) {
 		return nil, err
 	}
 	results, subErrs := CompositeQueryResults(responses)
-	// Profiles is the only hard requirement; license/implicit errors
-	// downgrade gracefully to "missing data" rather than failing the
-	// whole call.
 	if err, ok := subErrs["profiles"]; ok {
 		return nil, err
 	}

@@ -5,8 +5,6 @@ import (
 )
 
 func TestParseFieldErrors_TypicalRejection(t *testing.T) {
-	// Real-shape rejection: SF returns an array of objects with
-	// errorCode, message, and a fields slice.
 	raw := []byte(`[
 		{"fields":["Name"],"message":"Required fields are missing: [Name]","errorCode":"REQUIRED_FIELD_MISSING"},
 		{"fields":["Amount"],"message":"Amount must be positive","errorCode":"INVALID_FIELD"}

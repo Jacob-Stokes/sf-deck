@@ -11,9 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderProjects lists local SFDX projects discovered under the user's
-// default search roots. Bespoke row layout (two-line per project) so
-// it doesn't go through renderList.
 func (m Model) renderProjects(w, innerH int) string {
 	inner := w - 4
 	var lines []string
@@ -44,10 +41,6 @@ func (m Model) renderProjects(w, innerH int) string {
 	if sel >= len(projs) {
 		sel = 0
 	}
-	// Each project renders as 2-3 lines; renderRow returns the full
-	// multi-line block joined with "\n" so the viewport still budgets
-	// by *projects* rather than raw lines. Pass rowLines=3 so the
-	// windowing math understands each "row" actually consumes 3 lines.
 	lines = append(lines, renderRowsN(
 		len(projs), sel, innerH, len(lines), 0, inner, 3,
 		func(i int) string {
@@ -76,8 +69,6 @@ func (m Model) renderProjects(w, innerH int) string {
 	)...)
 	return strings.Join(lines, "\n")
 }
-
-// --- setup shortcuts ---------------------------------------------------
 
 type setupLink struct {
 	Name string

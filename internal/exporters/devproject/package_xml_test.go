@@ -27,11 +27,9 @@ func TestWritePackageXML_GroupsByType(t *testing.T) {
 
 	got := buf.String()
 
-	// XML header
 	if !strings.HasPrefix(got, "<?xml") {
 		t.Errorf("missing XML header:\n%s", got)
 	}
-	// Both Account and Contact are members of CustomObject
 	if !strings.Contains(got, "<members>Account</members>") {
 		t.Errorf("missing Account member:\n%s", got)
 	}
@@ -41,18 +39,15 @@ func TestWritePackageXML_GroupsByType(t *testing.T) {
 	if !strings.Contains(got, "<name>CustomObject</name>") {
 		t.Errorf("missing CustomObject type:\n%s", got)
 	}
-	// Field uses CustomField
 	if !strings.Contains(got, "<members>Account.Phone</members>") {
 		t.Errorf("missing field member:\n%s", got)
 	}
 	if !strings.Contains(got, "<name>CustomField</name>") {
 		t.Errorf("missing CustomField type:\n%s", got)
 	}
-	// Flow uses Name (DeveloperName)
 	if !strings.Contains(got, "<members>AccountRouter</members>") {
 		t.Errorf("missing Flow member:\n%s", got)
 	}
-	// API version pinned
 	if !strings.Contains(got, "<version>62.0</version>") {
 		t.Errorf("missing or wrong api version:\n%s", got)
 	}
@@ -81,9 +76,6 @@ func TestWritePackageXML_RecordsExcluded(t *testing.T) {
 }
 
 func TestWritePackageXML_DeterministicOrder(t *testing.T) {
-	// Same items in different input order should produce identical
-	// output — types sorted alphabetically, members sorted within
-	// each type.
 	itemsA := []devproject.Item{
 		{Kind: devproject.KindSObject, Ref: "Contact", Name: "Contact"},
 		{Kind: devproject.KindFlow, Ref: "0F1", Name: "FlowB"},
@@ -176,15 +168,12 @@ func TestSuggestedReadme_ManifestOnly(t *testing.T) {
 	if !strings.Contains(got, "dev@example.com") {
 		t.Errorf("missing org context:\n%s", got)
 	}
-	// Manifest-only mode: README should explain the three workflows
-	// (drop-in / generate / non-sfdx)
 	if !strings.Contains(got, "Drop into an existing sfdx project") {
 		t.Errorf("manifest-only README missing drop-in instructions:\n%s", got)
 	}
 	if !strings.Contains(got, "Generate a new sfdx project") {
 		t.Errorf("manifest-only README missing generate instructions:\n%s", got)
 	}
-	// Should NOT mention sfdx-project.json (that's the full-project mode)
 	if strings.Contains(got, "sfdx-project.json") {
 		t.Errorf("manifest-only README shouldn't mention sfdx-project.json:\n%s", got)
 	}
@@ -202,8 +191,6 @@ func TestSuggestedReadme_FullProject(t *testing.T) {
 	if !strings.Contains(got, "force-app/main/default") {
 		t.Errorf("full-project README should mention force-app:\n%s", got)
 	}
-	// Should NOT include the manifest-only "drop into existing project"
-	// instructions
 	if strings.Contains(got, "Drop into an existing sfdx project") {
 		t.Errorf("full-project README shouldn't have manifest-only steps:\n%s", got)
 	}
@@ -221,7 +208,6 @@ func TestSfdxProjectJSON(t *testing.T) {
 		t.Errorf("missing force-app package directory: %s", got)
 	}
 
-	// Empty project name falls back to a sensible default.
 	got = SfdxProjectJSON("", "63.0")
 	if !strings.Contains(got, `"name": "sf-deck-export"`) {
 		t.Errorf("missing default project name: %s", got)

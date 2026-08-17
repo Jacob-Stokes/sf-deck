@@ -1,28 +1,5 @@
 package ui
 
-// Left rail layout.
-//
-// The left pane is a single toggleable widget pane that hosts utilities
-// (Orgs, Bookmarks, …). Each utility is one subtab at the top of the
-// pane; the active subtab's content fills the rest of the pane.
-//
-// Layout:
-//
-//   ┌─────────────────────────┐
-//   │ Orgs · Bookmarks        │  ← subtab strip
-//   │ ─────────────────────── │
-//   │                         │
-//   │  (selected utility)     │
-//   │                         │
-//   └─────────────────────────┘
-//
-// Adding a new utility = add a utilityID const, a row in
-// leftrailUtilities() with label + glyph, and a render case in
-// renderLeftWidget(). Nothing else in the codebase needs to know the
-// list. Toggling which utility is active uses the same `[` / `]`
-// subtab keys (or `tab` / `shift+tab`) as elsewhere — see
-// cycleLeftUtility in update_nav.go.
-
 import (
 	"fmt"
 	"image/color"
@@ -36,8 +13,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// utilityID identifies one left-rail utility. Stable across renames
-// (used in persistence + keymap config).
 type utilityID string
 
 const (
@@ -51,24 +26,17 @@ const (
 	utilityBookmarks utilityID = "bookmarks"
 )
 
-// leftrailUtility is the display metadata for one utility.
 type leftrailUtility struct {
 	ID    utilityID
 	Label string
 }
 
-// leftrailUtilities lists every utility in display order. Currently
-// just Orgs — the rail is org-focused only. Dev Projects moved to a
-// right-rail navigation pill (see render_tabs.go).
 func leftrailUtilities() []leftrailUtility {
 	return []leftrailUtility{
 		{ID: utilityOrgs, Label: "Orgs"},
 	}
 }
 
-// currentUtility returns the leftrailUtility currently shown in the
-// widget pane. Falls back to the first one if the stored index is out
-// of range (defends against config drift).
 func (m Model) currentUtility() leftrailUtility {
 	utils := leftrailUtilities()
 	i := m.leftUtilityIdx
@@ -78,16 +46,10 @@ func (m Model) currentUtility() leftrailUtility {
 	return utils[i]
 }
 
-// orgsUtilityIdx returns the index of the Orgs utility in the utility
-// list. Always 0 now that Orgs is the only utility, but callers still
-// use this rather than a literal so the indirection survives if the
-// rail ever grows extra utilities again.
 func orgsUtilityIdx() int {
 	return utilityIdx(utilityOrgs)
 }
 
-// utilityIdx finds a utility by ID. Returns 0 when not found; callers
-// defend against drift with the same guard as currentUtility.
 func utilityIdx(id utilityID) int {
 	for i, u := range leftrailUtilities() {
 		if u.ID == id {
@@ -97,8 +59,6 @@ func utilityIdx(id utilityID) int {
 	return 0
 }
 
-// renderLeftWidget draws the left rail body. With Dev Projects moved
-// to the right-rail nav, the rail just shows the Orgs panel.
 func (m Model) renderLeftWidget(w, h, innerH int) string {
 	inner := w - 4
 	if inner < 4 {
@@ -113,11 +73,6 @@ func (m Model) renderLeftWidget(w, h, innerH int) string {
 	return style.Width(w).Height(h).MaxHeight(h).Render(clipLines(body, innerH))
 }
 
-// renderOrgsWidget is the content of the Orgs utility. Walks the
-// flattened row list (group headers + indented org rows) produced by
-// buildRailRows. Users with no groups configured see the same flat
-// list as before — buildRailRows omits the synthetic Ungrouped header
-// when there are zero user groups.
 func (m Model) renderOrgsWidget(inner int) string {
 	if m.orgsRes.Busy() && len(m.orgs) == 0 {
 		return theme.Subtle.Render("  loading…")
@@ -144,9 +99,6 @@ func (m Model) renderOrgsWidget(inner int) string {
 		onCursor := ri == cursor && m.focus == focusOrgs
 		switch row.Kind {
 		case railRowGroupHeader:
-			// Blank divider above every header except the first one,
-			// so groups visually separate. Pure render concern — the
-			// row list itself is unchanged so cursor indices line up.
 			if headersSeen > 0 {
 				b.WriteByte('\n')
 			}
@@ -159,8 +111,6 @@ func (m Model) renderOrgsWidget(inner int) string {
 		}
 	}
 
-	// Context-aware key hints — only when the rail itself is focused.
-	// Skip in narrow widths (would just truncate to noise).
 	if m.focus == focusOrgs && inner >= 16 {
 		b.WriteString("\n")
 		b.WriteString(m.renderOrgsRailHints(rows, cursor, inner))
@@ -169,11 +119,6 @@ func (m Model) renderOrgsWidget(inner int) string {
 	return b.String()
 }
 
-// renderOrgsRailHints produces a one-line dim hint pointing the
-// user at the org-manage modal for any edit action. The rail itself
-// only owns navigation aids (j/k, space to fold/expand) — keeping
-// it tight in the narrow rail and putting the full key list in the
-// modal which has room to breathe.
 func (m Model) renderOrgsRailHints(_ []orgRailRow, _ int, inner int) string {
 	hints := []string{
 		firstPretty(Keys.OrgGroupToggle) + ":fold",
@@ -212,7 +157,6 @@ func (m Model) renderRailGroupHeader(row orgRailRow, onCursor bool, groups []set
 	countStr := fmt.Sprintf("%d", count)
 	countStyle := lipgloss.NewStyle().Foreground(theme.Muted)
 
-	// 2-col jump slot kept for vertical alignment with org rows below.
 	jumpSlot := "  "
 	left := jumpSlot + lipgloss.NewStyle().Foreground(arrowColor).Render(arrow) + " "
 	leftW := lipgloss.Width(left)
@@ -230,10 +174,6 @@ func (m Model) renderRailGroupHeader(row orgRailRow, onCursor bool, groups []set
 	return left + rendered + strings.Repeat(" ", pad) + countStyle.Render(countStr)
 }
 
-// renderRailOrgRow draws one indented org row under a group header
-// (or under the synthetic Ungrouped section). Member rows are
-// indented by 2 cols relative to the existing flat layout to keep
-// the parent group visually distinct.
 func (m Model) renderRailOrgRow(row orgRailRow, onCursor bool, quickJump bool, inner int) string {
 	o := row.Org
 	i := row.OrgIdx
@@ -314,9 +254,6 @@ func cliDefaultMarkers(o sf.Org) string {
 	return " " + lipgloss.NewStyle().Foreground(theme.Cyan).Bold(true).Render(out)
 }
 
-// scratchExpiryTag renders the scratch-org countdown ("3d left"),
-// amber within a week, red within two days / expired. Empty for
-// non-scratch orgs. Date-granular — see sf.Org.ScratchDaysLeft.
 func scratchExpiryTag(o sf.Org) string {
 	days, ok := o.ScratchDaysLeft()
 	if !ok {

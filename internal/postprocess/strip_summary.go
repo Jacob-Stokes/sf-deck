@@ -1,15 +1,5 @@
 package postprocess
 
-// "Strip summary" transform — removes Subtotal / Total / Grand Total
-// rows that SF leaves embedded in grouped reports. detailsify trims
-// the trailing Grand Total only; this catches subtotals that appear
-// between groups in summary / matrix reports.
-//
-// Heuristic: a row is a summary row when its first non-empty cell
-// matches one of the SF summary labels (Total, Subtotal, Grand Total,
-// Sum of …, Avg of …, Count …, Min …, Max …). Case-insensitive,
-// prefix-match.
-
 import (
 	"strings"
 
@@ -35,7 +25,6 @@ func stripSummarySheet(wb *excelize.File, sheet string) error {
 	if err != nil {
 		return err
 	}
-	// Walk bottom-up so the indices we still need don't shift on delete.
 	for i := len(rows) - 1; i >= 1; i-- { // skip header at 0
 		if isAnySummaryRow(rows[i]) {
 			if err := wb.RemoveRow(sheet, i+1); err != nil {
@@ -46,9 +35,6 @@ func stripSummarySheet(wb *excelize.File, sheet string) error {
 	return nil
 }
 
-// isAnySummaryRow returns true when the first non-empty cell looks
-// like a summary label. Broader than the stricter check inside
-// detailsify (which only handles the trailing Grand Total).
 func isAnySummaryRow(row []string) bool {
 	for _, c := range row {
 		t := strings.TrimSpace(c)

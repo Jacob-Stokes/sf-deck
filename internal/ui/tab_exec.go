@@ -1,14 +1,5 @@
 package ui
 
-// /exec — anonymous Apex workspace. Mirrors /soql's shape: an
-// always-visible editor body, plus Saved / History sibling subtabs,
-// plus an Output subtab that shows the most recent run's debug log.
-//
-// The editor itself is a multi-line textarea (bubbles/textarea) so
-// users can compose 5-50 line snippets in-app. `e` opens $EDITOR
-// when they want their real editor; enter (when blurred) runs the
-// current body.
-
 import (
 	"fmt"
 	"strings"
@@ -19,9 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderExec branches by subtab. Saved / Output / History delegate
-// to their own renderers (declared in tab_exec_library.go / log
-// viewer); the Editor is the default body.
 func (m Model) renderExec(w, innerH int) string {
 	return m.dispatchSubtab(w, innerH, m.tabSubtabs(), m.execSubtabIdx,
 		map[Subtab]subtabBranch{
@@ -33,7 +21,6 @@ func (m Model) renderExec(w, innerH int) string {
 	)
 }
 
-// renderExecEditor is the Editor subtab body.
 func (m Model) renderExecEditor(w, innerH int) string {
 	inner := w - 4
 	titleSuffix := ""
@@ -89,9 +76,6 @@ func (m Model) renderExecEditor(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderExecResultSummary lays out the compile + run status block
-// shown below the editor after a run lands. Output (the full debug
-// log) lives on its own subtab — this is the at-a-glance summary.
 func renderExecResultSummary(r sf.ExecuteAnonymousResult, inner int) []string {
 	var lines []string
 	tookMs := r.Took.Milliseconds()
@@ -141,13 +125,6 @@ func renderExecResultSummary(r sf.ExecuteAnonymousResult, inner int) []string {
 	return lines
 }
 
-// renderExecOutput is the Output subtab — full debug-log scroll
-// viewer for the most recent run. Reuses the shared codeView path
-// (same one /apex class detail uses) so j/k scrolling, gutter line
-// numbers, and the focused/unfocused cursor styling come for free.
-//
-// When no log has been captured yet (no run, or log capture was
-// off), shows the editor-style "no result" hint.
 func (m Model) renderExecOutput(w, innerH int) string {
 	if m.execResult.LogBody == "" {
 		hint := "  no log captured yet — run some Apex with [log] on first"
@@ -183,7 +160,6 @@ func (m Model) renderExecOutput(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderExecSaved + renderExecHistory delegate to tab_exec_library.go.
 func (m Model) renderExecSaved(w, innerH int) string {
 	return m.renderExecSavedSubtab(w, innerH)
 }
@@ -192,14 +168,10 @@ func (m Model) renderExecHistory(w, innerH int) string {
 	return m.renderExecHistorySubtab(w, innerH)
 }
 
-// taLineCount counts newlines in s; used to size the textarea.
 func taLineCount(s string) int {
 	return strings.Count(s, "\n") + 1
 }
 
-// wrapLines hard-wraps long strings to width. Splits on whitespace
-// when possible; falls back to mid-word break for absurdly long
-// tokens (rare in compile messages).
 func wrapLines(s string, width int) []string {
 	if width <= 0 {
 		return []string{s}

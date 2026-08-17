@@ -1,11 +1,5 @@
 package sf
 
-// System permissions — ~200 boolean fields on the PermissionSet sobject
-// with names starting with "Permissions" (e.g. PermissionsApiEnabled).
-//
-// We discover them via describe rather than hard-coding the list, so
-// newly-added Salesforce permissions surface automatically.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -29,7 +23,6 @@ func ListSystemPermissions(target, parentID string) ([]SystemPermission, error) 
 		return nil, err
 	}
 
-	// Step 1: describe PermissionSet to get all Permissions* boolean fields.
 	desc, err := c.DescribeREST("PermissionSet")
 	if err != nil {
 		return nil, fmt.Errorf("describe PermissionSet: %w", err)
@@ -54,16 +47,6 @@ func ListSystemPermissions(target, parentID string) ([]SystemPermission, error) 
 		return fields[i].name < fields[j].name
 	})
 
-	// Step 2: build chunked SELECT statements (≤ 50 fields each so
-	// URLs stay well under any proxy / Salesforce URL-length cap),
-	// then ship them all in a single /composite POST. One HTTP
-	// round-trip total even for orgs with 600+ system perms.
-	//
-	// The composite endpoint counts each subrequest separately
-	// against the daily API quota (~12 calls for a typical org), so
-	// the caller (UI Resource[T]) caches the result aggressively —
-	// system perms only change when an admin explicitly toggles them,
-	// which is rare. Long TTL keeps the per-visit cost amortised.
 	const chunkSize = 50
 	values := map[string]bool{}
 

@@ -1,22 +1,5 @@
 package ui
 
-// Top-level frame layout.
-//
-// View() is the entry point Bubble Tea calls every frame. It returns
-// a tea.View carrying the rendered string + altscreen / cursor flags
-// the runtime reads.
-//
-// Layout:
-//
-//   renderHeader()       — top chrome bar (render_header.go)
-//   renderTabBar()       — tab row (render_tabs.go)
-//   body (3 panes)       — left rail + main + sidebar
-//   renderStatusBar()    — bottom chrome bar (render_status.go)
-//
-// Modal overlays (open menu, edit modal, choice modal, global search,
-// info modal) are composed as positioned layers over the base view with
-// lipgloss v2's NewLayer / NewCompositor.
-
 import (
 	"fmt"
 	"runtime/debug"
@@ -42,10 +25,6 @@ func (m Model) View() (out tea.View) {
 			out = renderPanicFrame(r)
 		}
 	}()
-	// Publish the latest snapshot to any IPC subscribers. Cheap
-	// (single-map copy + RWMutex) and runs once per render — keeps
-	// the control channel honest without the publisher needing to
-	// know which messages changed which fields.
 	m.PublishControlSnapshot()
 	return m.viewImpl()
 }
@@ -91,12 +70,6 @@ func (m Model) viewImpl() tea.View {
 		return v
 	}
 
-	// Zen mode: list-table surfaces remember their own zen flag (so
-	// switching tabs preserves whether each list was zen'd); other
-	// surfaces fall back to a global m.zenMode toggle. Either flips
-	// the entire layout to a single pane — no header, no tab bars, no
-	// sidebar, no left rail, no status bar. Press z again (or Esc)
-	// to return.
 	zenActive := m.zenMode
 	phaseStart := time.Now()
 	if state := (&m).activeListTableState(); state != nil && state.Zen {
@@ -136,27 +109,12 @@ func (m Model) viewImpl() tea.View {
 	status := m.cachedStatusBar()
 	trace.phase("status", phaseStart)
 
-	// Left rail: single widget pane hosting utilities (Orgs,
-	// Bookmarks, …). Toggled by `|`. Right rail: context sidebar,
-	// toggled by `\`.
-	//
-	// Pane sizing: each pane renderer takes a width and produces a
-	// string EXACTLY that wide (border included — lipgloss v2's
-	// Width counts the border in the total). The three rendered
-	// panes plus a symmetric 1-cell gutter on each terminal edge
-	// sum to m.width: leftGutter + widgetW + mainW + sideW +
-	// rightGutter == m.width. The gutter just gives the rounded
-	// borders breathing room from the terminal edge so the layout
-	// doesn't look like it's bleeding off the screen.
 	const edgeGutter = 1
 	innerWidth := m.width - 2*edgeGutter
 	widgetW := 0
 	if m.leftOpen {
 		widgetW = clamp(innerWidth/5, 24, 34)
 	}
-	// Sidebar width is 0 when either closed OR stacked-below-main —
-	// in stacked mode the sidebar shares the main column's
-	// horizontal real-estate.
 	sideW := 0
 	if m.sidebarOpen && !m.sidebarStacked {
 		sideW = clamp(innerWidth/4, 28, 48)
@@ -194,10 +152,6 @@ func (m Model) viewImpl() tea.View {
 		tabsHeight = lh
 	}
 
-	// Lipgloss v2: Style.Width/Height include the border in the block
-	// size — Height(h) renders exactly h rows total (content + border).
-	// So paneH is the FULL slot height. innerH (what renderers get to
-	// fill) is paneH minus the 2 border rows.
 	bodyTotalH := m.height - lipgloss.Height(header) - tabsHeight - lipgloss.Height(status)
 	paneH := bodyTotalH
 	if paneH < 5 {
@@ -207,22 +161,9 @@ func (m Model) viewImpl() tea.View {
 	if innerH < 3 {
 		innerH = 3
 	}
-	// Beside-the-main sidebar gets the full pane height; the stacked
-	// branch below overrides this with its shorter slot. Sidebar
-	// renderers read m.sidebarInnerH for column-reflow decisions.
 	m.sidebarInnerH = innerH
 	trace.setLayout(widgetTotal, mainTotal, sideTotal, paneH, innerH, m.leftOpen, m.sidebarOpen)
 
-	// Each pane renders at exactly its rendered width (border
-	// included). The compositor places the next pane at the running
-	// X cursor; bodyX starts at edgeGutter so a symmetric gutter
-	// flanks the layout on both terminal edges. The string-concat
-	// path (bodyParts → bodyRow) prepends a left-pad string of the
-	// same width so the two render paths produce identical output.
-	// gutter is a paneH-tall column of edgeGutter spaces — the
-	// joinRenderedColumns path concatenates row-by-row, so it
-	// needs the gutter at the same line count as the panes for
-	// every row to stay aligned.
 	gutter := buildGutterColumn(edgeGutter, paneH)
 	var bodyLayers []*lipgloss.Layer
 	var bodyParts []string
@@ -240,16 +181,9 @@ func (m Model) viewImpl() tea.View {
 		)
 		bodyX += widgetW
 	}
-	// Stacked mode: sidebar sits BELOW the main pane instead of beside
-	// it. Main gets 2/3 of the body height, sidebar gets the
-	// remainder. Both panes use mainW (the full width-after-rail)
-	// since the sidebar's old horizontal slot was returned to mainW
-	// when sideW was zeroed above.
 	mainPaneH := paneH
 	stackedSideH := 0
 	if m.sidebarStacked && m.sidebarOpen {
-		// 2/3 main, 1/3 sidebar. Floor at 5 each so neither pane
-		// collapses on a short terminal.
 		stackedSideH = paneH / 3
 		if stackedSideH < 5 {
 			stackedSideH = 5
@@ -275,9 +209,6 @@ func (m Model) viewImpl() tea.View {
 
 	switch {
 	case m.sidebarStacked && m.sidebarOpen:
-		// Stacked: build a column of [mainStr \n sidebar] occupying
-		// mainW wide × paneH tall. bodyParts stays row-aligned by
-		// joining vertically into a single column string.
 		stackedInnerH := stackedSideH - 2
 		if stackedInnerH < 3 {
 			stackedInnerH = 3
@@ -305,8 +236,6 @@ func (m Model) viewImpl() tea.View {
 			bodyLayers = append(bodyLayers, sidebarLayer)
 		}
 	}
-	// Right gutter (string-concat path only — compositor stops
-	// drawing past the rightmost layer X coord, which is fine).
 	if edgeGutter > 0 {
 		bodyParts = append(bodyParts, gutter)
 	}
@@ -326,9 +255,6 @@ func (m Model) viewImpl() tea.View {
 		tabRow = mainTabBar
 		tabLayers = append(tabLayers, mainTabLayers...)
 	}
-	// Align the tab row's left edge with the body panel: prepend exactly
-	// edgeGutter, pad the remainder on the right, and shift click layers by
-	// the same amount.
 	if edgeGutter > 0 {
 		tabRow = indentTabRow(tabRow, edgeGutter)
 	}
@@ -355,9 +281,6 @@ func (m Model) viewImpl() tea.View {
 	baseRendered := joinFrameBlocks(header, tabRow, bodyRow, status)
 	trace.phase("base_join", phaseStart)
 
-	// Theme picker is special-cased: top-right anchored, doesn't dim
-	// the background (so live preview is fully visible). Wins over
-	// other overlays since opening it explicitly closes them first.
 	phaseStart = time.Now()
 	if picker := m.renderThemePicker(); picker != "" {
 		trace.phase("theme_picker", phaseStart)
@@ -381,14 +304,7 @@ func (m Model) viewImpl() tea.View {
 	}
 	trace.phase("theme_picker", phaseStart)
 
-	// Modal overlays float over the base view. We layer them with the
-	// v2 compositor so the underlying UI stays visible (but dimmed via
-	// ANSI codes in the modal styling) instead of being replaced by a
-	// blank background. First non-empty overlay wins — interactive
-	// modals take precedence over info-only ones.
 	phaseStart = time.Now()
-	// The chip wizard contributes per-row click layers alongside its
-	// overlay string; attach them only when it's the winning overlay.
 	wizStr, wizLayers := m.renderChipWizardLayers()
 	overlays := []string{
 		// Palette renders ABOVE every other modal so the universal
@@ -449,10 +365,6 @@ func (m Model) viewImpl() tea.View {
 		hasPicker = true
 	}
 	trace.phase("picker", phaseStart)
-	// Walkthrough corner panel: a non-dimming top layer that leaves the
-	// UI underneath interactive (unlike the modal overlays above, it does
-	// NOT set hasOverlay / block input). Bottom-right anchored so it
-	// doesn't cover the header/tab bar the tour asks the user to use.
 	hasWalkthrough := false
 	if wt := m.renderWalkthrough(); wt != "" {
 		x := m.width - lipgloss.Width(wt) - 1
@@ -480,11 +392,6 @@ func (m Model) viewImpl() tea.View {
 	m.rememberFrame(rendered)
 	v := tea.NewView(rendered)
 	v.AltScreen = true
-	// Cell-motion mouse tracking: emits MouseWheelMsg so we can
-	// translate scroll-wheel into smooth list-cursor jumps instead
-	// of letting the terminal interpret each tick as an arrow-key
-	// event (which queues up and produces the lag-on-stop /
-	// lag-on-resume behaviour the user reported).
 	v.MouseMode = tea.MouseModeCellMotion
 	trace.setOutput(rendered)
 	return v
@@ -510,11 +417,6 @@ func joinFrameBlocks(header, tabRow, bodyRow, status string) string {
 	return b.String()
 }
 
-// buildGutterColumn returns a `width`-cell × `height`-row block of
-// spaces, lines joined by '\n'. Used as a column-shaped pad in
-// joinRenderedColumns so the symmetric edge-gutter on either side
-// of the body row is the same height as the panes — short gutters
-// would shift only their first row inward and break alignment.
 func buildGutterColumn(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
@@ -580,12 +482,6 @@ func (m Model) renderMainHitLayers(mainW int) []*lipgloss.Layer {
 	}
 	selected := m.currentSubtabIndex(subs)
 	_, layers := renderSubtabStripLayers(subs, selected, inner)
-	// The subtab strip is ALSO drawn into the main pane body (mainStr),
-	// so these layers exist only to carry click-zone IDs on top of it.
-	//
-	// They draw content identical to what is beneath, positioned over the
-	// body pills. This keeps opaque compositor cells from covering the strip
-	// while preserving click zones.
 	out := make([]*lipgloss.Layer, 0, len(layers))
 	for _, layer := range layers {
 		nl := lipgloss.NewLayer(layer.GetContent()).
@@ -671,9 +567,6 @@ func (m Model) mainTabBarWidth() int {
 	return w
 }
 
-// indentTabRow prepends n spaces to every line of a multi-line block —
-// used to inset the tab row by the edge gutter so its left edge lines up
-// with the body panel's left border.
 func indentTabRow(s string, n int) string {
 	if n <= 0 {
 		return s
@@ -686,10 +579,6 @@ func indentTabRow(s string, n int) string {
 	return strings.Join(lines, "\n")
 }
 
-// rightPadTabRowToWidth appends spaces to each line so it reaches width
-// (leaving already-wide lines untouched). Unlike padTabRowToWidth this
-// pads on the RIGHT, so a left-indented tab row keeps its left inset
-// while still filling the full frame width.
 func rightPadTabRowToWidth(s string, width int) string {
 	lines := strings.Split(s, "\n")
 	for i, ln := range lines {

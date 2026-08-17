@@ -5,14 +5,6 @@ package ui
 // existing editModal (text input) and choiceModal (picker / confirm)
 // primitives so the visual language stays consistent with the rest
 // of the app.
-//
-// What lives here:
-//   - openOrgGroupPrompt    : create / rename a group
-//   - openOrgMoveToGroupPicker : move cursored org to another group
-//   - openAddOrgChoice      : pick web / device login (Step 5)
-//   - openDisconnectOrgConfirm : confirm logout (Step 6)
-//   - runSetDefaultOrg      : fire-and-forget default switch (Step 6)
-//   - openOrgAliasPrompt    : rename alias (Step 6)
 
 import (
 	"fmt"
@@ -25,8 +17,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// openOrgGroupPrompt opens a single-line text-input modal for create
-// or rename. On submit calls applyOrgGroupPrompt + saves.
 func (m *Model) openOrgGroupPrompt(kind orgGroupPromptKind, targetID, initial string) tea.Cmd {
 	title := "New group"
 	hint := "Type a group name. Enter to save · Esc to cancel."
@@ -52,16 +42,9 @@ func (m *Model) openOrgGroupPrompt(kind orgGroupPromptKind, targetID, initial st
 	})
 }
 
-// openOrgMoveToGroupPicker shows a choice modal listing every group
-// (plus "Ungrouped" at the bottom). On select, the cursored org's
-// username is removed from its current group and appended to the
-// selected one. Caller has already verified the rail cursor is on
-// an org row.
 func (m *Model) openOrgMoveToGroupPicker(username string) tea.Cmd {
 	groups := m.settings.OrgGroups()
 	if len(groups) == 0 {
-		// Nothing to pick. Surfacing a flash beats opening an empty
-		// modal that immediately closes.
 		m.flash("no groups yet — press " + firstPretty(Keys.OrgGroupCreate) + " to create one")
 		return nil
 	}
@@ -83,9 +66,7 @@ func (m *Model) openOrgMoveToGroupPicker(username string) tea.Cmd {
 			Value: g.ID,
 		})
 	}
-	// "Ungrouped" — moves the org out of every group.
 	if current != "" {
-		// Only meaningful when the org is currently in a group.
 		options = append(options, choiceOption{
 			Label: "Ungrouped",
 			Hint:  "remove from any group",
@@ -111,12 +92,8 @@ func (m *Model) openOrgMoveToGroupPicker(username string) tea.Cmd {
 	})
 }
 
-// applyMoveOrgToGroup removes username from any current group and
-// appends it to targetID. ungroupedID strips group membership
-// without re-adding anywhere. No-op when target == current.
 func (m *Model) applyMoveOrgToGroup(username, targetID string) {
 	groups := m.settings.OrgGroups()
-	// Strip from any current group.
 	for i, g := range groups {
 		out := g.Members[:0]
 		for _, u := range g.Members {
@@ -127,7 +104,6 @@ func (m *Model) applyMoveOrgToGroup(username, targetID string) {
 		}
 		groups[i].Members = out
 	}
-	// Append to target.
 	if targetID != ungroupedID {
 		idx, _ := findGroupByID(groups, targetID)
 		if idx >= 0 {
@@ -175,20 +151,12 @@ func (m *Model) openAddOrgChoice() tea.Cmd {
 	})
 }
 
-// addOrgFlowStepMsg drives the multi-step add-org flow. Each step's
-// OnSuccessTyped emits one of these so the dispatcher can call the
-// next openX on the live Model (closures captured at modal-build
-// time see a stale copy — see openAddOrgChoice comment).
 type addOrgFlowStepMsg struct {
 	Step        string // "method_picked" | "instance_picked" | "custom_url"
 	Method      string // "web" | "sfdx-url"
 	InstanceURL string // populated for instance_picked / custom_url
 }
 
-// openAddOrgInstanceChoice is step 2 of the web-login flow — pick
-// which Salesforce login endpoint to target. Standard production
-// + sandbox are the headline options; custom + pre-release sit
-// below for the long tail.
 func (m *Model) openAddOrgInstanceChoice() tea.Cmd {
 	return m.openChoiceModal(choiceModalState{
 		Title: "Add org · instance",
@@ -211,15 +179,6 @@ func (m *Model) openAddOrgInstanceChoice() tea.Cmd {
 	})
 }
 
-// openAddOrgCustomURLPrompt is step 3 (custom branch only) — collect
-// the user's My Domain URL via a single-line input. Validates the
-// https:// scheme client-side so we fail fast instead of letting sf
-// open a browser tab that immediately errors.
-//
-// Save captures the validated URL into a closure-scoped pointer
-// then OnSuccess emits addOrgFlowStepMsg so the dispatcher fires
-// the login flow on the live Model (same reason as the choice-modal
-// chained steps).
 func (m *Model) openAddOrgCustomURLPrompt() tea.Cmd {
 	var captured string
 	return m.openEditModal(editModalState{
@@ -244,7 +203,6 @@ func (m *Model) openAddOrgCustomURLPrompt() tea.Cmd {
 	})
 }
 
-// openDisconnectOrgConfirm — Step 6. Confirm modal, then sf.Logout.
 func (m *Model) openDisconnectOrgConfirm(o sf.Org) tea.Cmd {
 	label := o.Display()
 	if label == "" {
@@ -268,9 +226,6 @@ func (m *Model) openDisconnectOrgConfirm(o sf.Org) tea.Cmd {
 	})
 }
 
-// runSetDefaultDevHub mirrors runSetDefaultOrg but writes the
-// target-dev-hub config key. DevHub default is what `sf org create
-// scratch` reaches for when no --target-dev-hub is passed.
 func (m *Model) runSetDefaultDevHub(o sf.Org) tea.Cmd {
 	target := o.Alias
 	if target == "" {
@@ -321,9 +276,6 @@ func (m *Model) openUnsetAliasConfirm(o sf.Org) tea.Cmd {
 	})
 }
 
-// runSetDefaultOrg — Step 6. Fire-and-forget; flashes on completion
-// via orgLifecycleResultMsg which Update routes into m.flash + a
-// rail refetch.
 func (m *Model) runSetDefaultOrg(o sf.Org) tea.Cmd {
 	target := o.Alias
 	if target == "" {
@@ -345,8 +297,6 @@ func (m *Model) runSetDefaultOrg(o sf.Org) tea.Cmd {
 	}
 }
 
-// openOrgAliasPrompt — Step 6. Single-line input, prefilled with
-// existing alias.
 func (m *Model) openOrgAliasPrompt(o sf.Org) tea.Cmd {
 	return m.openEditModal(editModalState{
 		Title:       "Rename alias",
@@ -366,10 +316,6 @@ func (m *Model) openOrgAliasPrompt(o sf.Org) tea.Cmd {
 	})
 }
 
-// orgGroupsChangedMsg signals that the persisted org-group state has
-// changed and the rail should re-render. The rail reads
-// m.settings.OrgGroups() on every render so this msg is mostly a
-// post-modal nudge for syncing the rail cursor.
 type orgGroupsChangedMsg struct{}
 
 // orgsChangedMsg signals that the underlying authed-org list may
@@ -422,8 +368,6 @@ func (m *Model) startLoginFlow(method, instanceURL string) tea.Cmd {
 	case "web":
 		cmd = sf.LoginWebCommand("", instanceURL)
 	case "sfdx-url":
-		// sf reads the URL from stdin, so the user pastes it into
-		// the suspended terminal. Cmd inherits stdin from tea.Exec.
 		cmd = sf.LoginSfdxURLCommand("")
 	default:
 		return nil
@@ -444,7 +388,4 @@ func (m *Model) startLoginFlow(method, instanceURL string) tea.Cmd {
 	})
 }
 
-// Compile-time guard so the settings import stays referenced — we
-// touch the type indirectly via settings.OrgGroupConfig in callers
-// across the package.
 var _ = settings.OrgGroupConfig{}

@@ -31,8 +31,6 @@ const (
 
 // Options controls one update lookup.
 type Options struct {
-	// Force bypasses the 24-hour cache. The successful result still refreshes
-	// the cache for later automatic checks.
 	Force bool
 }
 
@@ -115,8 +113,6 @@ func (c *Checker) Check(ctx context.Context, currentVersion string, opts Options
 		return Result{}, err
 	}
 	st := state{CheckedAt: checkedAt, Release: rel}
-	// Cache persistence is best-effort: a read-only home directory should not
-	// turn a successful network check into a command failure.
 	if path != "" {
 		_ = saveState(path, st)
 	}
@@ -148,8 +144,6 @@ func (c *Checker) fetch(ctx context.Context) (release, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		// A private repository or a repository with no published releases is
-		// a valid pre-launch state, not an application error.
 		return release{}, nil
 	}
 	if resp.StatusCode != http.StatusOK {

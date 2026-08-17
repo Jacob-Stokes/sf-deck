@@ -1,22 +1,6 @@
 package ui
 
 // Reports-folder collect — special case of triggerCollect for /reports.
-//
-// A report folder isn't an Openable (no canonical Lightning URL for a
-// folder), but it IS collect-able as a bulk operation: "add every
-// report in this folder (and optionally its subfolders) to a project."
-// The user picks "this folder only" or "include subfolders" via a
-// choice modal; both branches resolve to a flat list of report ids
-// at collect time and add them as KindReport items.
-//
-// Why not store folder refs (KindReportFolder) and resolve at use?
-// Two reasons:
-//   - Projects on every other surface are static bags of leaf refs.
-//     Adding a folder-ref kind would split the Scope abstraction
-//     into "items" + "live folder watchers" — needlessly complex.
-//   - Users know what's in their project at the moment they collect.
-//     Live folder watching surprises them later when reports get
-//     added to (or removed from) a folder. Re-collect to refresh.
 
 import (
 	tea "charm.land/bubbletea/v2"
@@ -27,10 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/treechip"
 )
 
-// triggerCollectReportFolder detects "K / ctrl+k on a /reports folder
-// row" and runs the folder-collect flow. Returns (nil, false) when
-// the user isn't on a report folder; the generic triggerCollect path
-// then handles report rows + every other surface as before.
 func (m *Model) triggerCollectReportFolder() (tea.Cmd, bool) {
 	if !m.onReportsBrowser() {
 		return nil, false
@@ -42,17 +22,10 @@ func (m *Model) triggerCollectReportFolder() (tea.Cmd, bool) {
 	subs, _ := m.visibleReportsItems()
 	row := m.reportsRowCursor()
 	if row >= len(subs) {
-		// Cursor on a report row, not a folder — defer to the
-		// standard collect path (cursorOpenable returns the
-		// ReportSummary, FromOpenable maps it to KindReport).
 		return nil, false
 	}
 	folder := subs[row]
 
-	// Compute "direct" and "recursive" report sets up-front so the
-	// modal options can show counts. Direct is filterReportsByFolder
-	// for the folder's id; recursive walks the subtree via the
-	// treechip source's Children method.
 	all := d.ReportList.Items()
 	direct := filterReportsByFolder(all, folder.ID)
 	descIDs := collectReportFolderDescendants(d.ReportFolders, folder.ID)
@@ -74,10 +47,6 @@ func (m *Model) triggerCollectReportFolder() (tea.Cmd, bool) {
 		return nil, true
 	}
 
-	// Two-step modal: pick-scope, then pick-project. The scope choice
-	// closes over the report slices; the project pick writes the
-	// final dev-project id + origin org into collectFolderPickedMsg.
-	// No package globals — the typed-value channel threads everything.
 	scopeOpts := []choiceOption{
 		{
 			Label: directLabel(folder.Label, len(direct)),
@@ -137,10 +106,6 @@ func (m *Model) triggerCollectReportFolder() (tea.Cmd, bool) {
 	return m.openChoiceModal(state), true
 }
 
-// collectFolderPickedMsg lands on the main loop after the user has
-// picked both scope (this-only / recursive) and dev project. Carries
-// the staged payload directly so the apply path doesn't need a
-// per-flow package global.
 type collectFolderPickedMsg struct {
 	Reports []sf.ReportSummary
 	DevID   string
@@ -199,11 +164,6 @@ func (m *Model) applyCollectFolderPicked(msg collectFolderPickedMsg) tea.Cmd {
 	return nil
 }
 
-// collectReportFolderDescendants returns the set of folder ids that
-// are strict descendants (children, grand-children, ...) of root in
-// the loaded report-folder tree. Walks the registry's TreeSource via
-// Children rather than re-querying SF — the source is already
-// fully-hydrated by the time the user can see the strip.
 func collectReportFolderDescendants(reg *treechip.Registry, root string) map[string]bool {
 	out := map[string]bool{}
 	if reg == nil || root == "" {
@@ -240,8 +200,6 @@ func recursiveLabel(folder string, n, subFolders int) string {
 	return "Include subfolders · " + intToStr(n) + " reports across " + intToStr(subFolders) + " subfolders"
 }
 
-// intToStr formats a non-negative int. Used by the folder-collect
-// labels; we don't pull strconv in just for this.
 func intToStr(n int) string {
 	if n == 0 {
 		return "0"

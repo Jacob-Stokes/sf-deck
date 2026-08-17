@@ -20,7 +20,6 @@ import (
 // from the terminal discovers the headless surface only through this
 // text, so a missing or stale entry is a copy bug, not just a doc nit.
 func TestUsageListsEveryHeadlessCommand(t *testing.T) {
-	// Pull the "  <noun>  description" leaders out of the commands block.
 	leader := regexp.MustCompile(`(?m)^  ([a-z]+)\s{2,}\S`)
 	listed := map[string]bool{}
 	for _, m := range leader.FindAllStringSubmatch(usageCommands, -1) {

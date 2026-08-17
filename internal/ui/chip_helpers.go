@@ -1,9 +1,5 @@
 package ui
 
-// Helpers shared by every surface that renders a chip strip from a
-// qchip.Registry. Centralised so each surface stays a one-liner
-// (chips := chipRowsFromQChips(reg.ChipsFor("*"))).
-
 import (
 	"fmt"
 
@@ -43,10 +39,6 @@ const chipEphemeralIDPrefix = "__eph_"
 // to prefix the label with the ephemeral glyph.
 const chipPreviewOriginIPC = "ipc"
 
-// chipEphemeralGlyph is the visual marker prefixed to ephemeral
-// chip labels on the strip. Tilde matches the editor/backup-file
-// convention for transient artefacts and stays single-cell-wide so
-// the existing column math doesn't shift.
 const chipEphemeralGlyph = "~"
 
 // newEphemeralChipID mints a fresh "__eph_<hex>__" id. Uses the
@@ -69,10 +61,6 @@ func newEphemeralChipID() string {
 // label is "Recently viewed".
 const recentlyViewedChipID = "__visited__"
 
-// projectChipActive reports whether the synthetic project chip is the
-// currently-cursored chip on the active chip-shaped surface. Used by
-// the empty-state copy to switch from "no matches" to a more useful
-// "no X collected — press ctrl+k to add" hint.
 func (m Model) projectChipActive() bool {
 	switch m.tab() {
 	case TabObjects, TabRecords:
@@ -100,25 +88,11 @@ func (m Model) projectChipActive() bool {
 	return false
 }
 
-// projectEmptyHint returns the empty-state help text shown when the
-// project chip is active but the project contains no items of the
-// kind the surface filters by. Includes the collect-keybind so the
-// user knows how to populate the working set without leaving the
-// surface.
 func (m Model) projectEmptyHint(label string) string {
 	return "  no " + label + " in this project · press " +
 		firstPretty(Keys.CollectItem) + " to collect"
 }
 
-// domainFromRegistry maps a *qchip.Registry pointer back to its
-// domain constant. cycleSimpleChipStrip needs this so it can call
-// m.stripRows(domain, "*") instead of stripRowsFor(reg, "*") — the
-// former picks up the synthetic project chip prepended in stripRows.
-//
-// Reverse-lookup walks every chipSurface declared in the TabSpec
-// registry; pointer-compare against each surface's Registry getter.
-// O(N) over surfaces but N is tiny and this fires on chip-cycle
-// only.
 func domainFromRegistry(m Model, reg *qchip.Registry) chipDomain {
 	for _, s := range allChipSurfaces() {
 		if s.Registry(&m) == reg {
@@ -128,30 +102,6 @@ func domainFromRegistry(m Model, reg *qchip.Registry) chipDomain {
 	return ""
 }
 
-// recentlyViewedChipApplies reports whether the synthetic Recently
-// viewed chip should appear on the strip for the given (domain,
-// scope). True when there's at least one entry in the merged-recent
-// stream that the surface's chip predicate would match.
-//
-// /records (domain=records, scope=<sObject>): visited records for
-//
-//	that sObject.
-//
-// /objects (domain=objects, scope=*): any visited sObject — either
-//
-//	a Kind=sobject entry or a record visit whose Type identifies
-//	an sObject we're listing.
-//
-// Other domains return false — Recently viewed only makes sense on
-// surfaces that explicitly opt in via this predicate. New domains
-// add a case here when they wire a Recently-viewed filter.
-//
-// The chip is prepended on every supported surface regardless of
-// whether the visit log has entries — matches Lightning behaviour
-// ("Recently Viewed" page is always there, just empty until you
-// open something). recentlyViewedChipHasEntries below answers the
-// "is there anything to show?" question separately, used by the
-// default-cursor decision.
 func recentlyViewedChipApplies(m Model, domain chipDomain, scope string) bool {
 	switch domain {
 	case domainRecords:
@@ -177,24 +127,10 @@ func recentlyViewedChipApplies(m Model, domain chipDomain, scope string) bool {
 	return false
 }
 
-// projectChipApplies reports whether the synthetic project chip
-// should appear in the strip for the given (domain, scope). The
-// rule is uniform across surfaces: only show the chip when the
-// loaded project has at least one item of this kind that applies
-// to the surface. /objects looks at the global Objects set,
-// /flows at FlowIDs, /records at the per-sObject records slice,
-// and so on. Hiding the chip when there's nothing in scope is
-// the consistent UX — users shouldn't have to click into an
-// empty chip to find out it's empty.
 func projectChipApplies(domain chipDomain, scope string, s *orgproject.Scope) bool {
 	if !s.Loaded() {
 		return false
 	}
-	// Records: per-sObject. The chip applies when the project has
-	// at least one record bound to THIS sObject. Different sObjects
-	// independently show / hide the chip — drilling into /Account
-	// with a project that's only Account records will show the
-	// chip; drilling into /Contact with the same project will not.
 	if domain == domainRecords {
 		return len(s.RecordIDsFor(scope)) > 0
 	}
@@ -211,9 +147,6 @@ func projectChipApplies(domain chipDomain, scope string, s *orgproject.Scope) bo
 	return surf.ScopeCount(s) > 0
 }
 
-// transientSlotKey builds the activeTransient map key — one slot per
-// (domain, scope) so per-sObject records surfaces don't share a
-// transient with /objects.
 func transientSlotKey(domain, scope string) string {
 	return domain + "|" + scope
 }
@@ -251,10 +184,6 @@ func chipRowsFromQChips(cs []qchip.Chip) []chipRow {
 	return out
 }
 
-// chipDisplayLabel composes a chip's strip/manager label from its origin
-// glyph + cross-org-shared glyph + label. Centralised so every render
-// surface stays visually consistent — adding a new badge means one
-// edit here, not chasing every renderer.
 func chipDisplayLabel(c qchip.Chip) string {
 	prefix := c.Origin.Glyph()
 	if c.Share.IsShared() {
@@ -293,17 +222,6 @@ func (m Model) stripRows(domain chipDomain, scope string) []chipRow {
 	}
 	rows := chipRowsFromQChips(favs)
 
-	// Synthetic chip prepends, in REVERSE display order — each
-	// prepend lands at index 0, so the LAST prepend wins position 0.
-	// Project belongs first (it's the user's pinned working set);
-	// Recently viewed belongs second.
-
-	// Recently viewed chip: prepended when the active surface has
-	// anything in the merged-recent stream that matches the
-	// surface's filter. /records (domain=records, scope=<sobject>)
-	// shows it when the user has visited records for this sObject;
-	// /objects (domain=objects, scope=*) shows it when the user has
-	// visited any sObject (or any record whose Type identifies one).
 	if recentlyViewedChipApplies(m, domain, scope) {
 		rows = append([]chipRow{{
 			ID:    recentlyViewedChipID,
@@ -312,10 +230,6 @@ func (m Model) stripRows(domain chipDomain, scope string) []chipRow {
 		}}, rows...)
 	}
 
-	// Loaded org-project chip: synthetic, prepended LAST so it
-	// lands at position 0. Cyclable like any other chip; selecting
-	// it filters the surface to project items via a Go closure
-	// (see applySelectedChipMatcher's project-chip branch).
 	if scopePill := m.activeScope(); scopePill.Loaded() && projectChipApplies(domain, scope, scopePill) {
 		rows = append([]chipRow{{
 			ID:    projectChipID,
@@ -359,9 +273,6 @@ func (m Model) stripRows(domain chipDomain, scope string) []chipRow {
 	// it's not part of their permanent set. Filtered out of the
 	// "others" list so it doesn't double-show.
 	if id := m.transientID(domain, scope); id != "" {
-		// Don't add the transient if it's already a favourite
-		// (e.g. user pinned it; transient slot should be cleared
-		// but defensive lookup here too).
 		if !chipIDIn(favs, id) {
 			if c, ok := reg.FindByID(id); ok {
 				rows = append(rows, chipRow{
@@ -412,11 +323,6 @@ func (m Model) stripRows(domain chipDomain, scope string) []chipRow {
 	return rows
 }
 
-// pushChipPreview is the variant of addChipPreview used by IPC-
-// spawned ephemerals: it accepts a full chipPreview so the caller
-// can populate Columns / Limit / Clauses (which the cross-org
-// addChipPreview path doesn't need). Same dedupe-by-id semantics
-// as addChipPreview.
 func (m *Model) pushChipPreview(p chipPreview) {
 	if m.chipPreviews == nil {
 		m.chipPreviews = map[string][]chipPreview{}
@@ -430,8 +336,6 @@ func (m *Model) pushChipPreview(p chipPreview) {
 	m.chipPreviews[key] = append(m.chipPreviews[key], p)
 }
 
-// transientID returns the chip id currently occupying the transient
-// slot for (domain, scope), or "" when none is active.
 func (m Model) transientID(domain chipDomain, scope string) string {
 	if m.activeTransient == nil {
 		return ""
@@ -448,10 +352,6 @@ func (m Model) chipPreviewsFor(domain chipDomain, scope string) []chipPreview {
 	return m.chipPreviews[transientSlotKey(string(domain), scope)]
 }
 
-// addChipPreview adds a session-only preview of a chip from another org
-// at the given (domain, scope). Duplicate previews (same chip ID at the
-// same slot) are no-ops — calling "Preview here" twice doesn't multiply
-// the row. Mutates Model state in place.
 func (m *Model) addChipPreview(domain chipDomain, scope string, c qchip.Chip, originOrgUser string) {
 	if m.chipPreviews == nil {
 		m.chipPreviews = map[string][]chipPreview{}
@@ -467,9 +367,6 @@ func (m *Model) addChipPreview(domain chipDomain, scope string, c qchip.Chip, or
 	})
 }
 
-// removeChipPreview drops a single preview from a slot. Called when the
-// user permanently adds the chip to scope (preview → real) so the strip
-// doesn't double-render.
 func (m *Model) removeChipPreview(domain chipDomain, scope, chipID string) {
 	if m.chipPreviews == nil {
 		return
@@ -515,7 +412,6 @@ func stripRowsFor(reg *qchip.Registry, scope string) []chipRow {
 	return rows
 }
 
-// chipIDIn / filterOutChipID are tiny slice helpers used by stripRows.
 func chipIDIn(cs []qchip.Chip, id string) bool {
 	for _, c := range cs {
 		if c.ID == id {
@@ -554,10 +450,6 @@ func chipMatcherFor[T query.Row](c qchip.Chip, subs qchip.Substitutions) func(T)
 	if c.Query.Where == nil {
 		return nil
 	}
-	// Substitute UP-FRONT, not inside the predicate closure. The chip
-	// strip is hit per-row on a hot path; doing the AST walk once at
-	// install time and capturing the substituted predicate keeps
-	// per-row eval allocation-free.
 	pred := qchip.SubstituteWhere(c.Query.Where, subs)
 	return func(t T) bool { return query.Eval(pred, t) }
 }
@@ -591,11 +483,6 @@ func (m Model) applySelectedChipMatcher(d *orgData) {
 	applyChipFromSurface(m, d, *surf)
 }
 
-// applyChipFromSurface is the shared body of "look up the cursored
-// chip on the surface's strip and write its predicate onto the
-// surface's ListView". Project chip short-circuits to the surface's
-// project predicate; everything else routes through the chip's
-// registry entry.
 func applyChipFromSurface(m Model, d *orgData, surf chipSurface) {
 	reg := surf.Registry(&m)
 	if reg == nil {
@@ -629,14 +516,6 @@ func applyChipFromSurface(m Model, d *orgData, surf chipSurface) {
 		surf.ApplyChip(d, c)
 		return
 	}
-	// Ephemeral (session-only) and cross-org preview chips live in
-	// m.chipPreviews rather than the registry, so reg.FindByID misses
-	// them. Without this fallback, navigating away and back to the
-	// strip would silently drop the predicate and re-render with
-	// whatever ListView.Extra was set to last. Look the chip up by
-	// id across every slot — chipPreviews is small (one entry per
-	// active ephemeral / cross-org preview) so the linear walk is
-	// fine.
 	for _, slot := range m.chipPreviews {
 		for _, p := range slot {
 			if p.Chip.ID == row.ID {
@@ -695,7 +574,6 @@ func (m *Model) toggleActiveChipFavourite() tea.Cmd {
 		return nil
 	}
 	if newFav {
-		// Promote: clear the transient slot if this chip was occupying it.
 		key := transientSlotKey(string(domain), scope)
 		if m.activeTransient[key] == chipID {
 			delete(m.activeTransient, key)
@@ -725,7 +603,6 @@ func (m Model) editActiveChip() (tea.Cmd, bool) {
 	if !ok {
 		return nil, false
 	}
-	// Salesforce-mode list views aren't sf-deck chips — skip.
 	if d, sobj := m.activeRecordsSObject(); sobj != "" && currentChipMode(d, sobj) == ChipModeSalesforce {
 		m.flash("Salesforce list views are edited in Salesforce, not sf-deck")
 		return nil, true
@@ -750,17 +627,7 @@ func (m Model) editActiveChip() (tea.Cmd, bool) {
 	return m.openChipWizard(domain, c), true
 }
 
-// activeChipContext returns the (domain, scope) the F keybind should
-// operate on, given the active tab. ok=false when no chip-shaped
-// surface is focused.
-//
-// Routes through resolveChipSurface so every registered chipped tab/subtab is
-// covered automatically.
 func (m Model) activeChipContext() (chipDomain, string, bool) {
-	// Records-on-detail is the one bespoke case left: the records
-	// subtab inside TabObjectDetail uses the records domain with
-	// the drilled-in sObject as scope. Everything else falls through
-	// to the generic surface resolver.
 	if m.tab() == TabObjectDetail && m.currentSubtab() == SubtabRecords {
 		_, sobj := m.activeRecordsSObject()
 		if sobj != "" {
@@ -773,12 +640,7 @@ func (m Model) activeChipContext() (chipDomain, string, bool) {
 	return "", "", false
 }
 
-// activeChipID returns the chip id currently selected on the strip
-// for the given (domain, scope). Generic over every domain by
-// reading the strip + the surface's ChipIdx hook.
 func (m Model) activeChipID(domain chipDomain, scope string) string {
-	// Records-on-detail still has its own per-sObject cursor that
-	// doesn't fit the chipSurface registry's single-cursor model.
 	if domain == domainRecords {
 		_, sobj := m.activeRecordsSObject()
 		if sobj == "" {
@@ -791,8 +653,6 @@ func (m Model) activeChipID(domain chipDomain, scope string) string {
 		if id, ok := d.ListViewCur[sobj]; ok {
 			return id
 		}
-		// Default on first visit matches selectedRecordsChip — see
-		// tab_records_dashboard.go.  Lands on Recently viewed.
 		return recentlyViewedChipID
 	}
 	strip := m.stripRows(domain, scope)
@@ -805,16 +665,9 @@ func (m Model) activeChipID(domain chipDomain, scope string) string {
 	return ""
 }
 
-// activeChipScope returns the scope string the resolved chip
-// surface is operating under right now.  "*" for surfaces with a
-// universal scope (objects, flows, apex, lwc, etc.); the active
-// sObject API name for records-shaped surfaces.  Returns ""
-// alongside a nil domain when no chip surface is active.
 func (m Model) activeChipScope() (chipDomain, string) {
 	surf := m.resolveChipSurface()
 	if surf == nil {
-		// Records surfaces don't go through resolveChipSurface —
-		// their scope is per-sobject and tied to the records subtab.
 		if _, sobj := m.activeRecordsSObject(); sobj != "" {
 			return domainRecords, sobj
 		}
@@ -823,11 +676,6 @@ func (m Model) activeChipScope() (chipDomain, string) {
 	return surf.Domain, "*"
 }
 
-// activeChipIDForRender resolves the current chip ID for whatever
-// chip surface is active on the user's tab.  Returns "" when no
-// chip surface is active.  Used by the render path to rewrite the
-// empty-state message when the user lands on Recently viewed with
-// nothing to show.
 func (m Model) activeChipIDForRender() string {
 	domain, scope := m.activeChipScope()
 	if domain == "" {
@@ -836,10 +684,6 @@ func (m Model) activeChipIDForRender() string {
 	return m.activeChipID(domain, scope)
 }
 
-// recentlyViewedEmptyHintFor returns the empty-state copy shown
-// when the Recently viewed chip is active and the visit log is
-// empty.  Tailored per domain so the recovery hint mentions the
-// right "broader" chip to cycle to.
 func recentlyViewedEmptyHintFor(domain chipDomain) string {
 	broader := "All"
 	if domain == domainRecords {
@@ -849,8 +693,6 @@ func recentlyViewedEmptyHintFor(domain chipDomain) string {
 	return "  no recently-viewed " + noun + " — press → for " + broader
 }
 
-// chipDomainNoun returns the user-facing label for a domain — used
-// in empty-state hints ("no recently-viewed sObjects").
 func chipDomainNoun(domain chipDomain) string {
 	switch domain {
 	case domainObjects:

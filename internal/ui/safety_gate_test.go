@@ -19,7 +19,6 @@ import (
 func safetyGateModel(orgs []sf.Org, overrides map[string]settings.SafetyLevel) Model {
 	st := &settings.Settings{}
 	for user, lvl := range overrides {
-		// Resolve honors per-username overrides written to settings.toml.
 		st.SetOrg(user, lvl, false)
 	}
 	return Model{
@@ -38,14 +37,11 @@ func TestRecordEditSaveGate(t *testing.T) {
 		t.Error("read-only production allowed a record write — gate bypassed")
 	}
 
-	// A sandbox (defaults to `records`) DOES allow record DML.
 	m = safetyGateModel([]sf.Org{sandbox}, nil)
 	if ok, reason := m.canWriteOrg(sandbox, settings.WriteRecord); !ok {
 		t.Errorf("sandbox should allow record write, got blocked: %q", reason)
 	}
 
-	// Production explicitly raised to `records` allows it; lowering it
-	// back to read_only blocks it again.
 	m = safetyGateModel([]sf.Org{prod}, map[string]settings.SafetyLevel{prod.Username: settings.SafetyRecords})
 	if ok, reason := m.canWriteOrg(prod, settings.WriteRecord); !ok {
 		t.Errorf("production at records should allow record write: %q", reason)
@@ -62,7 +58,6 @@ func TestAnonymousApexGate(t *testing.T) {
 		t.Error("sandbox at records allowed anonymous Apex — needs full")
 	}
 
-	// Only `full` unlocks anonymous Apex.
 	m = safetyGateModel([]sf.Org{sandbox}, map[string]settings.SafetyLevel{sandbox.Username: settings.SafetyFull})
 	if ok, reason := m.canWriteOrg(sandbox, settings.WriteAnonymous); !ok {
 		t.Errorf("org at full should allow anonymous Apex: %q", reason)
@@ -85,14 +80,11 @@ func TestBundleMetadataGate(t *testing.T) {
 	prod := sf.Org{Alias: "prod", Username: "boss@example.com"} // read_only default
 	sandbox := sf.Org{Alias: "sbx", Username: "qa@example.com.sbx", IsSandbox: true}
 
-	// Read-only production blocks metadata deploy/validate.
 	m := safetyGateModel([]sf.Org{prod}, nil)
 	if ok, _ := m.canWriteOrg(prod, settings.WriteMetadata); ok {
 		t.Error("read-only production allowed a metadata deploy/validate — gate bypassed")
 	}
 
-	// A sandbox defaults to `records`, which does NOT include metadata —
-	// so deploy/validate is blocked there too until raised to `metadata`.
 	m = safetyGateModel([]sf.Org{sandbox}, nil)
 	if ok, _ := m.canWriteOrg(sandbox, settings.WriteMetadata); ok {
 		t.Error("sandbox at records allowed a metadata deploy/validate — needs metadata")

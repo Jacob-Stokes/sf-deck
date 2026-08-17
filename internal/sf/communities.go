@@ -2,12 +2,6 @@ package sf
 
 import "fmt"
 
-// communities.go — Experience sites (Networks) as a browsable surface.
-//
-// Richer than the lean Network type used by the community-login helper:
-// carries config flags + a member count so the /communities tab can
-// show "what communities exist and how they're set up" at a glance.
-
 // CommunityRow is one Experience site (Network) with config + member
 // count resolved.
 type CommunityRow struct {
@@ -51,14 +45,11 @@ func (r CommunityRow) Targets() []OpenTarget {
 			Path: "/lightning/setup/SetupNetworks/home"},
 	}
 	if r.URLPathPrefix != "" {
-		// Live site — instance-relative to the community path. The org's
-		// community host is implicit; the open layer prepends instance.
 		t = append([]OpenTarget{{
 			ID: "live", Label: "Live site", Path: "/" + r.URLPathPrefix + "/s/",
 		}}, t...)
 	}
 	if r.ID != "" {
-		// Experience Builder + Administration both key off the network id.
 		t = append(t,
 			OpenTarget{ID: "builder", Label: "Experience Builder",
 				Path: "/sfsites/picasso/core/config/commeditor.apexp?servicename=SD&siteId=" + r.ID},
@@ -118,8 +109,6 @@ func ListCommunities(target string) ([]CommunityRow, error) {
 		rows = append(rows, row)
 	}
 
-	// Member counts — one aggregate, merged by NetworkId. Best-effort:
-	// a failure here leaves counts at 0 rather than failing the list.
 	if mq, err := c.QueryREST(
 		"SELECT NetworkId, COUNT(Id) n FROM NetworkMember GROUP BY NetworkId", false); err == nil {
 		for _, r := range mq.Records {

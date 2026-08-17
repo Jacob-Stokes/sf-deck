@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// fakeProvider is an in-memory Provider for testing the compare engine
-// without any Salesforce calls.
 type fakeProvider struct {
 	label   string
 	byAlias map[string][]Component // alias -> components
@@ -126,7 +124,6 @@ func TestCompareSnapshots(t *testing.T) {
 		t.Errorf("OnlyB = %v", byKey["OnlyB"].Status)
 	}
 
-	// Body diff straight from snapshots, no fetch.
 	res := BodyDiffFromSnapshots(byKey["Diff"], a, b)
 	if res.Added != 1 || res.Removed != 1 {
 		t.Errorf("snapshot body diff added=%d removed=%d, want 1/1", res.Added, res.Removed)
@@ -137,8 +134,6 @@ func TestCompareSnapshots(t *testing.T) {
 // that failed to retrieve on one side must be surfaced on Inv.Errors and
 // its rows suppressed — NOT emitted as phantom one-sided drift.
 func TestCompareSnapshotsSurfacesFailedTypes(t *testing.T) {
-	// "Layout" failed on the source side, so a only has it empty while b is
-	// full. Without the error it would emit every Layout as B-only drift.
 	a := Snapshot{"ApexClass": {"Keep": "x"}}
 	b := Snapshot{
 		"ApexClass": {"Keep": "x"},
@@ -155,7 +150,6 @@ func TestCompareSnapshotsSurfacesFailedTypes(t *testing.T) {
 			t.Errorf("failed type emitted phantom drift row: %+v", r)
 		}
 	}
-	// The healthy type still diffs.
 	var sawApex bool
 	for _, r := range inv.Rows {
 		if r.Type == "ApexClass" && r.Key == "Keep" {
@@ -214,7 +208,6 @@ func BenchmarkCompareSnapshotsScale(b *testing.B) {
 		for ci := 0; ci < perType; ci++ {
 			key := "C" + itoaB(ci)
 			a[tn][key] = bigXML
-			// 1 in 100 differs; the rest are identical (cheap path).
 			if ci%100 == 0 {
 				bb[tn][key] = bigXML + "<extra/>"
 			} else {

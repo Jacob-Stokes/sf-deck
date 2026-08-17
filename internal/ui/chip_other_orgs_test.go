@@ -7,8 +7,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// makeSettings is a tiny constructor that drops a fixed set of chips
-// + org groups into a fresh Settings — keeps the test cases short.
 func makeSettings(t *testing.T, chips []settings.ChipConfig, groups []settings.OrgGroupConfig) *settings.Settings {
 	t.Helper()
 	s := &settings.Settings{}

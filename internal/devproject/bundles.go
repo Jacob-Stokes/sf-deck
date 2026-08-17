@@ -1,25 +1,6 @@
 package devproject
 
 // Bundles — on-disk sfdx project directories tied to a DevProject.
-//
-// Persistent counterpart to the transient bundle directories the
-// `e` → "Full sfdx project + retrieve" export creates today. Once a
-// DevProject has one or more linked bundles, the user can:
-//
-//   - Re-retrieve into the same dir (preserving git history)
-//   - Deploy back to the org
-//   - See a diff of org-vs-bundle via sf project retrieve preview
-//   - Reveal in Finder / open in VS Code
-//
-// One-to-many: each Bundle belongs to exactly one DevProject; a
-// DevProject can have any number of bundles (different orgs,
-// different snapshots over time, etc.).
-//
-// The data is intentionally thin — we don't track the manifest's
-// contents in SQLite. Source of truth for "what's in this bundle" is
-// always package.xml on disk; SQLite just remembers the path + a few
-// timestamps so the UI can render the bundle list without re-reading
-// every package.xml on every paint.
 
 import (
 	"crypto/rand"
@@ -268,9 +249,6 @@ func (s *Store) DeleteBundle(bundleID string) error {
 func newBundleID() string {
 	var b [12]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		// Fallback to a timestamp-based id; collisions are still
-		// vanishingly rare with second granularity + a single-process
-		// usage pattern.
 		return fmt.Sprintf("b%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b[:])

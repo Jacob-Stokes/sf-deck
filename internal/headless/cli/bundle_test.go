@@ -9,10 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/settings"
 )
 
-// newTestAppWithStore returns a test App that has a real (but
-// in-temp-dir) devproject Store backing a.Projects. Lets us drive
-// bundle.list / project.list / project.create etc. through the
-// real CLI dispatcher with empty fixtures.
 func newTestAppWithStore(t *testing.T) *app.App {
 	t.Helper()
 	store, err := devproject.OpenPath(filepath.Join(t.TempDir(), "devprojects.db"))
@@ -81,9 +77,6 @@ func TestBundle_UnknownVerb(t *testing.T) {
 
 func TestBundle_DefaultVerbIsList(t *testing.T) {
 	a := newTestApp()
-	// Without an explicit verb, dispatcher should attempt list.
-	// Without a.Projects this returns the store-unavailable error
-	// on the bundle.list command, which is still proof of routing.
 	code, out, _ := runCLI(t, a, "bundle", "--json")
 	if code == 0 {
 		t.Fatal("expected non-zero exit")
@@ -92,8 +85,6 @@ func TestBundle_DefaultVerbIsList(t *testing.T) {
 		t.Errorf("command = %v, want bundle.list (default verb)", out["command"])
 	}
 }
-
-// ----- bundle list / show / delete against a real (in-temp-dir) store -----
 
 func TestBundle_ListEmptyStore(t *testing.T) {
 	a := newTestAppWithStore(t)
@@ -223,7 +214,6 @@ func TestBundle_ReportMissingFieldsFails(t *testing.T) {
 
 func TestBundle_BadDeployTestsLevel(t *testing.T) {
 	a := newTestAppWithStore(t)
-	// Drive the buildDeployOpts unknown-level path through the CLI.
 	code, out, _ := runCLI(t, a, "bundle", "deploy",
 		"--id", "anything", "--org", "x", "--tests", "InventedLevel", "--json")
 	if code == 0 {

@@ -9,14 +9,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
-// bundlePreview is the cached preview data for one bundle. Loaded
-// lazily on tab entry; refreshed on tab refresh.
-//
-// Fallback is true when the data came from ManifestPreviewFallback
-// rather than `sf project retrieve preview` — used by the renderer
-// to add a "diff via timestamp comparison" caption so users know the
-// origin of the data + accept its limitations (no conflict
-// detection, no deletion detection).
 type bundlePreview struct {
 	Retrieve         sf.ManifestPreview
 	Deploy           sf.ManifestPreview
@@ -25,25 +17,11 @@ type bundlePreview struct {
 	Err              error
 }
 
-// bundlePreviewLoadedMsg lands on Update after the preview goroutine
-// finishes. JobID identifies the bundle the preview belongs to.
 type bundlePreviewLoadedMsg struct {
 	BundleID string
 	Preview  bundlePreview
 }
 
-// loadBundlePreviewCmd kicks the goroutine that runs both retrieve
-// and deploy preview commands against the bundle. Returns a tea.Cmd
-// suitable for return from EnsureData.
-//
-// Two-stage with fallback: first try the source-tracking-based
-// `sf project retrieve preview` / `deploy preview`. If the org
-// returns NonSourceTrackedOrgError (production / Partial Copy /
-// Full sandbox without tracking — i.e. most enterprise orgs), fall
-// through to ManifestPreviewFallback which queries the Tooling API
-// for LastModifiedDates and compares against local mtimes. The
-// fallback is coarser (no conflict detection, no deletion detection)
-// but works on every org regardless of tracking state.
 func loadBundlePreviewCmd(bundleID, bundleDir, alias string, lastRetrievedAt time.Time) tea.Cmd {
 	return func() tea.Msg {
 		retrieve, retErr := sf.RetrievePreview(bundleDir, alias)
@@ -81,9 +59,6 @@ func loadBundlePreviewCmd(bundleID, bundleDir, alias string, lastRetrievedAt tim
 	}
 }
 
-// applyBundlePreviewLoaded folds the preview result into the model.
-// Cached on m.bundlePreviews keyed by bundle ID; refresh re-runs the
-// goroutine and overwrites the cache entry.
 func (m *Model) applyBundlePreviewLoaded(msg bundlePreviewLoadedMsg) {
 	if m.bundlePreviews == nil {
 		m.bundlePreviews = map[string]bundlePreview{}
@@ -95,19 +70,11 @@ func (m *Model) applyBundlePreviewLoaded(msg bundlePreviewLoadedMsg) {
 			"err":    msg.Preview.Err.Error(),
 		})
 	}
-	// Refresh the list-table view's row set whenever the preview
-	// for the currently-drilled bundle lands. Other bundles'
-	// previews can sit in m.bundlePreviews without disturbing the
-	// active list — the renderer reads m.bundleCur each frame.
 	if m.bundleCur == msg.BundleID {
 		m.bundleDetailList.Set(bundleDetailRowsFromPreview(msg.Preview))
 	}
 }
 
-// ensureBundleDetailData is the EnsureData hook for TabBundleDetail.
-// Loads the preview tables (retrieve + deploy) for the drilled-in
-// bundle if they aren't already cached. The first paint shows
-// "loading…" until the goroutine returns.
 func ensureBundleDetailData(m *Model, d *orgData, o sf.Org) tea.Cmd {
 	if m.bundleCur == "" || m.devProjects == nil {
 		return nil

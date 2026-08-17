@@ -1,10 +1,5 @@
 package ui
 
-// render_helpers.go — thin wrappers forwarding to uilayout.
-// All pure render helpers now live in internal/ui/uilayout/render_helpers.go.
-// These package-level aliases allow existing callers in internal/ui/
-// to keep using unqualified names without any changes.
-
 import (
 	"time"
 

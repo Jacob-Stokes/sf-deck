@@ -1,21 +1,11 @@
 package ui
 
-// The main pane sits between the left rail (leftrail.go) and the right
-// context sidebar (sidebar.go).
-
 import (
 	"strings"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderMain dispatches to the current view's renderer, then wraps the
-// content in the main pane's border. Border color picks up the yellow
-// "filter applied" tint when the active view has a committed search.
-//
-// Renderer dispatch is registry-driven: every tab declares its
-// top-level renderer in TabSpec.Renderer (tab_registry.go) and a
-// single resolveRenderer call walks subtab → tab to find it.
 func (m Model) renderMain(w, h, innerH int) string {
 	content := ""
 	if msg := m.disconnectedOrgNotice(w - 4); msg != "" {
@@ -27,9 +17,6 @@ func (m Model) renderMain(w, h, innerH int) string {
 	style := theme.Panelled
 	if m.focus == focusMain {
 		style = theme.PanelledFocus
-		// On SidebarFocusable tabs the focused pane is whichever
-		// bodyFocus points to — dim the main border when the
-		// sidebar has taken over so the user sees the swap.
 		if spec := lookupTabSpec(m.tab()); spec != nil && spec.SidebarFocusable && !m.bodyFocus {
 			style = theme.Panelled
 		}
@@ -53,12 +40,6 @@ func (m Model) renderMain(w, h, innerH int) string {
 	return style.Width(w).Height(h).MaxHeight(h).Render(clipLines(content, innerH))
 }
 
-// isRecordDrillTab reports whether the given tab is a "drilled
-// into a specific entity" surface. The main panel border switches
-// to the thick magenta treatment so the user always knows at a
-// glance "I'm inside a single record/field/flow/etc., not
-// browsing a list." Misleading name kept for backward grepping —
-// the set covers every drill, not just records.
 func isRecordDrillTab(t Tab) bool {
 	switch t {
 	case
@@ -130,7 +111,6 @@ func (m Model) searchStateForTab(v Tab) *searchState {
 	// sees the modified copy.
 	m.tabOverride = v
 	m.tabOverrideSet = true
-	// Resolve THIS tab's active subtab (not the user's current tab's).
 	sub := subtabSpecForTab(spec, m)
 	if sub != nil {
 		if sub.List != nil && sub.List.SearchPtr != nil {
@@ -155,11 +135,6 @@ func (m Model) searchStateForTab(v Tab) *searchState {
 	return nil
 }
 
-// subtabSpecForTab returns the active SubtabSpec for the given
-// TabSpec, reading the tab's own subtab index via its GetSubtabIdx
-// closure.  Unlike TabSpec.activeSubtabSpec (which uses
-// m.currentSubtab() — only valid for the user's current tab), this
-// works for any tab.
 func subtabSpecForTab(s *TabSpec, m Model) *SubtabSpec {
 	if s == nil || len(s.Subtabs) == 0 || s.GetSubtabIdx == nil {
 		return nil

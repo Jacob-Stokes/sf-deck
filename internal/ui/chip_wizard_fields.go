@@ -1,18 +1,5 @@
 package ui
 
-// Per-domain field catalogues for the chip wizard. Adding a new
-// surface (perm sets, profiles…) is one new function here plus one
-// case in wizardFieldsFor.
-//
-// Each field maps to a single CompareNode op in the AST. Picking the
-// right Op per row is what makes simple mode round-trip cleanly with
-// advanced mode — populateFromCompareNodes matches on (Field, Op).
-//
-// Records is special: the chip targets a specific sObject so the
-// catalogue is *describe-driven* rather than static. The Model's
-// cached describe is consulted to surface the right fields with the
-// right types. Other domains have a fixed shape.
-
 import (
 	"strings"
 
@@ -57,8 +44,6 @@ func (m Model) wizardFieldsFor(d chipDomain, scope string) []cwField {
 // already used for $userId.
 const chipLimitSentinel = "$limit"
 
-// objectFields — what the user can filter /objects on. Names match
-// EntityDefinition columns the SObject row impl exposes.
 func objectFields() []cwField {
 	return []cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains",
@@ -88,7 +73,6 @@ func objectFields() []cwField {
 	}
 }
 
-// flowFields — Flow object columns.
 func flowFields() []cwField {
 	return []cwField{
 		{Field: "DeveloperName", Op: query.OpContains, Label: "Name contains",
@@ -123,26 +107,6 @@ func flowFields() []cwField {
 	}
 }
 
-// recordFields builds the wizard catalogue for a records-shaped chip
-// scoped to a specific sObject. Reads the cached describe to surface
-// fields that actually exist on the target.
-//
-// Catalogue shape:
-//
-//  1. Audit-trail fields, always shown when present (OwnerId,
-//     CreatedDate, LastModifiedDate, CreatedById, LastModifiedById).
-//     These are what 90% of "filter records" queries hit.
-//
-//  2. Name + any externalId / unique / nameField the describe flags.
-//     These are the natural identity columns the user cares about.
-//
-//  3. A handful of additional filterable fields, capped to keep the
-//     wizard navigable. The advanced-SOQL editor is the right tool
-//     for queries that need more.
-//
-// When the describe isn't cached yet (rare — the user has to drill
-// into an sObject before V opens here), fall back to the static
-// short list.
 func (m Model) recordFields(sobject string) []cwField {
 	desc, ok := m.cachedDescribe(sobject)
 	if !ok {
@@ -151,10 +115,6 @@ func (m Model) recordFields(sobject string) []cwField {
 	return fieldsFromDescribe(desc)
 }
 
-// cachedDescribe pulls the active org's describe for the given
-// sObject if it's been loaded. Lazily-loaded resource — when the
-// user is on the Records subtab a describe is always already in
-// flight, so this hits typically.
 func (m Model) cachedDescribe(sobject string) (sf.SObjectDescribe, bool) {
 	if len(m.orgs) == 0 || sobject == "" || sobject == "*" {
 		return sf.SObjectDescribe{}, false
@@ -170,7 +130,6 @@ func (m Model) cachedDescribe(sobject string) (sf.SObjectDescribe, bool) {
 	return res.Value(), true
 }
 
-// staticRecordFields is the fallback shown when describe metadata is not cached.
 func staticRecordFields() []cwField {
 	return []cwField{
 		{Field: "OwnerId", Op: query.OpEq, Label: "Owner",
@@ -183,22 +142,6 @@ func staticRecordFields() []cwField {
 	}
 }
 
-// fieldsFromDescribe converts a describe payload into wizard rows.
-// Returns every filterable field — the wizard's viewport scrolls
-// through long lists. Order:
-//
-//  1. Priority audit/identity fields (Name, OwnerId, Created*,
-//     LastModified*) — what most queries reach for first.
-//  2. Other identity-shaped fields the describe flags (NameField /
-//     ExternalID / Unique).
-//  3. Custom fields (__c suffix) — what users filter on most often
-//     after the audit columns on bespoke objects.
-//  4. Remaining standard filterable fields — Industry, Type, etc.
-//
-// Fields are deduplicated by Name. Anything that isn't filterable
-// (formulas SF won't let you filter on, blob fields, …) drops out.
-// Unsupported simple-mode types (location, address, base64) drop
-// too; users reach those via Advanced SOQL.
 func fieldsFromDescribe(desc sf.SObjectDescribe) []cwField {
 	byName := make(map[string]sf.Field, len(desc.Fields))
 	for _, f := range desc.Fields {
@@ -226,29 +169,24 @@ func fieldsFromDescribe(desc sf.SObjectDescribe) []cwField {
 		}
 	}
 
-	// 1. Priority audit/identity in the canonical order.
 	for _, name := range priorityNames {
 		if f, ok := byName[name]; ok {
 			add(f)
 		}
 	}
 
-	// 2. Identity-shaped extras (NameField / ExternalID / Unique).
 	for _, f := range desc.Fields {
 		if f.NameField || f.ExternalID || f.Unique {
 			add(f)
 		}
 	}
 
-	// 3. Custom fields — usually the user's actual filtering targets
-	//    on bespoke objects.
 	for _, f := range desc.Fields {
 		if f.Custom {
 			add(f)
 		}
 	}
 
-	// 4. Remaining standard fields (Industry, Type, IsDeleted, …).
 	for _, f := range desc.Fields {
 		add(f)
 	}
@@ -296,8 +234,6 @@ func wizardRowForField(f sf.Field) (cwField, bool) {
 			Hint: "TODAY / THIS_WEEK / LAST_N_DAYS:30 / ISO date", Kind: cwText,
 		}, true
 	case "id", "reference":
-		// Reference / lookup fields. Hint mentions $userId for the
-		// common OwnerId / CreatedById case.
 		ref := hint
 		if f.Name == "OwnerId" || f.Name == "CreatedById" || f.Name == "LastModifiedById" {
 			ref = "Salesforce Id, or $userId for the current user"
@@ -307,14 +243,9 @@ func wizardRowForField(f sf.Field) (cwField, bool) {
 			Hint: ref, Kind: cwText,
 		}, true
 	}
-	// Unknown / unsupported type (blob, address, location, …).
-	// Skip — advanced SOQL is the escape hatch.
 	return cwField{}, false
 }
 
-// picklistHint formats the first few picklist values into a
-// comma-joined hint so the user knows what to type. Caps the list
-// to keep the hint short.
 func picklistHint(f sf.Field) string {
 	if len(f.PicklistValues) == 0 {
 		return f.Name + " · picklist"
@@ -337,9 +268,6 @@ func picklistHint(f sf.Field) string {
 	return out
 }
 
-// modifiedFields is the Modified after/before/by triple shared by
-// every org-metadata catalogue whose row exposes LastModifiedDate +
-// LastModifiedBy.Name.
 func modifiedFields() []cwField {
 	return []cwField{
 		{Field: "LastModifiedDate", Op: query.OpGT, Label: "Modified after",
@@ -351,7 +279,6 @@ func modifiedFields() []cwField {
 	}
 }
 
-// apexClassFields — ApexClassRow columns (/apex Classes subtab).
 func apexClassFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -371,7 +298,6 @@ func apexClassFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// apexTriggerFields — TriggerRow columns (/apex Triggers subtab).
 func apexTriggerFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -388,7 +314,6 @@ func apexTriggerFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// userFields — UserRow columns (/users).
 func userFields() []cwField {
 	return []cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -405,7 +330,6 @@ func userFields() []cwField {
 	}
 }
 
-// lwcFields — LWCBundle columns (/components LWC subtab).
 func lwcFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains",
@@ -420,7 +344,6 @@ func lwcFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// auraFields — AuraBundle columns (/components Aura subtab).
 func auraFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains",
@@ -447,7 +370,6 @@ func permSetFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// psgFields — PermissionSetGroup columns (/perms PSGs).
 func psgFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains",
@@ -460,7 +382,6 @@ func psgFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// profileFields — Profile columns (/perms Profiles).
 func profileFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -472,7 +393,6 @@ func profileFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// queueFields — QueueRow columns (/perms Queues).
 func queueFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -483,7 +403,6 @@ func queueFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// publicGroupFields — PublicGroupRow columns (/perms Public Groups).
 func publicGroupFields() []cwField {
 	return append([]cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -493,7 +412,6 @@ func publicGroupFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// savedQueryFields — devproject.SavedQuery columns (/soql Saved).
 func savedQueryFields() []cwField {
 	return []cwField{
 		{Field: "Name", Op: query.OpContains, Label: "Name contains", Kind: cwText},
@@ -508,7 +426,6 @@ func savedQueryFields() []cwField {
 	}
 }
 
-// soqlHistoryFields — devproject.SOQLHistoryEntry columns (/soql History).
 func soqlHistoryFields() []cwField {
 	return []cwField{
 		{Field: "Body", Op: query.OpContains, Label: "Query contains",
@@ -526,7 +443,6 @@ func soqlHistoryFields() []cwField {
 	}
 }
 
-// recentFields — recent.Entry columns (/home Recent).
 func recentFields() []cwField {
 	return []cwField{
 		{Field: "Kind", Op: query.OpEq, Label: "Kind",
@@ -539,8 +455,6 @@ func recentFields() []cwField {
 	}
 }
 
-// dashboardFields — DashboardRow columns (/reports Dashboards).
-// deployFields — DeployRow columns (/deploys).
 func deployFields() []cwField {
 	return []cwField{
 		{Field: "Status", Op: query.OpEq, Label: "Status",
@@ -567,7 +481,6 @@ func dashboardFields() []cwField {
 	}, modifiedFields()...)
 }
 
-// reportTypeFields — ReportTypeRow columns (/reports Report Types).
 func reportTypeFields() []cwField {
 	return []cwField{
 		{Field: "Label", Op: query.OpContains, Label: "Label contains", Kind: cwText},

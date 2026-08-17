@@ -36,10 +36,6 @@ import (
 // of which subtab is active. Each branch then gets the remaining
 // vertical budget to fill.
 func (m Model) renderSOQL(w, innerH int) string {
-	// No org connected? The editor / saved / history surfaces all
-	// depend on an active org for either running or scoping rows;
-	// route through the shared placeholder so the user is pointed
-	// back to /home where the welcome panel lives.
 	if len(m.orgs) == 0 {
 		return noOrgPlaceholder()
 	}
@@ -52,9 +48,6 @@ func (m Model) renderSOQL(w, innerH int) string {
 	)
 }
 
-// renderSOQLEditor is the Editor subtab body — query input,
-// run/error/results chrome. dispatchSubtab handles the strip; this
-// function only owns the Editor-specific layout.
 func (m Model) renderSOQLEditor(w, innerH int) string {
 	return m.renderSOQLSessionBody(&m.soqlSession, w, innerH, soqlSessionBodyOptions{
 		showSavedActions: true,
@@ -109,7 +102,6 @@ func (m Model) renderSOQLSessionBody(s *soqlSession, w, innerH int, opts soqlSes
 		editorLines = []string{lipgloss.NewStyle().Foreground(theme.FgDim).
 			Render("(press " + firstPretty(Keys.SOQLEdit) + " to edit)")}
 	}
-	// "> " prompt on first line, two-space indent on continuations.
 	for i, line := range editorLines {
 		prompt := "  "
 		if i == 0 {
@@ -133,24 +125,14 @@ func (m Model) renderSOQLSessionBody(s *soqlSession, w, innerH int, opts soqlSes
 
 	help := "  "
 	if s.soqlEditing {
-		// Editing-mode keys are mode-internal; keep them literal.
-		// Slim line: only the keys distinct to edit mode. Esc/ctrl+u
-		// are universal cancel/clear and don't need their own slot.
 		help += "↵ run · shift+↵ newline · ctrl+l format"
 	} else {
-		// Idle mode: focus on the SOQL-specific gestures. The
-		// global status bar already advertises yank, refresh,
-		// open, drill — don't double-list them here.
 		help += firstPretty(Keys.SOQLEdit) + " edit · " +
 			firstPretty(Keys.Drill) + " run"
 		if opts.showSavedActions {
 			help += " · " + firstPretty(Keys.SOQLSave) + " save · " +
 				firstPretty(Keys.SOQLExport) + " export"
 		}
-		// Tooling / Bulk are mode TOGGLES, not actions — the
-		// active state already shows up as a [tooling] / [bulk]
-		// badge next to the SOQL title above. Dim suffix so the
-		// keys are discoverable but visually subordinate.
 		help += "  ·  " +
 			firstPretty(Keys.SOQLToggleTooling) + " tooling · " +
 			firstPretty(Keys.SOQLToggleBulk) + " bulk"
@@ -160,11 +142,6 @@ func (m Model) renderSOQLSessionBody(s *soqlSession, w, innerH int, opts soqlSes
 	}
 	lines = append(lines, dimLine(help, inner))
 
-	// Auto-suggest bulk for large LIMITs / unbounded queries. Skips
-	// the hint when bulk is already on (the user knows) or while the
-	// editor is mid-type (visual noise while composing). REST pages
-	// 2000 rows at a time so a LIMIT 200000 query burns ~100 API
-	// calls; one ctrl+b keystroke collapses that to 1 bulk job.
 	if !s.soqlBulk && !s.soqlEditing && !s.soqlTooling {
 		if hint := bulkSuggestHint(s.soqlInput.Value()); hint != "" {
 			lines = append(lines, dimLine("  "+hint, inner))
@@ -231,13 +208,8 @@ func (m Model) soqlSessionRenderModel(s *soqlSession, inner int) listRenderModel
 			return rowProjectGutterFromMap(devproject.KindRecord, ref, projMap)
 		},
 	)
-	// Map the stored unfiltered cursor to a position within the
-	// currently-visible (filtered) rows — same shape records uses for
-	// search-cursor identity.
 	sortDataKey := soqlSortDataKey(entry)
 	adapter := soqlSessionTableAdapter(s, entry)
-	// listRenderModel.Cursor is a display-space int; convert at the
-	// render boundary.
 	cursor := int(adapter.DisplayCursor())
 	return listRenderModel{
 		Title:        soqlResultsTitle(s.soqlResult, len(visible)),
@@ -249,13 +221,7 @@ func (m Model) soqlSessionRenderModel(s *soqlSession, inner int) listRenderModel
 		Cell:         entry.cell,
 		Gutters:      leftGutters,
 		RightGutters: rightGutters,
-		// "e edit query" was here but the editor is visible right
-		// above the results — surfacing the key in two places is
-		// chrome noise. Drop.
 		FooterExtras: "",
-		// Fold search state into the data version so the per-row
-		// render cache (paginated mode) invalidates correctly when
-		// the user types into the search buffer.
 		DataVersion: listVersionWithStore(
 			len(records)*1009+len(entry.listCols)*7+len(search.Buffer())*131,
 			m,
@@ -286,7 +252,6 @@ func bulkSuggestHint(soql string) string {
 		return ""
 	}
 	low := strings.ToLower(trimmed)
-	// Aggregates return one row — Bulk would be wasteful.
 	if strings.Contains(low, "count(") || strings.Contains(low, "count_distinct(") {
 		return ""
 	}
@@ -308,8 +273,6 @@ func bulkSuggestHint(soql string) string {
 		}
 		return ""
 	}
-	// No LIMIT at all. Soft hint — we don't know the row count
-	// without running the query, so word it conditionally.
 	return "no LIMIT (ctrl+b for bulk on big sets)"
 }
 
@@ -428,30 +391,6 @@ func buildSOQLCols(names []string, rows []map[string]any) []uilayout.ListColumn 
 	return out
 }
 
-// soqlProjectionFor returns the cached column-spec + cell matrix for
-// the current SOQL result + search-buffer combination. Rebuilds on:
-//   - new query result (raw rows slice pointer change)
-//   - theme switch (column widths depend on lipgloss style output)
-//   - search-buffer edit (filter narrows the cell matrix)
-//
-// Cache lives on *orgData (pointer-stable across the value-receiver
-// Model copy) so every per-frame caller — soqlRenderModel (body),
-// listTableSOQL (wheel routing / sidebar / status / zen), measureCellSOQL
-// (snap-to-content) — hits the same memo. Without that, listTableSOQL
-// alone would re-walk every row on every wheel tick × ~5 callers per
-// frame; the 20K-row threshold where /soql starts lagging is exactly
-// that O(N × cols × callers × frames) cost. Mirrors what /records
-// gets from recordsProjectionFor.
-//
-// d == nil falls through to a fresh build with no caching — happens
-// during early-init renders before an org is selected.
-// computeTextareaVisibleRows estimates how many terminal rows the
-// textarea needs to render `value` at the given width without
-// internal viewport scrolling. Each logical line (split on `\n`)
-// soft-wraps to ceil(visualWidth / width) visible rows.
-//
-// Visual width uses ansi.StringWidth so multi-byte runes and
-// emoji are counted correctly. Width <= 0 returns 1 (degenerate).
 func computeTextareaVisibleRows(value string, width int) int {
 	if width <= 0 {
 		return 1
@@ -473,9 +412,6 @@ func computeTextareaVisibleRows(value string, width int) int {
 
 func soqlProjectionFor(d *orgData, records []map[string]any, search *searchState, themeID, query string) *soqlRenderEntry {
 	rowsPtr := slicePtrAny(records)
-	// Key the projection cache on the EFFECTIVE search text — when
-	// debounce is active mid-typing, Effective() lags Buffer() so
-	// consecutive fast keystrokes collapse into one filter pass.
 	searchBuf := ""
 	searchOn := false
 	if search != nil {
@@ -538,15 +474,9 @@ func soqlProjectionFor(d *orgData, records []map[string]any, search *searchState
 	return entry
 }
 
-// soqlSearchPtr returns the SOQL results grid's sticky search-state.
-// Pointer (heap-allocated in New) so the same state survives the
-// value-Model copy through Update / render. Mirrors the records
-// search contract — `/` opens it, the renderer narrows visible rows.
 func (m Model) soqlSearchPtr() *searchState {
 	return m.soqlSession.searchPtr()
 }
-
-// --- result-table helpers (used only by SOQL for now, but generic) ------
 
 // collectColumns gathers the projected field names for the result
 // grid. When `query` is non-empty AND parseable, columns appear in
@@ -586,9 +516,6 @@ func collectColumns(records []map[string]any, query string) []string {
 		}
 	}
 
-	// 2. Backfill: any record key that wasn't in the SELECT
-	// projection (FIELDS() expansions, server-added fields) goes
-	// on the end, alpha-sorted.
 	var extras []string
 	for _, r := range records {
 		for k := range r {
@@ -621,8 +548,6 @@ func collectColumns(records []map[string]any, query string) []string {
 			return extras[i] < extras[j]
 		})
 	} else {
-		// SELECT-driven mode: just alpha-sort the leftovers so
-		// FIELDS() expansions land in a stable order.
 		sort.Strings(extras)
 	}
 	cols = append(cols, extras...)
@@ -656,8 +581,6 @@ func parseSelectColumns(query string) []string {
 	if selIdx < 0 {
 		return nil
 	}
-	// Find the matching FROM keyword at paren-depth 0. Skipping
-	// over (SELECT ...) subqueries that have their own FROM.
 	body := q[selIdx+len("select "):]
 	depth := 0
 	end := -1
@@ -673,7 +596,6 @@ func parseSelectColumns(query string) []string {
 		if depth != 0 {
 			continue
 		}
-		// Look for " from " (with word boundaries) at depth 0.
 		if i+6 <= len(body) && strings.EqualFold(body[i:i+5], " from") {
 			next := byte(' ')
 			if i+5 < len(body) {
@@ -690,7 +612,6 @@ func parseSelectColumns(query string) []string {
 	}
 	projection := body[:end]
 
-	// Split on commas at paren-depth 0.
 	var raw []string
 	start := 0
 	depth = 0
@@ -717,8 +638,6 @@ func parseSelectColumns(query string) []string {
 		if item == "" {
 			continue
 		}
-		// Drop subqueries, aggregates, function calls — anything
-		// with parens isn't a flat column key in the result map.
 		if strings.ContainsAny(item, "()") {
 			continue
 		}
@@ -749,9 +668,6 @@ func formatCell(v any) string {
 		}
 		return "false"
 	case map[string]any:
-		// One registry handles every map shape SOQL returns:
-		// relationship lookups (Account.Name → "Acme"), compound address
-		// fields, compound person Name, geolocation. See compound_render.go.
 		if s, ok := renderCompound(x); ok {
 			return s
 		}
@@ -760,11 +676,6 @@ func formatCell(v any) string {
 	return fmt.Sprint(v)
 }
 
-// soqlRowRef returns the "<sObject>:<Id>" key used for tag /
-// project lookups on a SOQL result row. Empty when the row is
-// missing the standard `attributes.type` (sObject name) or `Id`
-// fields — usually only happens for aggregate queries that don't
-// project from a real sObject.
 func soqlRowRef(rec map[string]any) string {
 	id, _ := rec["Id"].(string)
 	if id == "" {
@@ -778,18 +689,6 @@ func soqlRowRef(rec map[string]any) string {
 	return ""
 }
 
-// bulkTagsAndProjectsForSOQLRows pre-fetches tag / project bindings
-// for SOQL result rows. Rows are keyed by their attributes.type +
-// Id so cross-sObject queries land each row under the right key.
-// bulkTagsAndProjectsForSOQLRows resolves the tag + dev-project
-// membership maps for the rows currently rendered on the SOQL grid.
-//
-// Routed through orgData.memoTagsFor / memoProjectsFor so the
-// SQLite-backed lookups are cached per (rows-slice-pointer,
-// devproject-generation). Same gutterCache pattern records-list uses;
-// without it, every frame on a 20K-row SOQL result would re-query
-// SQLite twice, allocating 40K keys to build the wanted-set — visible
-// as scroll lag even when the column-width cache is hot.
 func (m Model) bulkTagsAndProjectsForSOQLRows(rows []map[string]any) (
 	map[string][]devproject.Tag, map[string][]devproject.DevProject,
 ) {
@@ -824,9 +723,6 @@ func (m Model) bulkTagsAndProjectsForSOQLRows(rows []map[string]any) (
 	return tags, projects
 }
 
-// soqlTagKeys projects SOQL rows down to their TagLookupKey shape,
-// filtering out rows with no resolvable Ref. Used by both the tag
-// and project bulk-fetch paths above.
 func soqlTagKeys(rows []map[string]any) []devproject.TagLookupKey {
 	keys := make([]devproject.TagLookupKey, 0, len(rows))
 	for _, r := range rows {
@@ -841,11 +737,6 @@ func soqlTagKeys(rows []map[string]any) []devproject.TagLookupKey {
 	return keys
 }
 
-// soqlResultsTitle formats the title bar above a SOQL result grid.
-// Surfaces the cap state when the user only got a partial slice
-// (Done=false from queryMore, or visible rows < TotalSize) so the
-// "showing 50 of 12,000" reality is visible rather than silently
-// implied.
 func soqlResultsTitle(res sf.QueryResult, visible int) string {
 	if !res.Done && res.TotalSize > visible {
 		return fmt.Sprintf("RESULTS · %d of %d rows · capped (add LIMIT or refine WHERE)",

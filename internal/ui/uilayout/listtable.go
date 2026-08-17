@@ -1,28 +1,5 @@
 package uilayout
 
-// Shared list-table primitive. Used by every "table of N projected
-// columns where each row is one record" surface — records subtab,
-// SOQL results, reports run, Salesforce list-view results.
-//
-// Goals:
-//   - One implementation: width policy, horizontal scroll, frozen
-//     leftmost column, fullscreen ("zen") flag, per-column resize
-//     state all live here. Surface code is a thin shim that builds a
-//     ListTableSpec and calls RenderListTable.
-//   - Auto-fit by default: derive ideal widths from longest visible
-//     cell (capped), shrink toward header-only minimums when the
-//     pane is tight, fall back to horizontal scroll only when even
-//     minimums don't fit. Users can override per column with < / >
-//     (step) and { / } (snap to min/max).
-//   - Frozen column: when horizontal scroll is engaged, the first
-//     column stays put on the left so the user always knows which
-//     row they're on.
-//
-// What this does NOT handle:
-//   - Vertical scroll: that's RenderRows / RenderRowsViewport's job.
-//     Callers compose: build the column block here, then feed each
-//     rendered row into RenderRows for cursor-following row scroll.
-
 import (
 	"image/color"
 	"sort"
@@ -40,21 +17,11 @@ import (
 // actual width within [Min, Max] depending on pane budget and the
 // caller's per-column override (UserWidth, 0 = no override).
 type ListColumn struct {
-	// Name is the stable identifier (e.g. SF API field name). Used as
-	// the persistence key for user-set widths.
-	Name string
-	// Header is the user-visible column label.
+	Name   string
 	Header string
-	// Min is the floor — rendering narrower than this is forbidden.
-	// Sensible default: max(8, len(header)+2). 0 means "use default".
-	Min int
-	// Ideal is the target width when the pane has room. Usually the
-	// 90th-percentile cell width capped at AutoMaxIdeal. 0 means
-	// "use Min as ideal too" (rare; for short fixed cols).
-	Ideal int
-	// Max is the ceiling — pressing the snap-to-max key jumps here.
-	// Usually the longest visible cell width. 0 means "use Ideal".
-	Max int
+	Min    int
+	Ideal  int
+	Max    int
 	// Style applied to body cells. Zero-value defaults to theme.Fg.
 	Style lipgloss.Style
 	// Unsortable marks a column whose cells are composite/glyph blobs
@@ -84,12 +51,7 @@ type ListTableState struct {
 	// the layout uses this verbatim (clamped to [Min, Max]) instead
 	// of deriving from auto-fit.
 	UserWidths map[string]int
-	// Zen toggles fullscreen mode for this view. Caller checks this
-	// to decide whether to suppress chrome (header / sidebar / left
-	// rail / dashboard) — RenderListTable itself doesn't change.
-	Zen bool
-	// FrozenCols is how many leftmost columns stay anchored when
-	// HScroll > 0. Default 1 (the "name" column). 0 disables.
+	Zen        bool
 	FrozenCols int
 	// ColCursor is the index of the highlighted column. Always live —
 	// the cursor is the target for sort, resize, snap-min, snap-max,
@@ -98,19 +60,8 @@ type ListTableState struct {
 	// to [0, len(cols)-1] by the dispatcher.
 	ColCursor int
 
-	// SortColumn is the column Name (matches ListColumn.Name) the user
-	// sorted by, applied client-side as a final pass over the visible
-	// rows. Empty = no user sort, fall back to the row order the data
-	// source returned (chip's ORDER BY, report definition, etc.).
-	// Toggled by `s` (sorts the cursored column); cleared by `S`.
-	SortColumn string
-	// SortDesc reverses the sort. Default false (ascending).
-	SortDesc bool
-	// RowsOrdered reports that the caller has already applied
-	// SortColumn/SortDesc to the row slice before rendering. The
-	// header still shows the sort arrow, but RenderListModel skips
-	// its own per-frame sort permutation. Set by ListView adapters
-	// whose Filtered() cache returns display-ordered rows.
+	SortColumn   string
+	SortDesc     bool
 	RowsOrdered  bool
 	sortCacheKey string
 	sortCache    []int
@@ -208,9 +159,7 @@ type ListTableSpec struct {
 	// so large records/SOQL/report tables don't re-sort every frame.
 	// Leave empty when the caller cannot provide a stable version.
 	SortCacheKey string
-	// Cell returns the body string for (row, col). Called once per
-	// visible cell per render; should be fast (no SF round-trips).
-	Cell func(row, col int) string
+	Cell         func(row, col int) string
 
 	// Gutters is the list of synthetic frozen leftmost columns that
 	// sit OUTSIDE the regular Cols slice — never sortable, never
@@ -231,15 +180,6 @@ type ListTableSpec struct {
 	// (Tags via Gutters, Name) anchor the left side.
 	RightGutters []GutterSpec
 
-	// Marks are per-row visual annotations — name-tint, inline
-	// badges, dim treatment — applied at render time. Each mark
-	// declares a Matches closure + a Treatment; the renderer walks
-	// them per row and composes matching treatments. See
-	// rowmarks.go for the primitive + composition rules.
-	//
-	// Empty / nil → no marks; rows render with their declared
-	// column styles unchanged. Specs that opt in declare marks
-	// once; per-row dispatch happens at render time.
 	Marks []RowMark
 }
 
@@ -263,10 +203,7 @@ type GutterSpec struct {
 // the auto-fit picked (vs. the user's pin) and can compute the next
 // step on [ / ] keypresses.
 type ResolvedWidths struct {
-	Widths []int
-	// FromUser[i] is true when Widths[i] came from state.UserWidths
-	// rather than auto-fit. Resize handlers use this to decide
-	// whether [ / ] should clear or modify the override.
+	Widths   []int
 	FromUser []bool
 	// HScroll is the actual scroll offset used (state.HScroll
 	// clamped to a valid range).
@@ -276,10 +213,7 @@ type ResolvedWidths struct {
 	FrozenCount int
 	// Overflow is true when the column set didn't all fit and
 	// horizontal scroll is engaged.
-	Overflow bool
-	// FullWidth is the total width all columns would consume at
-	// their resolved widths (sum of Widths + separators + gutter).
-	// Surface code uses this for the "X of Y cols" indicator.
+	Overflow  bool
 	FullWidth int
 }
 
@@ -310,8 +244,6 @@ func LayoutListTable(spec ListTableSpec, state *ListTableState, inner int) Resol
 		}
 		inner -= g.Width + len(Sep)
 	}
-	// Right gutters consume the same kind of budget but render AFTER
-	// the columns. Same discount applies.
 	for _, g := range spec.RightGutters {
 		if g.Cell == nil || g.Width <= 0 {
 			continue
@@ -348,7 +280,6 @@ func LayoutListTable(spec ListTableSpec, state *ListTableState, inner int) Resol
 		widths[i] = w
 	}
 
-	// Step 2: do they all fit at the chosen widths?
 	sepW := 3 // " │ "
 	gutter := 2
 	totalAt := func(ws []int) int {
@@ -372,14 +303,11 @@ func LayoutListTable(spec ListTableSpec, state *ListTableState, inner int) Resol
 		}
 	}
 
-	// Step 3: flex non-user columns down toward min. Iterate proportional
-	// shrink until either we fit or every flex column is at its min.
 	for {
 		over := totalAt(widths) - inner
 		if over <= 0 {
 			break
 		}
-		// Slack = how much each flex column can still give up.
 		totalSlack := 0
 		flexCount := 0
 		for i := range widths {
@@ -395,7 +323,6 @@ func LayoutListTable(spec ListTableSpec, state *ListTableState, inner int) Resol
 		if totalSlack == 0 {
 			break // can't shrink further
 		}
-		// Distribute the over-by-amount across flex columns weighted by slack.
 		took := 0
 		for i := range widths {
 			if fromUser[i] {
@@ -419,8 +346,6 @@ func LayoutListTable(spec ListTableSpec, state *ListTableState, inner int) Resol
 			}
 		}
 		if took == 0 {
-			// Couldn't shrink anything by even 1 even though slack
-			// said we could — defensive guard against infinite loop.
 			break
 		}
 	}
@@ -490,9 +415,6 @@ func RenderListTableHeader(spec ListTableSpec, res ResolvedWidths, state *ListTa
 	sortColIdx := -1
 	sortDesc := false
 	if state != nil {
-		// Always show the cursor highlight — column ops target it
-		// unconditionally now (sort/resize/snap), so the user
-		// always knows the target without having to enter a mode.
 		cursorIdx = state.ColCursor
 		if state.SortColumn != "" {
 			for i, c := range spec.Cols {
@@ -562,11 +484,6 @@ func RenderListTableRow(spec ListTableSpec, res ResolvedWidths, row int, selecte
 	if len(terms) > 0 {
 		hlTerms = terms[0]
 	}
-	// Resolve row marks once before per-cell loop so we can apply
-	// the name-column tint + the row-wide dim flag. Mark *labels*
-	// render in their own column via spec.Cell when the surface
-	// declares a Marks column; the inline-append shape was retired
-	// 2026-05-02 in favour of column tabulation.
 	markName, markDim := ApplyMarks(spec.Marks, row)
 	// Row-wide background tint for the selected cursor row. Reads as a
 	// full-row band rather than a single left-edge mark, which makes
@@ -581,11 +498,6 @@ func RenderListTableRow(spec ListTableSpec, res ResolvedWidths, row int, selecte
 	)
 	if selected {
 		hasRowBg = true
-		// Same tint for focused + unfocused: BgAlt is already a
-		// subtle palette colour designed to coexist with all the
-		// per-column fg styles. Differentiating the two states adds
-		// theme machinery for marginal value — focus is already
-		// signalled by the pane border (PanelledFocus vs Panelled).
 		rowBg = theme.BgAlt
 	}
 	parts := make([]string, len(cells))
@@ -598,13 +510,9 @@ func RenderListTableRow(spec ListTableSpec, res ResolvedWidths, row int, selecte
 		if s.GetForeground() == nil {
 			s = lipgloss.NewStyle().Foreground(theme.Fg)
 		}
-		// Apply mark-driven name color to the primary identifier
-		// column (the first column index, regardless of visible
-		// position). Subsequent columns use their declared style.
 		if idx == 0 && markName != nil {
 			s = s.Foreground(markName)
 		}
-		// Dim treatment applies to every column on the row.
 		if markDim {
 			s = s.Foreground(theme.Muted)
 		}
@@ -647,8 +555,6 @@ func RenderListTableRow(spec ListTableSpec, res ResolvedWidths, row int, selecte
 			continue
 		}
 		gv := g.Cell(row)
-		// Render at fixed width so columns stay aligned even when the
-		// gutter content is shorter (most rows: untagged → empty).
 		gs := lipgloss.NewStyle().Width(g.Width)
 		sepStyle := lipgloss.NewStyle()
 		if hasRowBg {
@@ -671,8 +577,6 @@ func RenderListTableRow(spec ListTableSpec, res ResolvedWidths, row int, selecte
 		}
 		rightGutter += sepStyle.Render(Sep) + gs.Render(ansi.Truncate(gv, g.Width, "…"))
 	}
-	// Column separator between regular cells also needs the bg so the
-	// row reads as one continuous band rather than striped pickets.
 	sepBetween := Sep
 	if hasRowBg {
 		sepBetween = lipgloss.NewStyle().Background(rowBg).Render(Sep)
@@ -702,8 +606,6 @@ func SortedIndices(spec ListTableSpec, state *ListTableState) []int {
 		}
 	}
 	if col < 0 {
-		// Sort column doesn't exist on this spec (chip changed columns,
-		// stale state). Drop the sort silently and use identity order.
 		return nil
 	}
 	cacheKey := sortedIndicesCacheKey(spec, state, col)
@@ -815,7 +717,6 @@ func visibleColumnIndices(n int, res ResolvedWidths, inner int) ([]int, int) {
 	const sepW = 3
 	used := gutter
 	cells := make([]int, 0, n)
-	// Frozen prefix.
 	for i := 0; i < res.FrozenCount && i < n; i++ {
 		w := res.Widths[i]
 		if len(cells) > 0 {
@@ -824,12 +725,9 @@ func visibleColumnIndices(n int, res ResolvedWidths, inner int) ([]int, int) {
 		used += w
 		cells = append(cells, i)
 		if used > inner {
-			// Pane too tight even for the frozen set. Stop here so the
-			// renderer at least shows what fits.
 			return cells, 0
 		}
 	}
-	// Scrolled tail.
 	start := res.HScroll
 	if start < res.FrozenCount {
 		start = res.FrozenCount
@@ -841,8 +739,6 @@ func visibleColumnIndices(n int, res ResolvedWidths, inner int) ([]int, int) {
 			need += sepW
 		}
 		if used+need > inner {
-			// Partial fit: show the column truncated to whatever's
-			// left when that's at least a readable sliver.
 			remaining := inner - used
 			if len(cells) > 0 {
 				remaining -= sepW
@@ -859,8 +755,6 @@ func visibleColumnIndices(n int, res ResolvedWidths, inner int) ([]int, int) {
 	return cells, 0
 }
 
-// defaultMinFor is the floor when a Column doesn't supply Min: at
-// least 8 chars and at least header+2.
 func defaultMinFor(c ListColumn) int {
 	min := 8
 	if h := ansi.StringWidth(c.Header) + 2; h > min {
@@ -1038,7 +932,6 @@ func parseNumeric(s string) (float64, bool) {
 	if s == "" {
 		return 0, false
 	}
-	// Trim commas and a trailing percent sign so "1,234" / "97%" parse.
 	cleaned := strings.ReplaceAll(s, ",", "")
 	cleaned = strings.TrimSuffix(cleaned, "%")
 	if cleaned == "" {

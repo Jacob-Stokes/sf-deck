@@ -47,7 +47,6 @@ type ListView[T any] = resource.ListView[T]
 // SObjectChildren is a package-level alias for resource.SObjectChildren.
 type SObjectChildren[Row any, Detail any] = resource.SObjectChildren[Row, Detail]
 
-// resourceUpdatedMsg is a package-level alias for resource.UpdatedMsg.
 type resourceUpdatedMsg = resource.UpdatedMsg
 
 // ChipMode picks "where chips come from" on records-shaped surfaces:
@@ -102,30 +101,11 @@ func (f SObjectFilter) String() string {
 // themselves are re-Set from the describe on every render via
 // syncFieldList.
 type describeFieldState struct {
-	List  ListView[sf.Field]
-	Table uilayout.ListTableState
-	// ChipID is the selected field-filter chip for this sobject (one of
-	// qchip.FieldBuiltins' IDs). Empty = the default "all" chip. The
-	// chip's predicate is applied to List via SetExtra each render.
+	List   ListView[sf.Field]
+	Table  uilayout.ListTableState
 	ChipID string
 }
 
-// orgData holds every piece of per-org state. Each Salesforce data set
-// is a Resource[T]; browsable lists also get a ListView[T] wrapper so
-// cursor + search behaviour is uniform across views.
-//
-// Adding a view that shows one more Salesforce thing is now:
-//  1. Add a Resource[T] field on the matching orgData<X> sub-struct
-//     in orgdata_groups.go.
-//  2. Wire its Fetch closure in initOrgDataResources (or newOrgData
-//     for ad-hoc state).
-//  3. (Optional) wire a ListView with a Match predicate.
-//  4. Call d.MyThing.Ensure(c) in ensureDataFor for the relevant view.
-//  5. Render from d.MyThing.Value() / d.MyThingList.Filtered().
-//
-// All field access remains untouched — Go promotes embedded fields,
-// so d.Records / d.DescribeCur / d.Home / etc. still resolve the
-// same way they did when orgData was one flat struct.
 type orgData struct {
 	orgDataCore
 	orgDataTopLists
@@ -145,31 +125,17 @@ type orgData struct {
 	orgDataNav
 }
 
-// gutterCacheState holds the per-orgData bulk tag/project results so
-// successive renders within the same generation share one fetch.
 type gutterCacheState struct {
-	// tags / projects: keyed by domain discriminator → slice-pointer
-	// → bulk map. The slice-pointer key catches "items slice was
-	// replaced via Set" without needing to walk the items themselves.
 	tags     map[string]gutterEntry[map[string][]devproject.Tag]
 	projects map[string]gutterEntry[map[string][]devproject.DevProject]
 }
 
-// gutterEntry is one cached bulk-lookup result. itemsPtr is the
-// header pointer of the items slice the cache was built against;
-// generation is the store's mutation counter at fill time.
 type gutterEntry[T any] struct {
 	itemsPtr   uintptr
 	generation int
 	value      T
 }
 
-// newOrgData wires up the resources for a single org. Fetch closures
-// capture the alias so every resource knows how to talk to sf.
-// applySFConfig translates the [ui.api] settings (seconds / ms) into
-// the sf package's Config (durations) and installs it. Each accessor
-// returns its resolved value (override or built-in fallback), so this
-// always sends a fully-populated Config.
 func applySFConfig(st *settings.Settings) {
 	if st == nil {
 		return
@@ -205,10 +171,6 @@ func resolveStartTab(st *settings.Settings) Tab {
 }
 
 func newOrgData(username, alias string, c *cache.Cache, st *settings.Settings) *orgData {
-	// ttl resolves the effective TTL for a Resource key, honoring user
-	// overrides in settings.toml while defaulting to the fallback the
-	// caller passes. Hidden behind a closure so every Resource below
-	// stays a one-liner.
 	ttl := func(key string, fallback time.Duration) time.Duration {
 		return st.CacheTTL(key, fallback)
 	}
@@ -255,9 +217,6 @@ func newOrgData(username, alias string, c *cache.Cache, st *settings.Settings) *
 			return struct{}{}, errors.New("layouts have no detail drill")
 		},
 	)
-	// Object-scoped flows drill into the EXISTING /flow detail tab
-	// (DurableId is a FlowDefinition id), so the detail half of the
-	// children engine is unused here too.
 	d.ObjectFlows = resource.NewSObjectChildren[sf.ObjectFlowRow, struct{}](
 		"objflows:", "objflowdetail:",
 		sf.ListObjectFlows,
@@ -359,7 +318,6 @@ func (d *orgData) EnsureRecords(alias, sobject string) *Resource[sf.RecordsList]
 			NoCache: true, // records never hit disk; live data + privacy risk
 			Fetch: func() (sf.RecordsList, error) {
 				limit := d.settings.LimitRecentRecords()
-				// Prefer the cached describe if we have it — saves a round-trip.
 				if desc, ok := d.Describes[sobject]; ok && !desc.FetchedAt().IsZero() {
 					return sf.RecentRecordsWithDescribe(alias, desc.Value(), limit)
 				}
@@ -379,22 +337,11 @@ func (d *orgData) EnsureChipRecords(alias, sobject string, c qchip.Chip, subs qc
 	key := sobject + ":" + c.ID
 	return ensureKeyed(&d.ChipRecords, key, func() *Resource[sf.RecordsList] {
 		return &Resource[sf.RecordsList]{
-			Scope: d.username,
-			Key:   "chiprecords:" + key,
-			// First-visit-of-session only; manual `r` to refresh.
-			// See EnsureRecords for the rationale.
+			Scope:   d.username,
+			Key:     "chiprecords:" + key,
 			TTL:     d.ttl("chip_records", 24*time.Hour),
 			NoCache: true,
 			Fetch: func() (sf.RecordsList, error) {
-				// Default columns from the describe — the standard audit
-				// set when the object has it:
-				//   Id · Name · CreatedDate · CreatedBy · LastModifiedDate · LastModifiedBy
-				// falling back to Id (+Name) alone. CreatedDate makes the
-				// "Recently created" chip's sort axis visible; the created/
-				// modified by columns pair with their dates. CreatedBy /
-				// LastModifiedBy are universal relationships, gated on the
-				// matching date field's presence as a cheap proxy for "this
-				// object exposes standard audit fields."
 				var defaultCols []string
 				var hasName, hasModDate, hasCreatedDate bool
 				if desc, ok := d.Describes[sobject]; ok && !desc.FetchedAt().IsZero() {
@@ -410,19 +357,10 @@ func (d *orgData) EnsureChipRecords(alias, sobject string, c qchip.Chip, subs qc
 						}
 					}
 					defaultCols = append(defaultCols, "Id")
-					// Human-readable label column: standard objects use Name;
-					// CustomMetadata (__mdt) has no Name — it uses
-					// DeveloperName / MasterLabel / Label. Take the first
-					// present so every shape shows a readable column, not
-					// just the Id.
 					for _, nameField := range []string{"Name", "MasterLabel", "Label", "DeveloperName"} {
 						if present[nameField] {
 							defaultCols = append(defaultCols, nameField)
 							hasName = true
-							// Mirror the query projection (sf/records.go):
-							// MasterLabel/Label shapes also surface
-							// DeveloperName — the API identity CMDT
-							// developers actually key on.
 							if nameField != "Name" && nameField != "DeveloperName" && present["DeveloperName"] {
 								defaultCols = append(defaultCols, "DeveloperName")
 							}
@@ -441,32 +379,17 @@ func (d *orgData) EnsureChipRecords(alias, sobject string, c qchip.Chip, subs qc
 							defaultCols = append(defaultCols, "LastModifiedBy.Name")
 						}
 					} else if present["SystemModstamp"] {
-						// CustomMetadata (__mdt) has no LastModifiedDate /
-						// CreatedDate / audit-by fields — but it DOES expose
-						// SystemModstamp. Show it as the modified column so a
-						// CMDT record isn't a bare Id + label.
 						defaultCols = append(defaultCols, "SystemModstamp")
 					}
 				} else {
 					defaultCols = []string{"Id", "Name"}
 					hasName = true
 				}
-				// If the chip didn't pin its own columns, fill in our
-				// defaults — keeps existing UX (Name + LastModifiedDate
-				// columns) when the chip is just "Active" / "Recent".
 				cc := c
 				if len(cc.Query.Columns) == 0 {
 					cc.Query.Columns = defaultCols
 				}
 				displayCols := append([]string(nil), cc.Query.Columns...)
-				// Drop ORDER BY clauses targeting fields the sObject
-				// doesn't accept as sortable. CustomMetadata records
-				// describe LastModifiedDate but reject it in ORDER BY,
-				// surfacing as INVALID_FIELD. Any chip's "Recent" /
-				// "Mine, recent" / similar reaches this branch on the
-				// first visit to a CMT — strip the unsortable column so
-				// the SOQL shape stays valid (we trade ordering for
-				// reachability; the user can resort client-side).
 				if desc, ok := d.Describes[sobject]; ok && !desc.FetchedAt().IsZero() {
 					v := desc.Value()
 					sortable := map[string]bool{}
@@ -483,15 +406,6 @@ func (d *orgData) EnsureChipRecords(alias, sobject string, c qchip.Chip, subs qc
 					}
 					cc.Query.OrderBy = append([]query.OrderBy(nil), kept...)
 				}
-				// Three-state Limit:
-				//
-				//   0  → inherit settings.DefaultChipLimit (auto)
-				//   -1 → unbounded (manual + blank input in wizard)
-				//   >0 → hard cap pinned to that value
-				//
-				// Auto and pinned both emit a LIMIT clause; unbounded
-				// drops the clause and lets QueryREST cursor-follow to
-				// completion.
 				cap := cc.Query.Limit
 				switch {
 				case cap > 0:
@@ -503,8 +417,6 @@ func (d *orgData) EnsureChipRecords(alias, sobject string, c qchip.Chip, subs qc
 				}
 				cc.Query.Columns = recordsFetchColumns(displayCols)
 				soql := qchip.ApplyToSOQL(cc, sobject, subs)
-				// Pass cap=0 so QueryRESTCapped doesn't double-truncate;
-				// the SOQL clause (or its absence) already controls bounds.
 				rl, err := sf.RecordsForSOQL(alias, sobject, soql, displayCols, hasName, hasModDate, 0)
 				rl.Query = soql
 				return rl, err
@@ -717,9 +629,8 @@ func (d *orgData) EnsureListViewResult(alias, sobject, listViewID string) *Resou
 	key := sobject + ":" + listViewID
 	return ensureKeyed(&d.ListViewResults, key, func() *Resource[sf.ListViewResult] {
 		return &Resource[sf.ListViewResult]{
-			Scope: d.username,
-			Key:   "listview:" + key,
-			// First-visit-of-session only; manual `r` to refresh.
+			Scope:   d.username,
+			Key:     "listview:" + key,
 			TTL:     d.ttl("list_view_results", 24*time.Hour),
 			NoCache: true,
 			Fetch: func() (sf.ListViewResult, error) {
@@ -761,8 +672,6 @@ func (d *orgData) EnsureFlowVersionDetail(alias, versionID string) *Resource[map
 // caching still applies (TTL key "record_detail").
 func (d *orgData) EnsureRecordDetail(alias, sobject, recordID string) *Resource[map[string]any] {
 	key := sobject + ":" + recordID
-	// Capture sobject + id by value into the closure so re-firing the
-	// fetch later (after a refresh) hits the right record.
 	sobj, id := sobject, recordID
 	return ensureKeyed(&d.RecordDetails, key, func() *Resource[map[string]any] {
 		return &Resource[map[string]any]{
@@ -853,8 +762,6 @@ func (d *orgData) EnsureReportRun(alias, reportID string) *Resource[sf.ReportRun
 	return ensureKeyed(&d.ReportRuns, reportID, func() *Resource[sf.ReportRun] {
 		return &Resource[sf.ReportRun]{
 			Scope: d.username, Key: "reportrun:" + reportID,
-			// First-visit-of-session only; manual `r` for local refresh,
-			// `R` (planned) to force a SF re-run.
 			TTL:     d.ttl("report_runs", 24*time.Hour),
 			NoCache: true,
 			Fetch: func() (sf.ReportRun, error) {
@@ -896,12 +803,6 @@ func (d *orgData) EnsureReportFolders(alias string, st *settings.Settings) (*tre
 // EnsureDescribe lazily wires a describe Resource for the given sobject.
 func (d *orgData) EnsureDescribe(alias, sobject string) *Resource[sf.SObjectDescribe] {
 	return ensureKeyed(&d.Describes, sobject, func() *Resource[sf.SObjectDescribe] {
-		// Key is versioned (describe_v2) so the on-disk cache from an
-		// older build — which serialized SObjectDescribe BEFORE the
-		// MruEnabled field existed — is bypassed rather than served with
-		// MruEnabled defaulting to false (which mislabelled every cached
-		// object as not-recently-viewable). Bump the suffix whenever the
-		// persisted describe shape gains a field readers branch on.
 		return &Resource[sf.SObjectDescribe]{
 			Scope: d.username, Key: "describe_v3:" + sobject,
 			TTL:   d.ttl("describes", time.Hour),
@@ -1092,11 +993,6 @@ func (d *orgData) syncFieldList(sobject string, fields []sf.Field) *describeFiel
 	return fs
 }
 
-// cursoredField returns the field under the Schema list cursor for the
-// current describe, syncing the list from the describe first. (ok=false
-// when the describe isn't loaded or the filtered list is empty.) Shared
-// by the breadcrumb / identity / sidebar / activate read sites so they
-// all agree on "which field is selected."
 func (d *orgData) cursoredField(sobject string, r *Resource[sf.SObjectDescribe]) (sf.Field, bool) {
 	if r == nil || r.FetchedAt().IsZero() {
 		return sf.Field{}, false
@@ -1110,11 +1006,6 @@ func (d *orgData) cursoredField(sobject string, r *Resource[sf.SObjectDescribe])
 	return rows[cur], true
 }
 
-// fetchDeploysDelta backs d.Deploys.FetchWithExisting. It receives a
-// snapshot captured before the command goroutine starts, then does a
-// full pull on cold-start (no cached rows yet) or a delta pull after
-// that. Caps the merged slice at 25 so a long-running session doesn't
-// unbounded-grow the list.
 func fetchDeploysDelta(alias string, existing []sf.DeployRow, limit int) ([]sf.DeployRow, error) {
 	if limit <= 0 {
 		limit = 25
@@ -1122,8 +1013,6 @@ func fetchDeploysDelta(alias string, existing []sf.DeployRow, limit int) ([]sf.D
 	if len(existing) == 0 {
 		return sf.RecentDeploys(alias, limit)
 	}
-	// Rows are sorted by CreatedDate DESC in the SOQL so the first
-	// cached row is the most recent one we've seen.
 	since := existing[0].CreatedDate
 	delta, err := sf.RecentDeploysSince(alias, limit, since)
 	if err != nil {
@@ -1134,7 +1023,6 @@ func fetchDeploysDelta(alias string, existing []sf.DeployRow, limit int) ([]sf.D
 		// the CreatedDate delta excludes rows whose status is changing.
 		return refreshInFlightDeploys(alias, existing), nil
 	}
-	// Delta comes back DESC; prepend to existing and cap to the limit.
 	merged := append(delta, existing...)
 	if len(merged) > limit {
 		merged = merged[:limit]
@@ -1142,11 +1030,6 @@ func fetchDeploysDelta(alias string, existing []sf.DeployRow, limit int) ([]sf.D
 	return refreshInFlightDeploys(alias, merged), nil
 }
 
-// refreshInFlightDeploys re-queries any non-terminal rows in the
-// merged window and patches them in place. Without this, the
-// delta-merge would keep a Pending/InProgress row frozen forever
-// (delta only fetches CreatedDate > newest). Errors are swallowed —
-// a failed patch just means the row updates on the next poll.
 func refreshInFlightDeploys(alias string, rows []sf.DeployRow) []sf.DeployRow {
 	var ids []string
 	for _, r := range rows {
@@ -1168,28 +1051,6 @@ func refreshInFlightDeploys(alias string, rows []sf.DeployRow) []sf.DeployRow {
 	}
 	return rows
 }
-
-// Sync helpers (orgData → ListView) live in model_sync.go.
-//
-// modelServices lives in model_services.go.
-
-// modelRuntime lives in model_runtime.go.
-
-// modelChips lives in model_chips.go.
-
-// modelOrgs lives in model_orgs.go.
-
-// modelSOQL lives in model_soql.go.
-
-// modelLocalNavigation lives in model_local_nav.go.
-
-// modelTransient lives in model_transient.go.
-
-// modelSurfaceState lives in model_surface_state.go.
-
-// modelDevProjectState lives in model_devproject_state.go.
-
-// modelOrgManagement lives in model_org_management.go.
 
 // Model is the top-level Bubble Tea model.
 //
@@ -1221,7 +1082,6 @@ type Model struct {
 	modelOrgManagement
 }
 
-// openMenuMode distinguishes "select to open" vs "select to yank URL".
 type openMenuMode int
 
 const (
@@ -1229,7 +1089,6 @@ const (
 	menuYank
 )
 
-// openMenuState is the live state of the open-targets overlay.
 type openMenuState struct {
 	title   string
 	mode    openMenuMode
@@ -1238,19 +1097,8 @@ type openMenuState struct {
 	targets []sf.OpenTarget
 	cursor  int
 
-	// restoreGlobalSearch is set when the open menu was launched
-	// from inside the global-search modal (ctrl+o on a hit). Esc
-	// on the open menu pops back to this exact search state —
-	// same input value, scope chain, cursor, mode — so the user
-	// resumes where they were without re-typing. nil = nothing to
-	// restore (standard open menu launched from a list surface).
 	restoreGlobalSearch *globalSearchState
 
-	// pendingTarget is set on the browser sub-picker menu (opened via
-	// b / ctrl+o on a target). It's the ORIGINAL open target the user
-	// was on; the sub-picker's rows are browser choices that fire this
-	// target with the chosen browser as a one-off override. nil on a
-	// normal open menu.
 	pendingTarget *sf.OpenTarget
 }
 
@@ -1270,7 +1118,6 @@ func New(c *cache.Cache) Model {
 	// [ui.api] preferences here at startup. Done before any client work.
 	applySFConfig(st)
 
-	// Resolve pinned tab order. Falls back to defaults when unset.
 	RebuildTabsForNumbers(st.PinnedTabs())
 
 	// Migrate legacy chip sections (lenses / object_filters / flow_filters)
@@ -1283,8 +1130,6 @@ func New(c *cache.Cache) Model {
 		_ = st.Save()
 	}
 
-	// Apply the persisted theme before any rendering happens so first
-	// paint matches the user's preference.
 	theme.ApplyPalette(st.Theme())
 	m := Model{
 		modelServices: modelServices{
@@ -1294,33 +1139,16 @@ func New(c *cache.Cache) Model {
 			updates:  updatecheck.New(),
 		},
 		modelRuntime: modelRuntime{
-			lastCompositor: lipgloss.NewCompositor(),
-			renderCache:    newRenderCache(),
-			renderTrace:    newRenderTracerFromEnv(),
-			wheel:          &wheelRuntime{},
-			// Default focus is the main pane. Visible focus follows the
-			// rail's visibility: open the
-			// rail (alt+o or |), focus shifts; close it, focus
-			// returns to main.
-			focus: focusMain,
-			// Startup visibility defaults are user-overridable via
-			// [ui.startup] in settings.toml; the literal here is the
-			// built-in default each accessor falls back to.
-			sidebarOpen:    st.StartupSidebarOpen(true),
-			sidebarStacked: st.SidebarStartsStacked(),
-			// Hide the SOQL query line under the VIEWS chip strip by
-			// default — most users don't read the underlying SOQL on
-			// every records page, and showing it eats a row of vertical
-			// space. ctrl+- re-reveals it when needed. (Stored as the
-			// inverse "visible" preference; default false = hidden.)
+			lastCompositor:  lipgloss.NewCompositor(),
+			renderCache:     newRenderCache(),
+			renderTrace:     newRenderTracerFromEnv(),
+			wheel:           &wheelRuntime{},
+			focus:           focusMain,
+			sidebarOpen:     st.StartupSidebarOpen(true),
+			sidebarStacked:  st.SidebarStartsStacked(),
 			queryLineHidden: !st.StartupQueryLineVisible(false),
-			// leftOpen defaults to false — the org panel sits on the
-			// main tab bar as a pill (renderTabBar prepends an Orgs
-			// pill when the rail is collapsed). Users who want it
-			// pinned open can hit `ctrl+\` to toggle it permanently for
-			// the session.
-			leftOpen:   st.StartupLeftRailOpen(false),
-			leftPinned: st.StartupLeftRailOpen(false),
+			leftOpen:        st.StartupLeftRailOpen(false),
+			leftPinned:      st.StartupLeftRailOpen(false),
 		},
 		modelChips: modelChips{
 			chipRegistries:  newChipRegistries(),
@@ -1347,8 +1175,6 @@ func New(c *cache.Cache) Model {
 			bodyFocus: true,
 		},
 	}
-	// Hydrate user-defined chips from settings into each registry.
-	// One unified slice on disk; per-domain LoadFromSettings filters.
 	m.chipRegistry(domainRecords).LoadFromSettings(st)
 	m.chipRegistry(domainObjects).LoadFromSettings(st)
 	m.chipRegistry(domainFlows).LoadFromSettings(st)
@@ -1432,30 +1258,18 @@ func (m Model) runtimeStartupCmd() tea.Cmd {
 		m.orgsRes.Ensure(m.cache),
 		m.projectsRes.Ensure(m.cache),
 	}
-	// Wire the control-channel pump. ControlWritesCmd returns nil
-	// when --control wasn't enabled, so this is a no-op then.
 	if cmd := m.ControlWritesCmd(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// First-launch welcome modal (no-op after the first run, or in demo).
 	if cmd := m.welcomeTriggerCmd(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// Cached stable-release discovery runs asynchronously and is skipped for
-	// development/demo builds or when the user disables it.
 	if cmd := m.updateCheckCmd(false); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	return tea.Batch(cmds...)
 }
 
-// newSOQLInput builds the SOQL editor widget with our theme + initial
-// query. Multi-line textarea so long queries can break across clauses
-// (`SELECT ...` / `FROM ...` / `WHERE ...`) instead of horizontal-
-// scrolling a 200-char single line. Enter is intercepted by the edit
-// handler to run the query; shift+enter / alt+enter insert a newline.
-// Starts blurred — handleKey calls Focus() when the user enters edit
-// mode.
 func newSOQLInput(initial string) textarea.Model {
 	ta := textarea.New()
 	ta.Prompt = ""
@@ -1470,23 +1284,15 @@ func newSOQLInput(initial string) textarea.Model {
 	// importantly, the viewport's YOffset can land non-zero on
 	// shift+enter and stay there until MaxHeight ≥ row count.
 	ta.MaxHeight = 500
-	// Rebind newline insertion to shift+enter so plain Enter is free
-	// for "run query." The default binding maps both Enter and
-	// ctrl+m to InsertNewline.
 	ta.KeyMap.InsertNewline = key.NewBinding(
 		key.WithKeys("shift+enter", "alt+enter"),
 		key.WithHelp("shift+enter", "insert newline"),
 	)
 	ta.SetValue(initial)
-	// Cursor at end of buffer so users land ready to append.
 	ta.CursorEnd()
 	return ta
 }
 
-// newExecInput builds the multi-line anonymous-Apex editor widget.
-// Starts blurred — handleExecKey focuses it when the user enters
-// edit mode (e key). Multi-line so users can paste / type 5-50 line
-// snippets in-app without bouncing to $EDITOR for every tweak.
 func newExecInput(initial string) textarea.Model {
 	ta := textarea.New()
 	ta.Prompt = ""

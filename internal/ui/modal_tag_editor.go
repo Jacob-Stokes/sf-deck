@@ -1,17 +1,5 @@
 package ui
 
-// Tag editor modal — create-or-edit a single tag. Used by the tag
-// manager's `n` (new) and `↵` (edit) gestures.
-//
-// Three fields: name, color, icon. Tab cycles between them; Enter
-// saves; Esc cancels. The color slot is a 7-entry palette picker
-// (matches tagPalette) cycled with ←/→. The icon slot is a single-
-// rune capture — first printable character lands as the icon (or
-// backspace clears).
-//
-// Reuses the modalBox primitive + flash-on-success pattern shared by
-// editModal / choiceModal.
-
 import (
 	"errors"
 	"strings"
@@ -23,25 +11,18 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// tagEditorState holds the live state of the editor.
 type tagEditorState struct {
-	// Original is the tag being edited (zero ID = create new).
 	Original devproject.Tag
 
-	// Working values (mutated as the user types / cycles).
 	Name  string
 	Color string
 	Icon  string
 
-	// Field is the focused slot: 0=name, 1=color, 2=icon.
 	Field int
 
-	// Err is the last commit error so the user can fix and retry.
 	Err error
 }
 
-// openTagEditor opens the editor for an existing tag (Original.ID > 0)
-// or a new one (Original.ID == 0). Pre-populates from Original.
 func (m *Model) openTagEditor(t devproject.Tag) tea.Cmd {
 	color := t.Color
 	if color == "" {
@@ -57,7 +38,6 @@ func (m *Model) openTagEditor(t devproject.Tag) tea.Cmd {
 	return nil
 }
 
-// renderTagEditor draws the editor overlay. Returns "" when not open.
 func (m Model) renderTagEditor() string {
 	te := m.tagEditor
 	if te == nil {
@@ -69,14 +49,12 @@ func (m Model) renderTagEditor() string {
 	}
 	header := lipgloss.NewStyle().Foreground(theme.Blue).Bold(true).Render(title)
 
-	// Live-preview pill of the in-progress edit.
 	preview := renderTagPill(devproject.Tag{
 		Name:  fallbackName(te.Name),
 		Color: te.Color,
 		Icon:  te.Icon,
 	})
 
-	// Three rows, each with a bullet on the focused slot.
 	nameRow := tagEditorRow("name", fallbackName(te.Name), te.Field == 0)
 	colorRow := tagEditorRow("color", colorPalettePicker(te.Color, te.Field == 1), te.Field == 1)
 	iconRow := tagEditorRow("icon", iconValueOrPlaceholder(te.Icon), te.Field == 2)
@@ -117,7 +95,6 @@ func iconValueOrPlaceholder(s string) string {
 	return s
 }
 
-// tagEditorRow formats one labelled field row with a focus marker.
 func tagEditorRow(label, value string, focused bool) string {
 	mark := "  "
 	labelStyle := lipgloss.NewStyle().Foreground(theme.Muted)
@@ -129,11 +106,6 @@ func tagEditorRow(label, value string, focused bool) string {
 	return mark + labelStyle.Render(label) + "  " + valueStyle.Render(value)
 }
 
-// colorPalettePicker returns "blue cyan green …" with the active color
-// highlighted. The full palette renders so the user sees every option
-// without cycling blindly. When focused, a trailing "←/→" cue makes the
-// change affordance obvious right on the row (the footer hint alone was
-// easy to miss).
 func colorPalettePicker(active string, focused bool) string {
 	parts := make([]string, 0, len(tagPalette))
 	for _, c := range tagPalette {
@@ -152,7 +124,6 @@ func colorPalettePicker(active string, focused bool) string {
 	return out
 }
 
-// updateTagEditor handles key presses.
 func (m Model) updateTagEditor(msg tea.KeyMsg) (Model, tea.Cmd) {
 	te := m.tagEditor
 	if te == nil {
@@ -165,8 +136,6 @@ func (m Model) updateTagEditor(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.tagEditor = nil
 		return m, nil
 	case "down", "tab":
-		// Move to the next field. Arrows are the primary way (intuitive);
-		// tab still works for keyboard-flow habit.
 		te.Field = (te.Field + 1) % 3
 		return m, nil
 	case "up", "shift+tab":
@@ -176,8 +145,6 @@ func (m Model) updateTagEditor(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "left", "right":
-		// On the colour line, ←/→ cycle the palette. On other lines they
-		// do nothing (name/icon are text — arrows don't move a caret here).
 		if te.Field == 1 {
 			te.Color = cycleColor(te.Color, key == "right")
 		}
@@ -196,18 +163,14 @@ func (m Model) updateTagEditor(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, m.commitTagEditor()
 	}
 
-	// Printable input. Color slot consumes nothing here (use ←/→).
 	if len(key) == 1 && key[0] >= 0x20 && key[0] < 0x7f {
 		switch te.Field {
 		case 0:
 			te.Name += key
 		case 2:
-			// Icon = single rune; replace whatever was there.
 			te.Icon = key
 		}
 	}
-	// Unicode runes (emoji etc.) come through with longer key strings.
-	// We only accept them for the icon slot.
 	if te.Field == 2 && len(key) > 1 && !strings.HasPrefix(key, "ctrl+") &&
 		!strings.HasPrefix(key, "alt+") && !strings.HasPrefix(key, "shift+") {
 		te.Icon = key
@@ -215,8 +178,6 @@ func (m Model) updateTagEditor(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// commitTagEditor saves the tag (create or update) and closes the
-// modal on success. Failures stay on screen with the error visible.
 func (m *Model) commitTagEditor() tea.Cmd {
 	te := m.tagEditor
 	if te == nil {
@@ -249,8 +210,6 @@ func (m *Model) commitTagEditor() tea.Cmd {
 	return nil
 }
 
-// cycleColor advances (or reverses) through tagPalette, wrapping at
-// the ends. Unknown active color → first palette entry.
 func cycleColor(active string, forward bool) string {
 	if len(tagPalette) == 0 {
 		return ""

@@ -11,16 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// --- generic KV panel ----------------------------------------------------
-//
-// Most sidebars are just "title + list of k:v rows + optional extra
-// sections." renderKVPanel gives every one of them the same shape:
-//
-//   renderKVPanel(inner, "Account", []kv{{"label", "Account"}, ...})
-//
-// Extra sections (picklist values, package dirs, limits list) are still
-// bespoke at the end of each view's renderer.
-
 type kv struct{ K, V string }
 
 func renderKVPanel(inner int, title string, rows []kv, extra ...string) string {
@@ -48,32 +38,17 @@ func (m Model) compactSidebarPills() bool {
 func (m Model) kvPanelPills(inner int, title string, pills []markPill, rows []kv, extra ...string) string {
 	if m.compactSidebarPills() {
 		if pillRow := renderMarkPills(pills); pillRow != "" {
-			// Inline: "<title>  <pills>" on one line, no separate row.
 			return renderKVPanelTitled(inner, sideTitle(title)+"  "+pillRow, rows, extra...)
 		}
 	}
 	return renderKVPanelWithPills(inner, title, pills, rows, extra...)
 }
 
-// kvPanelTagged is kvPanelPills plus tag/project surfacing. In STACKED
-// mode the tags are appended to the title line (as pills) and the
-// projects are right-aligned on that same line — moving them OUT of the
-// scrollable body, where a narrow stacked column truncated them and
-// forced the user into the inspect (i) modal to read them. In the
-// RHS-beside sidebar (roomy) the header stays clean and tags/projects
-// keep their normal body sections (the caller still appends
-// sidebarTagsProjectsSection to extra as before).
-//
-// kind/ref/orgUser identify the item for the tag + project lookups.
 func (m Model) kvPanelTagged(inner int, title string, pills []markPill, kind devproject.ItemKind, ref, orgUser string, rows []kv, extra ...string) string {
 	if !m.compactSidebarPills() {
-		// RHS mode — unchanged: flag pills via kvPanelPills, tags/projects
-		// live in the body (already appended to extra by the caller).
 		return m.kvPanelPills(inner, title, pills, rows, extra...)
 	}
 
-	// Stacked mode: fold tags into the title line and right-align
-	// projects, moving both out of the truncation-prone body.
 	titleLine := m.stackedTitleWithTagsProjects(sideTitle(title),
 		renderMarkPills(pills), kind, ref, orgUser, inner)
 	return renderKVPanelTitled(inner, titleLine, rows, extra...)
@@ -115,14 +90,9 @@ func placeTitleAndProjects(left, projectPills string, inner int) string {
 	if gap >= 2 {
 		return left + strings.Repeat(" ", gap) + projectPills
 	}
-	// No room to right-align — tuck projects onto their own line.
 	return left + "\n  " + projectPills
 }
 
-// tagsProjectsHeaderPills returns the inline pill strings for an item's
-// tags and projects, for the stacked-mode header. Either may be "".
-// Projects render as their sidebar pills (single name, or "N projects");
-// tags render as their normal coloured pills.
 func (m Model) tagsProjectsHeaderPills(kind devproject.ItemKind, ref, orgUser string) (tagPills, projectPills string) {
 	if m.devProjects == nil || ref == "" {
 		return "", ""
@@ -136,8 +106,6 @@ func (m Model) tagsProjectsHeaderPills(kind devproject.ItemKind, ref, orgUser st
 	return tagPills, projectPills
 }
 
-// renderKVPanelTitled is renderKVPanel with a pre-styled title line (so
-// callers can append inline pills); rows + extra render as usual.
 func renderKVPanelTitled(inner int, titleLine string, rows []kv, extra ...string) string {
 	var out []string
 	out = append(out, titleLine)
@@ -173,8 +141,6 @@ func renderKVPanelWithPills(inner int, title string, pills []markPill, rows []kv
 	return strings.Join(out, "\n")
 }
 
-// --- per-view dispatcher ------------------------------------------------
-
 func (m Model) renderSidebar(w, h, innerH int) string {
 	inner := w - 4
 	if inner < 10 {
@@ -206,20 +172,9 @@ func (m Model) renderSidebar(w, h, innerH int) string {
 	} else {
 		content = m.resolveSidebar(contentInner)
 	}
-	// Universal truncation guard: ANY sidebar panel whose content is
-	// clipped — vertically (taller than innerH) or horizontally (a line
-	// truncated with an ellipsis) — gets a red warning stamped on its
-	// last visible row pointing at the inspect shortcut. This lives here
-	// (the one choke point every RHS panel flows through) so it works
-	// generically, not per-panel. The inspect modal works for any non-
-	// empty sidebar, so the shortcut is always offered.
 	switch {
 	case stackedNote:
 		content = stampSidebarTruncation(content, contentInner, innerH, content != "")
-		// Height innerH-3: row 0 is the panel title, innerH-2 is the
-		// footer-button row (stampSidebarFooterButtons writes there —
-		// a taller box loses its bottom border to the buttons), and
-		// innerH-1 stays empty for breathing room.
 		box := renderNoteBox(inner-contentInner-2, innerH-3, note)
 		content = joinNoteBeside(clipLines(content, innerH), box, contentInner, innerH)
 	case besideNote:
@@ -236,9 +191,6 @@ func (m Model) renderSidebar(w, h, innerH int) string {
 		if noteH < noteBoxBesideMinH {
 			noteH = noteBoxBesideMinH
 		}
-		// -2: the footer-button row (innerH-2, where the stamp writes —
-		// any overlap eats the box's bottom border) plus the final
-		// breathing-room row both stay free below the box.
 		contentBudget := innerH - noteH - 2
 		content = stampSidebarTruncation(content, inner, contentBudget, content != "")
 		box := renderNoteBox(inner, noteH, note)
@@ -250,10 +202,6 @@ func (m Model) renderSidebar(w, h, innerH int) string {
 	// click hit-layers are registered separately in render.go (they
 	// need absolute coordinates the sidebar render can't compute).
 	content = stampSidebarFooterButtons(content, inner, innerH)
-	// Bright border when the sidebar is the active pane —
-	// SidebarFocusable tab + bodyFocus=false. Mirrors the main pane's
-	// PanelledFocus styling so the user can see at a glance which
-	// pane Tab landed on.
 	style := theme.Panelled
 	if m.focus == focusMain {
 		if spec := lookupTabSpec(m.tab()); spec != nil && spec.SidebarFocusable && !m.bodyFocus {
@@ -263,16 +211,6 @@ func (m Model) renderSidebar(w, h, innerH int) string {
 	return style.Width(w).Height(h).MaxHeight(h).Render(clipLines(content, innerH))
 }
 
-// sidebarFooterButtons returns the two button strings rendered at
-// the bottom-right of the sidebar. Each button carries its full
-// hint text (label + the actual bound key, surfaced via firstPretty)
-// so the user can read what the button does without hovering. The
-// click hit-layer over each button (see sidebarFooterHitLayers)
-// makes the whole button area mouse-targetable.
-//
-// The returned `stackedBtn` renders RIGHTMOST; `hideBtn` is just
-// to its left with one space between. theme.Muted matches the
-// footer-hint styling already used elsewhere in the sidebar.
 func sidebarFooterButtons() (hideBtn, stackedBtn string, totalWidth int) {
 	style := lipgloss.NewStyle().Foreground(theme.Muted)
 	hideKey := firstPretty(Keys.ToggleSidebar)
@@ -289,17 +227,6 @@ func sidebarFooterButtons() (hideBtn, stackedBtn string, totalWidth int) {
 	return
 }
 
-// sidebarFooterHitLayers returns invisible click-target layers
-// positioned over the two icon buttons stamped in
-// stampSidebarFooterButtons. Anchored relative to the sidebar
-// layer's own origin — caller is render.go which already places
-// the sidebar layer at (bodyX, panelY), so these compose to
-// absolute hit boxes via lipgloss layer nesting.
-//
-// w / h are the sidebar's outer dimensions (including its border).
-// Buttons sit one row above the inner bottom so the global footer
-// hint row has breathing room — outer-Y = h - 3 (top border + the
-// (innerH - 2) row we stamp to).
 func sidebarFooterHitLayers(w, h int) []*lipgloss.Layer {
 	if h < 5 {
 		return nil
@@ -317,8 +244,6 @@ func sidebarFooterHitLayers(w, h int) []*lipgloss.Layer {
 	}
 	hideW := lipgloss.Width(hide)
 	stackW := lipgloss.Width(stack)
-	// X positions (sidebar-local): one cell of right padding from
-	// the border, then [stack][space][hide] reading right-to-left.
 	stackX := w - 2 - stackW
 	hideX := stackX - 1 - hideW
 	if hideX < 2 {
@@ -336,11 +261,6 @@ func sidebarFooterHitLayers(w, h int) []*lipgloss.Layer {
 	}
 }
 
-// stampSidebarFooterButtons replaces the last visible row of the
-// sidebar content with the original line plus the two right-aligned
-// icon buttons. Returns the updated multiline string. When the
-// sidebar is too narrow to fit both buttons + at least 2 chars of
-// the original last line, returns content unchanged.
 func stampSidebarFooterButtons(content string, inner, innerH int) string {
 	if content == "" || innerH < 1 {
 		return content
@@ -373,8 +293,6 @@ func stampSidebarFooterButtons(content string, inner, innerH int) string {
 	last := lines[btnRow]
 	lastW := lipgloss.Width(last)
 	if lastW+1+btnW > inner {
-		// Not enough room — drop the original last line entirely
-		// and right-align the buttons on a blank row.
 		last = ""
 		lastW = 0
 	}
@@ -419,7 +337,6 @@ func stampSidebarTruncation(content string, inner, innerH int, inspectable bool)
 	}
 	warn := sidebarTruncationWarning(inner, inspectable)
 	if clippedV {
-		// Vertical clip: keep the first innerH-1 lines, warning last.
 		keep := innerH - 1
 		if keep < 0 {
 			keep = 0
@@ -449,8 +366,6 @@ func stripTruncSentinel(s string) string {
 	return strings.ReplaceAll(s, truncSentinel, "")
 }
 
-// sidebarTruncationWarning is the red line shown when a sidebar panel
-// is clipped. Points at the inspect shortcut when one is available.
 func sidebarTruncationWarning(inner int, inspectable bool) string {
 	msg := "⚠ truncated"
 	if inspectable {
@@ -460,9 +375,6 @@ func sidebarTruncationWarning(inner int, inspectable bool) string {
 		Render(ansi.Truncate("  "+msg, inner, "…"))
 }
 
-// activeListPaginated reports whether the surface the user is
-// currently looking at has its list-table state in paginated mode.
-// Used by the wheel-event dispatcher to pick the per-mode handler.
 func (m Model) activeListPaginated() bool {
 	mp := &m
 	state := mp.activeListTableState()
@@ -472,19 +384,6 @@ func (m Model) activeListPaginated() bool {
 	return state.Paginated
 }
 
-// sidebarSystemAPI is the placeholder right-pane for the /system
-// API subtab — until that view gets a real list-table-shaped
-// payload, the sidebar just shows a static hint.
-
-// sidebarObjectDetailDispatch routes to the right per-subtab sidebar
-// for ObjectDetail, whose subtabs aren't declared in TabSpec.Subtabs
-// (they fan out from a render-time switch instead). Mirror of the
-// Identity dispatcher; explicit branches per subtab — no default
-// fallback so a future SubtabXX without an entry no-ops cleanly.
-
-// resolveSidebar walks the spec resolver chain (subtab → tab) and
-// returns the first non-nil Sidebar closure's output. Empty string
-// when no resolver applies.
 func (m Model) resolveSidebar(inner int) string {
 	spec, sub := m.activeSpec()
 	if sub != nil && sub.Sidebar != nil {
@@ -496,26 +395,6 @@ func (m Model) resolveSidebar(inner int) string {
 	return ""
 }
 
-// sidebarObjectDetailRecord is the Object-drill Records-subtab sidebar.
-// Shows the selected row's full KV. Source depends on the active chip:
-// synthetic "recent" pulls from d.Records; a Salesforce list view
-// pulls from d.ListViewResults.
-
-// sidebarRecords shows the full selected record as KV when in record-
-// list mode, or the selected sObject's summary when in picker mode.
-
-// Picker mode → reuse the sObject sidebar verbatim.
-
-// Record-list mode → show the selected record as a KV dump.
-// Route via currentRecordAt so the row reflects the active search
-// filter (and the chip-records path, not just bare Records).
-
-// Id first, then every other field sorted.
-
-// Deterministic order for display.
-
-// sortStrings is a local shim so we don't pull `sort` into sidebar.go
-// just for the one call site.
 func sortStrings(xs []string) {
 	for i := 1; i < len(xs); i++ {
 		for j := i; j > 0 && xs[j-1] > xs[j]; j-- {
@@ -524,32 +403,13 @@ func sortStrings(xs []string) {
 	}
 }
 
-// --- per-view renderers -------------------------------------------------
-
-// Per-row metadata available straight from the EntityDefinition
-// list query — no describe fetch required, so these always show.
-
 // If we have a cached describe for this one, show the deeper
 // caps split into individual rows (the "QCUD" mnemonic is opaque
 // without context). Each cap also implies what actions are safe
 // to wire up on this sObject.
 
-// sidebarApex routes the right-pane render for /apex by active
-// subtab. Classes + Triggers each get their own renderer; VF Pages
-// + Components fall through to an empty placeholder until they
-// have detail data.
-
-// sidebarApexClass renders the cursored Apex class's metadata in
-// the right pane. Pills above the kv rows show managed-package
-// status + IsValid so they're scannable without parsing column
-// values.
-
 // Character count (body minus comments), not lines — see the
 // Apex SIZE column note in list_column_schemas.go.
-
-// sidebarApexTrigger is sidebarApexClass's twin for the Triggers
-// subtab. Same shape; trigger-specific fields swap in (parent
-// sObject, events).
 
 // sidebarField is the full "everything about this field" detail view.
 // Structured as Object-Manager-style sections (IDENTITY · CONSTRAINTS ·
@@ -564,45 +424,8 @@ func sortStrings(xs []string) {
 // the main pane already shows the failure (the inaccessible
 // managed-object NOT_FOUND case). Surface it instead of hanging.
 
-// Each section builds a []kv (or plain strings) and is joined at
-// the end. Sections separate with a blank line + dim title.
-
-// --- IDENTITY ---
-
-// --- CONSTRAINTS ---
-
-// --- REFERENCE ---
-
-// --- PICKLIST ---
-
-// --- FORMULA / DEFAULT ---
-
 // --- SECURITY / BEHAVIOR ---
 
-// --- SOQL CAPABILITIES ---
-
-// --- HELP ---
-
-// --- TAGS / PROJECTS ---
-
-// In a short slot (stacked layout) the flat list overflows + gets
-// clipped — losing CONSTRAINTS / SOQL at the bottom. Reflow the
-// already-short kv lines into columns to fit the height. The
-// generic truncation guard in renderSidebar stamps the warning if
-// anything still clips.
-
-// sidebarFieldBudget is the content-height the schema-subtab field
-// sidebar may use before it should reflow into columns. The title +
-// separator that renderKVPanel-style headers add aren't present here
-// (sidebarField emits its own title), so the budget is the full
-// available sidebar height.
-
-// reflowLinesToBudget packs an already-rendered, mostly-short line list
-// into up to 3 balanced columns so it fits budget rows. Lines are NOT
-// re-wrapped (callers pass short kv rows); over-long lines truncate to
-// the column width. Returns reflowed=true when it had to column-pack
-// (so the caller can warn that info is denser/clipped). When the list
-// already fits, or budget is unknown, it's returned unchanged.
 func reflowLinesToBudget(lines []string, inner, budget int) (out []string, reflowed bool) {
 	if budget <= 0 || len(lines) <= budget {
 		return lines, false
@@ -647,9 +470,6 @@ func reflowLinesToBudget(lines []string, inner, budget int) (out []string, reflo
 			packed[r] = strings.Join(parts, gap)
 		}
 		if len(packed) <= budget {
-			// Reflow happened — the card is denser than its natural
-			// single column (and cells may be ellipsis-cut). Mark it so
-			// the generic guard offers the full-info modal.
 			if len(packed) > 0 {
 				packed[len(packed)-1] += truncSentinel
 			}
@@ -659,12 +479,6 @@ func reflowLinesToBudget(lines []string, inner, budget int) (out []string, reflo
 	return lines, true
 }
 
-// sidebarFieldTypeDisplay matches the TYPE column's virtual-type
-// expansion so the sidebar is consistent with the table.
-
-// yesNo is a tiny formatter for the boolean kv rows in the sidebar.
-// Renders "yes" in the default fg, "no" dimmed so a column of booleans
-// reads as a visual pattern (active rows stand out).
 func yesNo(b bool) string {
 	if b {
 		return "yes"
@@ -693,20 +507,11 @@ func stringish(v any) (string, bool) {
 	return "", false
 }
 
-// CreatedBy / CreatedDate live in the sidebar only — the row
-// stays compact with no dedicated CREATED column. Chip predicates
-// (e.g. the "Created by me" built-in) can still filter on these
-// fields via sf.Flow.Field().
-
-// Active marker.
-
 // itoaFn avoids name collision with the update.go private itoa used by
 // activate(); both do the same thing, but keeping them local avoids
 // introducing a shared helper just for this.
 func itoaFn(n int) string { return fmt.Sprintf("%d", n) }
 
-// humanBytes formats a byte count with a unit suffix. Apex log sizes
-// run from a few KB to several MB; raw byte counts are unreadable.
 func humanBytes(n int) string {
 	switch {
 	case n < 1024:
@@ -720,11 +525,6 @@ func humanBytes(n int) string {
 	}
 }
 
-// compactChars formats a raw character count into a short, column-
-// friendly form: "847", "3.2K", "992K", "1.4M". Decimal (1000-based)
-// units — this is a code-size figure, not a disk allocation, so plain
-// thousands read more naturally than KiB. Used for the Apex "SIZE"
-// column (ApexClass.LengthWithoutComments, a char count — NOT lines).
 func compactChars(n int) string {
 	switch {
 	case n < 1000:
@@ -736,37 +536,6 @@ func compactChars(n int) string {
 	}
 }
 
-// While the user is actively editing the query, the most useful
-// sidebar content is the FROM sObject's schema — field list with
-// types + capability flags. Mirrors what Inspector Reloaded shows
-// in its right-hand pane while building a query.
-
-// sidebarSOQLSchema renders the describe of the FROM sObject (when
-// resolvable) as a scannable field reference. Returns "" when the
-// query has no FROM yet OR the describe isn't loaded yet — caller
-// falls through to the result-row sidebar in that case.
-//
-// Layout: header with sObject name + label, then per-field rows
-// showing `apiName  type  badges`. Reference fields show their
-// target sObject; picklist fields show value count; required
-// fields get a `*` marker.
-
-// Trigger a fetch if not cached. The render returns "loading…"
-// and re-runs naturally when the describe lands.
-
-// Describe not yet cached. The autocomplete engine's
-// EnsureDescribe path (fired on every editor keystroke)
-// kicks the fetch, so the next render after the user
-// types ANY key will land the describe and we'll render
-// the schema. Until then, just show "loading…".
-
-// Build the field list. Sort: NameField first, then Id, then
-// rest alphabetical — easier to scan.
-
-// extractFromSObject returns the FROM target of a SOQL query. Uses
-// the same FROM regex parseSelectColumns relies on, but pulled out
-// to a one-shot helper so the sidebar doesn't need to walk the
-// projection.
 func extractFromSObject(query string) string {
 	m := fromSObjectRe.FindStringSubmatch(query)
 	if len(m) < 2 {
@@ -774,18 +543,6 @@ func extractFromSObject(query string) string {
 	}
 	return m[1]
 }
-
-// renderSchemaFieldRow formats one field row in the schema sidebar.
-// Layout: "  fieldName  type · flags". Reference fields append
-// "→ TargetSObject". Picklists append the value count. Wider
-// sidebar widths reveal more detail; narrow widths truncate.
-
-// Capability badges: only show the ones that DIFFER from the
-// usual defaults (filterable+sortable are common; non-
-// filterable is the notable case).
-
-// Hard-truncate to the sidebar inner width so long custom
-// API names don't wrap.
 
 // fromSObjectRe matches "FROM <name>" anywhere in the query.
 // Mirrors parseSelectColumns' approach but doesn't need paren
@@ -804,7 +561,6 @@ func mustCompileFromRe() *fromRe {
 type fromRe struct{}
 
 func (r *fromRe) FindStringSubmatch(s string) []string {
-	// Strip parens to skip subquery FROMs.
 	depth := 0
 	var b strings.Builder
 	b.Grow(len(s))
@@ -828,7 +584,6 @@ func (r *fromRe) FindStringSubmatch(s string) []string {
 	lower := strings.ToLower(flat)
 	idx := strings.Index(lower, "from ")
 	if idx < 0 {
-		// Try a tab-separated FROM as well.
 		idx = strings.Index(lower, "from\t")
 		if idx < 0 {
 			idx = strings.Index(lower, "from\n")
@@ -837,7 +592,6 @@ func (r *fromRe) FindStringSubmatch(s string) []string {
 			return nil
 		}
 	}
-	// Word-boundary check on the left.
 	if idx > 0 {
 		prev := flat[idx-1]
 		if prev != ' ' && prev != '\t' && prev != '\n' && prev != '\r' {
@@ -845,7 +599,6 @@ func (r *fromRe) FindStringSubmatch(s string) []string {
 		}
 	}
 	start := idx + 5
-	// Skip whitespace after FROM.
 	for start < len(flat) && (flat[start] == ' ' || flat[start] == '\t' || flat[start] == '\n') {
 		start++
 	}
@@ -864,18 +617,6 @@ func (r *fromRe) FindStringSubmatch(s string) []string {
 	}
 	return []string{flat[idx:end], flat[start:end]}
 }
-
-// 1. Cloud banner — animates while the user is on /home unless
-//    disabled (static) or hidden (skipped entirely). Falls back to
-//    the local alias when OrgInfo hasn't landed yet.
-
-// 2. ORG details — moved out of the main pane, condensed to a
-//    KV list. Long values wrap onto a second line via sideKV.
-
-// Limits live in /home → Limits with sort, search, column mode, row
-// highlighting, and Lightning open. The sidebar stays focused on identity.
-
-// --- sidebar visual helpers ---------------------------------------------
 
 func sideTitle(s string) string {
 	return lipgloss.NewStyle().Foreground(theme.Blue).Bold(true).Render(s)
@@ -925,36 +666,14 @@ func sideEmpty(s string) string {
 	return lipgloss.NewStyle().Foreground(theme.Muted).Italic(true).Render("  " + s)
 }
 
-// sidebarPerms shows the cursored permset/PSG/profile's metadata on
-// the /perms top tab. Keeps the body tight — overview-shape, the full
-// drill-in view already has a dedicated overview subtab.
-
-// sidebarPermParent shows the current drilled-in parent's identity
-// on every TabPermParentDetail subtab. Per-subtab sidebars (e.g. the
-// cursored field on the Fields subtab) land in later phases.
-
-// actionRow is the sidebar-facing flattening of any per-entity
-// action (field, object, validation-rule, …). The action registries
-// live in their own files; they adapt to this shape when rendering
-// the shared sidebar menu so the row-level layout stays in one place.
 type actionRow struct {
-	Label   string
-	Hint    string // the "what this does" line shown when allowed
-	Allowed bool   // false → row is dimmed, Reason is shown instead
-	Reason  string // why it's disabled (e.g. "custom objects only")
-	// Separator marks the row as a visual divider rather than a real
-	// action. Rendered as a thin rule and skipped by cursor movement.
-	// Label / Hint / Allowed / Reason are ignored when set.
+	Label     string
+	Hint      string // the "what this does" line shown when allowed
+	Allowed   bool   // false → row is dimmed, Reason is shown instead
+	Reason    string // why it's disabled (e.g. "custom objects only")
 	Separator bool
 }
 
-// rowContext is the per-cursored-row info the detail sidebars now
-// render instead of mirroring the main-pane action list. It answers
-// "what is this row and what happens if I act on it" — full help,
-// current value, how an edit ships, and the consequence — so the
-// sidebar complements the main pane rather than duplicating its
-// cursor. Surfaces populate it from their cursored row; an empty
-// Heading means "cursor on a non-actionable row" (ReadOnlyMsg shows).
 type rowContext struct {
 	Heading     string   // e.g. "Toggle Allow Reports", "Edit label"
 	Current     string   // current value, rendered after "now:"
@@ -967,17 +686,7 @@ type rowContext struct {
 	Hints       []string // bottom hint-bar items (e.g. "↵ open", "o Lightning")
 }
 
-// sidebarRowContext renders the context panel for the cursored row.
-// title is the panel header (e.g. "OBJECT · CONTEXT").
-//
-// Layout: a title, then the context body (heading + now/help/ships/
-// affects), then a reserved full-width hint bar (the org target + any
-// nav hints). When the body is taller than the panel, it reflows into
-// up to three columns so it fits without clipping; the hint bar always
-// stays full-width below the columns, wrapping to extra lines if the
-// panel is too narrow for one line.
 func (m Model) sidebarRowContext(title string, inner int, ctx rowContext) string {
-	// --- body as logical items (each wraps within its column) ---
 	var items []ctxItem
 	if ctx.Heading == "" {
 		msg := ctx.ReadOnlyMsg
@@ -1008,7 +717,6 @@ func (m Model) sidebarRowContext(title string, inner int, ctx rowContext) string
 		}
 	}
 
-	// --- hint bar (always full-width, reserved at the bottom) ---
 	var hintBar []string
 	if o, ok := m.currentOrg(); ok {
 		lvl := m.safetyFor(o)
@@ -1043,10 +751,6 @@ func (m Model) sidebarRowContext(title string, inner int, ctx rowContext) string
 	return strings.Join(out, "\n")
 }
 
-// ctxItem is one logical chunk of the context body. label is an
-// optional inline prefix ("ships: ", "now "); text is the value/prose
-// that word-wraps to the available column width. style picks the
-// foreground treatment.
 type ctxItem struct {
 	label string
 	text  string
@@ -1075,8 +779,6 @@ func renderCtxItem(it ctxItem, w int) []string {
 	case ctxDanger:
 		return wrapStyled(lipgloss.NewStyle().Foreground(theme.Red).Bold(true), "", it.text, w)
 	case ctxKV:
-		// label muted, value fg — render as one wrapped block; keep it
-		// simple by styling the whole line muted-then-value via prefix.
 		lines := wrapPlain(it.label, it.text, w)
 		st := lipgloss.NewStyle().Foreground(theme.Fg)
 		out := make([]string, len(lines))
@@ -1091,8 +793,6 @@ func renderCtxItem(it ctxItem, w int) []string {
 	}
 }
 
-// wrapStyled word-wraps label+text to width w and applies style to
-// every line. Continuation lines indent to align under the label.
 func wrapStyled(style lipgloss.Style, label, text string, w int) []string {
 	lines := wrapPlain(label, text, w)
 	out := make([]string, len(lines))
@@ -1102,9 +802,6 @@ func wrapStyled(style lipgloss.Style, label, text string, w int) []string {
 	return out
 }
 
-// wrapPlain word-wraps "label+text" to width w (unstyled). The first
-// line is "label"+first words; continuation lines indent by the label
-// width so the text block aligns. Returns at least one line.
 func wrapPlain(label, text string, w int) []string {
 	if w < 4 {
 		w = 4
@@ -1112,7 +809,6 @@ func wrapPlain(label, text string, w int) []string {
 	indent := strings.Repeat(" ", ansi.StringWidth(label))
 	avail := w - ansi.StringWidth(label)
 	if avail < 3 {
-		// label itself eats the width — just truncate the combined.
 		return []string{ansi.Truncate(label+text, w, "…")}
 	}
 	words := strings.Fields(text)
@@ -1158,13 +854,11 @@ func wrapPlain(label, text string, w int) []string {
 // clean single column means the user is reading a denser, narrower
 // rendering — worth offering the modal.
 func layoutContextItems(items []ctxItem, inner, budget int) (lines []string, reflowed bool) {
-	// Single column first.
 	single := renderItemColumn(items, inner-2)
 	single = indentLines(single, "  ")
 	if budget <= 0 || len(single) <= budget {
 		return single, false
 	}
-	// Try 2 then 3 columns; pick the first that fits the budget.
 	for cols := 2; cols <= 3; cols++ {
 		laid, ok := renderItemColumns(items, cols, inner, budget)
 		if ok {
@@ -1183,8 +877,6 @@ func layoutContextItems(items []ctxItem, inner, budget int) (lines []string, ref
 	return single, true
 }
 
-// renderItemColumn renders items top-to-bottom into a flat []string at
-// content width w (each item wraps, blank line between items).
 func renderItemColumn(items []ctxItem, w int) []string {
 	var out []string
 	for i, it := range items {
@@ -1210,13 +902,10 @@ func renderItemColumns(items []ctxItem, cols, inner, budget int) ([]string, bool
 	if colW < 10 {
 		return nil, false // too narrow to wrap meaningfully
 	}
-	// Pre-render each item to its wrapped block at colW.
 	blocks := make([][]string, len(items))
 	for i, it := range items {
 		blocks[i] = renderCtxItem(it, colW)
 	}
-	// Greedy balanced assignment: walk items, push onto the shortest
-	// column so far (respecting order within a column).
 	colLines := make([][]string, cols)
 	colHeight := make([]int, cols)
 	target := 0
@@ -1236,7 +925,6 @@ func renderItemColumns(items []ctxItem, cols, inner, budget int) ([]string, bool
 		colLines[c] = append(colLines[c], b...)
 		colHeight[c] += len(b)
 	}
-	// Pad columns to equal height + width, stitch row-by-row.
 	maxH := 0
 	for _, cl := range colLines {
 		if len(cl) > maxH {
@@ -1262,7 +950,6 @@ func renderItemColumns(items []ctxItem, cols, inner, budget int) ([]string, bool
 	return out, true
 }
 
-// indentLines prefixes every line with pad.
 func indentLines(lines []string, pad string) []string {
 	out := make([]string, len(lines))
 	for i, ln := range lines {
@@ -1271,9 +958,6 @@ func indentLines(lines []string, pad string) []string {
 	return out
 }
 
-// detailNavHints is the standard hint-bar item set for the drill-
-// detail context panels: back, refresh, and (when lightning) the
-// Lightning open. Kept here so all the detail surfaces read the same.
 func detailNavHints(lightning bool) []string {
 	hints := []string{
 		firstPretty(Keys.Back) + " back",
@@ -1311,11 +995,6 @@ func sideHintBar(items []string, inner int) []string {
 	return lines
 }
 
-// inspectModalForCurrentView builds the full-info modal for the active
-// RHS panel — GENERIC: it re-renders whatever sidebar the current view
-// shows, at the modal's full width and with no height clip, so every
-// panel (not just the detail/context ones) can be inspected in full.
-// Returns (_, false) only when there is no sidebar at all.
 func (m Model) inspectModalForCurrentView() (infoModalState, bool) {
 	full, ok := m.fullSidebarContent()
 	if !ok {
@@ -1324,13 +1003,7 @@ func (m Model) inspectModalForCurrentView() (infoModalState, bool) {
 	return infoModalState{Title: m.inspectModalTitle(), PreRendered: full}, true
 }
 
-// fullSidebarContent re-renders the active sidebar at a wide width with
-// the column-reflow / height-clip pressure removed, yielding the full
-// untruncated panel. Returns (_, false) when the view has no sidebar.
 func (m Model) fullSidebarContent() (string, bool) {
-	// Wide inner width so values don't truncate horizontally; huge
-	// sidebarInnerH so the context panels stay single-column (no reflow)
-	// and nothing self-clips. modalWidth caps the eventual box.
 	w := modalWidth(m.width, 44, 80)
 	inner := w - 4
 	if inner < 20 {
@@ -1346,8 +1019,6 @@ func (m Model) fullSidebarContent() (string, bool) {
 	return content, true
 }
 
-// inspectModalTitle is the heading for the generic inspect modal —
-// names the entity under inspection when we can identify it.
 func (m Model) inspectModalTitle() string {
 	subj := m.inspectSubject()
 	if subj == "" {
@@ -1356,8 +1027,6 @@ func (m Model) inspectModalTitle() string {
 	return subj + " · full info"
 }
 
-// inspectSubject is the short identity label for the inspect modal
-// title (sObject / field / drilled entity / user).
 func (m Model) inspectSubject() string {
 	o, ok := m.currentOrg()
 	if !ok {
@@ -1384,49 +1053,6 @@ func (m Model) inspectSubject() string {
 	return d.DescribeCur
 }
 
-// sidebarFieldActions is the TabFieldDetail right sidebar — a context
-// panel for the cursored field-detail row.
-
-// fieldRowContext builds the context panel for the cursored field
-// row. The field actions write via the Tooling CustomField API (not
-// the Metadata deploy that object edits use).
-
-// Current value from the cursored field.
-
-// fieldActionCurrentValue returns the "now:" value for a field action.
-
-// sidebarObjectActions is the Details-subtab right sidebar. It is now
-// INFO-ONLY: the action menu lives in the main pane (arrow keys walk
-// the editable rows; Enter / ctrl+e fires them). This sidebar just
-// mirrors the catalog of available actions and highlights whichever
-// one the cursored main-pane row maps to, so the user can safely hide
-// it without losing the ability to act.
-
-// Details subtab — surface the subtab nav + Lightning open.
-
-// objectRowContext builds the context panel for the cursored Details
-// row. Read-only rows explain themselves; editable rows carry the
-// deploy routing + consequence so the user knows what a write ships.
-
-// Current value for the cursored row, pulled from describe/baseline.
-
-// objectActionCurrentValue returns the current value string for an
-// object action index, used as the "now:" line in the context panel.
-
-// sidebarRecordType renders a compact summary of the currently-
-// selected record type on the Record Types subtab. Drill into a
-// record type (enter) to open TabRecordTypeDetail for the full
-// Metadata + action menu.
-
-// sidebarTrigger renders a compact summary of the currently-selected
-// trigger on the Triggers subtab. Drill (enter) to open
-// TabTriggerDetail for the body + action menu.
-
-// sidebarValidationRule renders a compact summary of the currently-
-// selected rule on the Validation subtab. Drill into a rule (enter)
-// to open TabValidationDetail for the full formula body + action
-// menu.
-
 // wrap word-wraps s to width, joining continuation lines with a
 // two-space hanging indent (callers prefix the first line with "  "
 // themselves). Rune-safe — the previous version byte-sliced, which
@@ -1450,7 +1076,6 @@ func wrap(s string, width int) string {
 				lines = append(lines, line)
 				line = word
 			}
-			// Hard-break words longer than a full line (URLs, ids).
 			for lipgloss.Width(line) > width {
 				r := []rune(line)
 				if len(r) <= width {
@@ -1462,20 +1087,8 @@ func wrap(s string, width int) string {
 		}
 		lines = append(lines, line)
 	}
-	// Trim a trailing empty produced by an empty final paragraph.
 	for len(lines) > 1 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
 	return strings.Join(lines, "\n  ")
 }
-
-// Focused-item details. When a row is selected on the Items
-// subtab the sidebar surfaces the canonical id (where one
-// exists), the kind label, and any captured context. Kinds
-// without an Id (sObject, field) just show what they DO carry —
-// the ref still answers "what is this?" cleanly.
-
-// devProjectKindHasID reports whether the given kind's Ref slot
-// holds a true Salesforce Id (or local sf-deck id) versus a
-// compound / api-name-only reference. Drives whether the sidebar
-// labels the value as "id" (canonical) or "ref" (composite).

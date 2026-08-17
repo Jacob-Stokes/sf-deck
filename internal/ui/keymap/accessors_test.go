@@ -9,14 +9,12 @@ func TestFirstAndFirstPretty(t *testing.T) {
 	if got := First([]string{"o", "ctrl+o"}); got != "o" {
 		t.Errorf("First = %q, want o", got)
 	}
-	// FirstPretty substitutes symbol glyphs for a few word-keys.
 	if got := FirstPretty([]string{"enter"}); got != "↵" {
 		t.Errorf("FirstPretty(enter) = %q, want ↵", got)
 	}
 	if got := FirstPretty([]string{"up"}); got != "↑" {
 		t.Errorf("FirstPretty(up) = %q, want ↑", got)
 	}
-	// A key with no substitution passes through unchanged.
 	if got := FirstPretty([]string{"o"}); got != "o" {
 		t.Errorf("FirstPretty(o) = %q, want o", got)
 	}
@@ -26,7 +24,6 @@ func TestCommandByID(t *testing.T) {
 	if CommandByID("collect_item") == nil {
 		t.Error("collect_item should be a registered command")
 	}
-	// The split-collect command added recently.
 	if CommandByID("collect_item_pick") == nil {
 		t.Error("collect_item_pick should be registered")
 	}
@@ -39,7 +36,6 @@ func TestCommandByID(t *testing.T) {
 func TestSetByIDAndKeysByID(t *testing.T) {
 	km := DefaultKeymap()
 
-	// KeysByID returns the current binding.
 	if len(km.KeysByID("drill")) == 0 {
 		t.Error("drill should have default keys")
 	}
@@ -47,7 +43,6 @@ func TestSetByIDAndKeysByID(t *testing.T) {
 		t.Error("unknown id → nil keys")
 	}
 
-	// SetByID rebinds; KeysByID reflects it.
 	if err := km.SetByID("collect_item", []string{"ctrl+k", "x"}); err != nil {
 		t.Fatalf("SetByID: %v", err)
 	}
@@ -56,7 +51,6 @@ func TestSetByIDAndKeysByID(t *testing.T) {
 		t.Errorf("after rebind, keys = %v, want [ctrl+k x]", got)
 	}
 
-	// SetByID on an unknown command errors.
 	if err := km.SetByID("no_such_id", []string{"z"}); err == nil {
 		t.Error("SetByID on unknown command should error")
 	}

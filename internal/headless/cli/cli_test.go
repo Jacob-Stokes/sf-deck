@@ -25,8 +25,6 @@ func newTestApp() *app.App {
 	}
 }
 
-// runCLI is the test harness: parse argv, dispatch, capture stdout +
-// exit code, decode JSON. Mirrors what a script consumer sees.
 func runCLI(t *testing.T, a *app.App, argv ...string) (int, map[string]any, string) {
 	t.Helper()
 	args := Parse(argv)
@@ -279,7 +277,6 @@ func TestChipUpdate_PartialAndIdempotent(t *testing.T) {
 	_, _, _ = runCLI(t, a, "--json", "chip", "create",
 		"--id", "x", "--domain", "records", "--label", "Old")
 
-	// First update changes label.
 	code, got, _ := runCLI(t, a, "--json", "chip", "update",
 		"--id", "x", "--domain", "records", "--label", "New")
 	if code != headless.ExitOK {
@@ -289,7 +286,6 @@ func TestChipUpdate_PartialAndIdempotent(t *testing.T) {
 		t.Errorf("first update changed = %v", got["changed"])
 	}
 
-	// Same label again → no-op.
 	code, got, _ = runCLI(t, a, "--json", "chip", "update",
 		"--id", "x", "--domain", "records", "--label", "New")
 	if code != headless.ExitOK {
@@ -375,7 +371,6 @@ func TestChipDelete_Roundtrip(t *testing.T) {
 		t.Errorf("changed = %v", got["changed"])
 	}
 
-	// Second delete: not found.
 	code, _, _ = runCLI(t, a, "--json", "chip", "delete",
 		"--id", "x", "--domain", "records")
 	if code != headless.ExitNotFound {
@@ -388,7 +383,6 @@ func TestChipList_DefaultsToListVerb(t *testing.T) {
 	_, _, _ = runCLI(t, a, "--json", "chip", "create",
 		"--id", "x", "--domain", "records", "--label", "X")
 
-	// No verb → list.
 	code, got, _ := runCLI(t, a, "--json", "chip")
 	if code != headless.ExitOK {
 		t.Fatalf("default-verb exit = %d", code)

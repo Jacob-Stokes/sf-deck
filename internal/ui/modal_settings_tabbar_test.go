@@ -41,22 +41,17 @@ func TestApplyTabBarSlot(t *testing.T) {
 	s := &settings.Settings{}
 	m := &Model{modelServices: modelServices{settings: s}}
 
-	// Start from the defaults so slot reads are deterministic.
 	m.applyTabBarReset()
 	if got := TabsForNumbers(); len(got) != 8 {
 		t.Fatalf("after reset expected 8 tabs, got %d", len(got))
 	}
 
-	// Assign /reports to slot 0. It isn't a default pin, so this is a
-	// genuine change; home (previously slot 0) should drop off.
 	m.applyTabBarSlot(0, "reports")
 	got := TabsForNumbers()
 	if len(got) == 0 || got[0].String() != "reports" {
 		t.Fatalf("slot 0 = %v, want reports at front", tabsToIDs(got))
 	}
 
-	// Assigning an already-present tab to a different slot MOVES it
-	// (no duplicate). Put /reports (now at slot 0) into slot 3.
 	m.applyTabBarSlot(3, "reports")
 	got = TabsForNumbers()
 	count := 0
@@ -69,7 +64,6 @@ func TestApplyTabBarSlot(t *testing.T) {
 		t.Errorf("reports should appear exactly once after move, got %d in %v", count, tabsToIDs(got))
 	}
 
-	// Clearing a slot removes that tab and closes the gap.
 	before := len(TabsForNumbers())
 	m.applyTabBarSlot(0, "")
 	if after := len(TabsForNumbers()); after != before-1 {

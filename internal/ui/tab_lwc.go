@@ -6,9 +6,6 @@ package ui
 // LWCCur and falling back to AuraDetail when LWCDetail doesn't have
 // the id (cheap to maintain since both bundle kinds use 18-char Ids
 // from the same Tooling pool).
-//
-// Tab constant is still TabLWC for compatibility — the user-visible
-// name is now "components".
 
 import (
 	"fmt"
@@ -22,10 +19,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/highlight"
 )
 
-// bulkTagsForBundles pre-fetches tag bindings for LWC + Aura bundle
-// lists. Pass either lwc or aura (the other nil) — kind tells the
-// helper which item kind to query against. Memoised on *orgData via
-// the gutter cache.
 func (m Model) bulkTagsForBundles(kind devproject.ItemKind, lwc []sf.LWCBundle, aura []sf.AuraBundle) map[string][]devproject.Tag {
 	if !m.settings.TagColumnVisible() {
 		return nil
@@ -48,8 +41,6 @@ func (m Model) bulkTagsForBundles(kind devproject.ItemKind, lwc []sf.LWCBundle, 
 	})
 }
 
-// bulkProjectsForBundles mirrors bulkTagsForBundles for the project
-// gutter.
 func (m Model) bulkProjectsForBundles(kind devproject.ItemKind, lwc []sf.LWCBundle, aura []sf.AuraBundle) map[string][]devproject.DevProject {
 	if !m.settings.ProjectColumnVisible() {
 		return nil
@@ -86,11 +77,6 @@ func bundleCacheKey(kind devproject.ItemKind, lwc []sf.LWCBundle, aura []sf.Aura
 	return "", 0
 }
 
-// bundleLookupKeys is the shared front-end for bulkTagsForBundles +
-// bulkProjectsForBundles — guards on store/org availability and
-// builds the TagLookupKey slice from whichever bundle slice was
-// passed. Returns ok=false when the lookup should bail (no store,
-// no org, or no bundles for the requested kind).
 func bundleLookupKeys(m Model, kind devproject.ItemKind, lwc []sf.LWCBundle, aura []sf.AuraBundle) ([]devproject.TagLookupKey, string, bool) {
 	if m.devProjects == nil {
 		return nil, "", false
@@ -116,7 +102,6 @@ func bundleLookupKeys(m Model, kind devproject.ItemKind, lwc []sf.LWCBundle, aur
 	return keys, o.Username, true
 }
 
-// renderComponents dispatches between the LWC + Aura subtabs.
 func (m Model) renderComponents(w, innerH int) string {
 	if len(m.orgs) == 0 {
 		return noOrgPlaceholder()
@@ -132,9 +117,6 @@ func (m Model) renderComponents(w, innerH int) string {
 	)
 }
 
-// renderLWCList draws the LWC bundle list (default subtab).
-// dispatchSubtab handles the subtab strip; this owns the chip
-// dashboard + busy/loading branch + table.
 func (m Model) renderLWCList(w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -176,7 +158,6 @@ func (m Model) renderLWCList(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderAuraList draws the Aura bundle list (Aura subtab).
 func (m Model) renderAuraList(w, innerH int) string {
 	inner := w - 4
 	d := m.activeOrgData()
@@ -218,10 +199,6 @@ func (m Model) renderAuraList(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// renderComponentsDetail dispatches to LWC or Aura detail based on
-// which detail-cache holds the cursored Id. Both kinds drill into
-// the same TabLWCDetail; we look up by Id rather than by subtab so
-// the user can hold a class open across subtab toggles.
 func (m Model) renderComponentsDetail(w, innerH int) string {
 	inner := w - 4
 	if len(m.orgs) == 0 {
@@ -239,18 +216,12 @@ func (m Model) renderComponentsDetail(w, innerH int) string {
 	return m.renderLWCDetail(d, inner, innerH)
 }
 
-// bundleFile is a shape-erased view over an LWC or Aura resource
-// that the detail renderer + cycle handler can both read from. The
-// label is what shows up on the file-strip pill; the source is the
-// raw body; the lang is the chroma lexer key.
 type bundleFile struct {
 	Label  string
 	Source string
 	Lang   string
 }
 
-// lwcBundleFiles returns the files inside an LWC bundle in their
-// declared order (preserved from the Tooling fetch).
 func lwcBundleFiles(d *sf.LWCBundleDetail) []bundleFile {
 	if d == nil {
 		return nil
@@ -288,9 +259,6 @@ func auraBundleFiles(d *sf.AuraBundleDetail) []bundleFile {
 	return out
 }
 
-// bundleLabelFromPath shortens a "myComponent/myComponent.html" to
-// "myComponent.html" — the bundle name is shown in the title strip
-// already, no need to repeat it on every file pill.
 func bundleLabelFromPath(p string) string {
 	if i := strings.LastIndexByte(p, '/'); i >= 0 {
 		return p[i+1:]
@@ -298,10 +266,6 @@ func bundleLabelFromPath(p string) string {
 	return p
 }
 
-// renderLWCDetail draws one LWC bundle. Files inside the bundle are
-// presented as a cycle-able strip (← / → step files); only the
-// active file's body is rendered, scrollable via j / k like other
-// code-detail surfaces.
 func (m Model) renderLWCDetail(d *orgData, inner, innerH int) string {
 	res := d.lwcDetailRes(m.orgs[m.selected].Alias, d.LWCCur)
 	if res == nil {
@@ -320,7 +284,6 @@ func (m Model) renderLWCDetail(d *orgData, inner, innerH int) string {
 	}, files, res.FetchedAt().IsZero(), res.Busy(), inner, innerH)
 }
 
-// renderAuraDetail draws one Aura bundle — same shape as LWC.
 func (m Model) renderAuraDetail(d *orgData, inner, innerH int) string {
 	res := d.auraDetailRes(m.orgs[m.selected].Alias, d.LWCCur)
 	if res == nil {
@@ -337,9 +300,6 @@ func (m Model) renderAuraDetail(d *orgData, inner, innerH int) string {
 	}, files, res.FetchedAt().IsZero(), res.Busy(), inner, innerH)
 }
 
-// bundleHeader is the metadata block shared by LWC + Aura detail.
-// LWC has IsExposed; Aura doesn't — the ShowExposed flag picks
-// which surfaces include that pill.
 type bundleHeader struct {
 	Title       string
 	Fallback    string // the drill ID, fallback when DeveloperName is empty
@@ -350,10 +310,6 @@ type bundleHeader struct {
 	ShowExposed bool
 }
 
-// renderBundleDetail is the shared body of LWC + Aura detail views.
-// Header + file strip + body viewport. The cursor / scroll state
-// lives on d.BodyCursor / d.BodyScroll keyed by "<bundleId>:<label>"
-// so cycling files preserves each file's last position.
 func (m Model) renderBundleDetail(d *orgData, h bundleHeader, files []bundleFile, loading, busy bool, inner, innerH int) string {
 	title := h.Title
 	if title == "" {
@@ -370,8 +326,6 @@ func (m Model) renderBundleDetail(d *orgData, h bundleHeader, files []bundleFile
 	if strip := renderSubtabStrip(subs, m.currentSubtabIndex(subs), inner); strip != "" {
 		lines = append(lines, strings.Split(strip, "\n")...)
 	} else {
-		// Single-file bundle (or still loading): keep one reserved
-		// line so the title doesn't sit under the hit-layer band.
 		lines = append(lines, "")
 	}
 	lines = append(lines, sectionTitle(title))
@@ -445,7 +399,6 @@ func bundleFileIdx(d *orgData, bundleID string, n int) int {
 	return idx
 }
 
-// setBundleFileIdx records the active file index for a bundle.
 func setBundleFileIdx(d *orgData, bundleID string, idx int) {
 	if d == nil || bundleID == "" {
 		return
@@ -456,9 +409,6 @@ func setBundleFileIdx(d *orgData, bundleID string, idx int) {
 	d.LWCFileIdx[bundleID] = idx
 }
 
-// bundleBodyID is the cache key for a bundle resource's cursor +
-// scroll. Per-(bundleID, fileLabel) so each file inside a bundle
-// keeps its own viewport position.
 func bundleBodyID(bundleID, fileLabel string) string {
 	if bundleID == "" || fileLabel == "" {
 		return ""
@@ -466,9 +416,6 @@ func bundleBodyID(bundleID, fileLabel string) string {
 	return "bundle:" + bundleID + ":" + fileLabel
 }
 
-// activeBundleFiles returns the file list for the currently-drilled
-// bundle, dispatching by which kind (LWC vs Aura) is loaded. Empty
-// when nothing is drilled in.
 func (m Model) activeBundleFiles(d *orgData) []bundleFile {
 	if d == nil || d.LWCCur == "" || len(m.orgs) == 0 {
 		return nil
@@ -487,10 +434,6 @@ func (m Model) activeBundleFiles(d *orgData) []bundleFile {
 	return nil
 }
 
-// lwcDetailSubtabs returns one subtab per resource file in the
-// currently-drilled bundle. Synthetic IDs ("file:" + label) so the
-// existing subtab registry / dispatcher machinery (Tab cycle,
-// Shift+1..9 jump) Just Works without per-bundle TabSpec entries.
 func (m Model) lwcDetailSubtabs() []subtabInfo {
 	d := m.activeOrgData()
 	if d == nil || d.LWCCur == "" {
@@ -507,8 +450,6 @@ func (m Model) lwcDetailSubtabs() []subtabInfo {
 	return out
 }
 
-// bundleSubtabIdx is the GetSubtabIdx hook for TabLWCDetail. Reads
-// the active file index for the currently-drilled bundle.
 func (m Model) bundleSubtabIdx() int {
 	d := m.activeOrgData()
 	if d == nil || d.LWCCur == "" {
@@ -518,8 +459,6 @@ func (m Model) bundleSubtabIdx() int {
 	return bundleFileIdx(d, d.LWCCur, len(files))
 }
 
-// setBundleSubtabIdx is the SetSubtabIdx hook for TabLWCDetail.
-// Writes the active file index for the currently-drilled bundle.
 func (m *Model) setBundleSubtabIdx(idx int) {
 	d := m.activeOrgData()
 	if d == nil || d.LWCCur == "" {
@@ -538,8 +477,6 @@ func (m *Model) setBundleSubtabIdx(idx int) {
 	setBundleFileIdx(d, d.LWCCur, idx)
 }
 
-// moveBundleDetailCursor steers the body cursor for the currently
-// active file within the drilled-in bundle.
 func (m *Model) moveBundleDetailCursor(delta int) {
 	d := m.activeOrgData()
 	if d == nil {
@@ -557,9 +494,6 @@ func (m *Model) moveBundleDetailCursor(delta int) {
 	m.codeViewMoveCursor(d, bundleBodyID(d.LWCCur, cur.Label), lineCount(cur.Source), delta)
 }
 
-// triggerOpenLWCBundle drills into an LWC bundle. Same target tab as
-// Aura — TabLWCDetail — and the renderer picks which kind to draw by
-// inspecting which detail map holds the id.
 func (m *Model) triggerOpenLWCBundle(id string) tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -574,7 +508,6 @@ func (m *Model) triggerOpenLWCBundle(id string) tea.Cmd {
 	return tea.Batch(m.onTabChanged(), res.Ensure(m.cache))
 }
 
-// triggerOpenAuraBundle is the Aura analog of triggerOpenLWCBundle.
 func (m *Model) triggerOpenAuraBundle(id string) tea.Cmd {
 	d := m.activeOrgData()
 	if d == nil {
@@ -589,18 +522,11 @@ func (m *Model) triggerOpenAuraBundle(id string) tea.Cmd {
 	return tea.Batch(m.onTabChanged(), res.Ensure(m.cache))
 }
 
-// refreshLWCDetailData is the r-key refresh for TabLWCDetail: re-fetch
-// the drilled-in bundle's resources (the keyed detail resource) — LWC or
-// Aura, whichever the current bundle is. Without this r was a no-op on
-// the component detail; only ctrl+r reached it.
 func (m Model) refreshLWCDetailData(d *orgData) tea.Cmd {
 	if d == nil || d.LWCCur == "" || len(m.orgs) == 0 {
 		return nil
 	}
 	alias := m.orgs[m.selected].Alias
-	// The detail view holds LWC and Aura bundles under the same cursor;
-	// refresh whichever map owns this id (Aura checked first, mirroring
-	// the renderer's dispatch).
 	if _, ok := d.AuraDetail[d.LWCCur]; ok {
 		if r := d.auraDetailRes(alias, d.LWCCur); r != nil {
 			return r.Refresh(m.cache)

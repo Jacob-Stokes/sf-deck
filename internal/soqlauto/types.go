@@ -1,17 +1,6 @@
 // Package soqlauto provides context-aware autocomplete suggestions
 // for SOQL editors. Behavioural parity target: Salesforce Inspector
 // Reloaded's data-export.js autocomplete handler.
-//
-// Pure logic — no UI deps. Callers (Bubble Tea handlers, REPLs,
-// future Apex anonymous editor) build a Snapshot per keystroke and
-// receive a ranked []Suggestion. Describe loading is lazy: misses
-// emit to Classification.LoadingFor and the caller is responsible
-// for kicking off the fetch + re-invoking on completion.
-//
-// Implementation strategy (copied from Inspector): regex-based
-// classification of the substring before the caret, with a flat
-// loop over relationship hops to traverse the describe graph.
-// No parser, no tokenizer.
 package soqlauto
 
 import "github.com/Jacob-Stokes/sf-deck/internal/sf"
@@ -25,21 +14,10 @@ type Snapshot struct {
 	SelEnd    int // == CursorPos when no selection
 	Tooling   bool
 
-	// Describes returns the cached describe ref for an sObject.
-	// Status == Loaded means Describe is non-nil; any other status
-	// means the engine should NOT walk its fields and the caller
-	// should kick a fetch.
 	Describes func(sobject string) DescribeRef
 
-	// EnsureDescribe is a fire-and-forget hint that the engine
-	// needs this describe loaded. The caller wires it to the
-	// app's describe-fetch command; subsequent Snapshots will
-	// see Status == Loaded once the fetch lands.
 	EnsureDescribe func(sobject string)
 
-	// SObjects is the list of API names for sObjects in the
-	// active org. Used to suggest sObjects after FROM. Empty when
-	// the catalog hasn't loaded yet.
 	SObjects []string
 }
 

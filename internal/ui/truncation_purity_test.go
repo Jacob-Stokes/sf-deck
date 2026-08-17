@@ -5,11 +5,6 @@ package ui
 // multi-byte runes mid-character and measures bytes, not display
 // cells. All single-line truncation must go through ansi.Truncate
 // (or uilayout.Truncate / dimLine / sideDim, which wrap it).
-//
-// Companion contract (enforced socially + by the helpers, not this
-// test): HORIZONTAL truncation is for single-line contexts only —
-// prose blocks wrap, and VERTICAL truncation happens at the pane's
-// height budget with the ⚠ truncated indicator / scroll affordance.
 
 import (
 	"os"

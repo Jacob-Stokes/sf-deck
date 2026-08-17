@@ -58,10 +58,6 @@ func soqlSavedList(a *app.App, rest []string, stdout io.Writer, mode headless.Wr
 	if err != nil {
 		return writeArgErr("soql.saved.list", err, stdout, mode)
 	}
-	// Summary projection — no body. Same rationale as apex snippet
-	// list: an agent listing the saved-query library shouldn't dump
-	// every saved SOQL into stdout. Callers pull the body via
-	// `soql saved show --id ...`.
 	out := make([]map[string]any, 0, len(all))
 	for _, s := range all {
 		out = append(out, savedQuerySummary(s))
@@ -197,8 +193,6 @@ func soqlSavedDelete(a *app.App, rest []string, stdout io.Writer, mode headless.
 	return headless.ExitCodeFor(r)
 }
 
-// savedQueryView is the DETAIL projection — full body. Used by show
-// / create / update / delete.
 func savedQueryView(s devproject.SavedQuery) map[string]any {
 	return map[string]any{
 		"id":          s.ID,
@@ -212,8 +206,6 @@ func savedQueryView(s devproject.SavedQuery) map[string]any {
 	}
 }
 
-// savedQuerySummary is the LIST projection — no body, body_chars +
-// body_sha256 for size + change-detection. Mirrors snippetSummary.
 func savedQuerySummary(s devproject.SavedQuery) map[string]any {
 	return map[string]any{
 		"id":          s.ID,

@@ -10,12 +10,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/instance"
 )
 
-// dispatchInstance routes `sf-deck instance <verb>`. Today only `list`
-// — the discovery entry point for agents using the controller skill.
-//
-// We don't use *app.App for anything here (registry reads happen
-// against the filesystem, not the org cache) but we keep the
-// signature symmetric with the other dispatchers for consistency.
 func dispatchInstance(a *app.App, args Args, stdout io.Writer, mode headless.WriteMode) int {
 	_ = a
 	verb := args.Verb
@@ -39,8 +33,6 @@ func instanceList(rest []string, stdout io.Writer, mode headless.WriteMode) int 
 	if err != nil {
 		return writeInstanceErr("instance.list", err, stdout, mode)
 	}
-	// Surface as a simple array of records — agents iterate the
-	// entries to find the instance they want by number or label.
 	type row struct {
 		Number    int    `json:"number"`
 		PID       int    `json:"pid"`
@@ -67,7 +59,6 @@ func instanceList(rest []string, stdout io.Writer, mode headless.WriteMode) int 
 
 func writeInstanceErr(command string, err error, stdout io.Writer, mode headless.WriteMode) int {
 	if errors.Is(err, errors.New("")) {
-		// placeholder for future typed errors; falls through to generic.
 	}
 	return writeArgErr(command, err, stdout, mode)
 }

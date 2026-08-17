@@ -59,19 +59,10 @@ type ListViewColumn struct {
 // surface both so the UI can flag "showing 200 of N — import the
 // view to see all" when the preview cap clipped the slice.
 type ListViewResult struct {
-	Columns []ListViewColumn `json:"columns"`
-	// `records` is a slice of maps. Each map has "columns" which itself
-	// is a slice of {fieldNameOrPath, value, label}. We flatten to a
-	// simple map[string]any keyed by fieldNameOrPath for display.
-	Records []map[string]any `json:"-"`
-	// TotalSize is SF's `size` field — the unbounded match count.
-	// When TotalSize > len(Records) the preview is truncated by our
-	// 200-row request cap (or SF's own paging boundary).
-	TotalSize int `json:"size"`
-	// Done mirrors SF's `done` field. False means there's more — SF
-	// also returns a nextPageUrl which we don't currently follow
-	// (preview is by-design discovery, not exhaustive iteration).
-	Done bool `json:"done"`
+	Columns   []ListViewColumn `json:"columns"`
+	Records   []map[string]any `json:"-"`
+	TotalSize int              `json:"size"`
+	Done      bool             `json:"done"`
 }
 
 // RunListView runs the list view via REST and returns its columns +
@@ -87,9 +78,6 @@ func RunListView(orgAlias, sobjectName, listViewID string, limit int) (ListViewR
 	if c, err := RESTClient(orgAlias); err == nil {
 		return c.ListViewResultsREST(sobjectName, listViewID, limit)
 	}
-	// CLI-fallback path. Resolve the API version through the same
-	// helper the REST client uses so we don't drift behind on
-	// pinned-version paths.
 	path := fmt.Sprintf("/services/data/v%s/sobjects/%s/listviews/%s/results",
 		APIVersionForAlias(orgAlias), sobjectName, listViewID)
 	raw, err := runSF("api", "request", "rest", path, "-o", orgAlias)

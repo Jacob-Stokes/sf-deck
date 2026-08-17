@@ -2,12 +2,6 @@
 // pipeline. Wraps the devproject store + the exporters/devproject
 // package_xml writer + the sf project retrieve/deploy shell-outs
 // in a thin service layer the headless CLI consumes.
-//
-// Why a separate package: the TUI's devproject_export.go does all
-// of this through tea.Cmd async work + flash banners + user
-// pickers. Headless needs the same operations done synchronously,
-// returning typed errors instead of UI messages, so the headless
-// envelope can map them to JSON error codes.
 package bundles
 
 import (
@@ -122,9 +116,6 @@ func Show(store *devproject.Store, id string) (Bundle, error) {
 	return toWire(b), nil
 }
 
-// fetchBundle wraps store.GetBundle to translate sql.ErrNoRows into
-// the typed ErrNotFound the service exposes. Keeps the headless
-// wrapper's error mapping clean.
 func fetchBundle(store *devproject.Store, id string) (devproject.Bundle, error) {
 	b, err := store.GetBundle(id)
 	if err != nil {
@@ -159,9 +150,6 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 		return CreateResult{}, ErrNotFound{ID: in.ProjectID}
 	}
 
-	// Items are keyed by canonical username, not alias. Caller
-	// resolved alias→username; default to the alias as a fallback for
-	// tests / callers that already pass a username here.
 	orgFilter := in.OrgUser
 	if orgFilter == "" {
 		orgFilter = in.OrgAlias
@@ -169,13 +157,6 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 	if in.ScopeAllOrgs {
 		orgFilter = ""
 	}
-	// versionOrg drives the manifest's <version>. It's the deploy/
-	// retrieve TARGET, which is distinct from orgFilter (the item
-	// scope). For an all-orgs bundle orgFilter is "" — but the bundle
-	// still targets a specific org, so resolve the version from that
-	// target rather than letting APIVersionForAlias("") fall back to
-	// the pinned default. Empty only when the caller supplied no org at
-	// all (e.g. a scope-only export), where the default is correct.
 	versionOrg := in.OrgUser
 	if versionOrg == "" {
 		versionOrg = in.OrgAlias
@@ -234,8 +215,6 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 		}
 	}
 
-	// README — same content the TUI flow writes. Strictly cosmetic
-	// but agents inspecting the bundle deserve the same explainer.
 	_ = os.WriteFile(filepath.Join(path, "README.md"),
 		[]byte(dpexport.SuggestedReadme(dp.Name, orgFilter, result, in.FullProject)),
 		0o644)
@@ -292,9 +271,6 @@ func Link(store *devproject.Store, projectID, path, orgAlias string) (Bundle, er
 	if err != nil {
 		return Bundle{}, fmt.Errorf("normalize path: %w", err)
 	}
-	// Pre-check that the dir looks valid — the Stale check would
-	// surface this lazily on first retrieve/deploy, but failing fast
-	// at link time gives the caller a clear error.
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
 		return Bundle{}, fmt.Errorf("not a directory: %s", abs)
 	}
@@ -330,8 +306,6 @@ func Delete(store *devproject.Store, bundleID string) error {
 	return store.DeleteBundle(bundleID)
 }
 
-// ----- error types -----------------------------------------------
-
 // ErrNotFound is returned when a bundle / project lookup misses.
 type ErrNotFound struct{ ID string }
 
@@ -351,8 +325,6 @@ func (e ErrStale) Error() string {
 	return fmt.Sprintf("bundle %s is stale (path %s missing or not a sfdx project)",
 		e.ID, e.Path)
 }
-
-// ----- helpers ---------------------------------------------------
 
 func toWire(b devproject.Bundle) Bundle {
 	return Bundle{
@@ -374,8 +346,6 @@ func optTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
-// dirHasFiles reports whether path exists and contains any entries. A
-// missing path is "empty" (not an error) — MkdirAll will create it.
 func dirHasFiles(path string) (bool, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {

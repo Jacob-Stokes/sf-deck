@@ -1,15 +1,5 @@
 package sf
 
-// LWC = Lightning Web Component. Tooling exposes them as
-// LightningComponentBundle records (one bundle per developer-named
-// component) plus per-resource LightningComponentResource rows for
-// each file inside the bundle (.html / .js / .css / .xml).
-//
-// We list the bundles for /lwc and offer drill-in to the bundle's
-// resources for /lwc/<bundle>. Aura is a different entity
-// (AuraDefinitionBundle) — supported separately if/when needed; the
-// list here is LWC-only.
-
 import (
 	"encoding/json"
 	"fmt"

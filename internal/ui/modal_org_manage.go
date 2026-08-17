@@ -2,36 +2,6 @@ package ui
 
 // modal_org_manage.go — the roomy "Org Manager" modal that owns
 // every group / auth-lifecycle edit action.
-//
-// The rail (focus=orgs) stays a quick-nav surface: 0 to focus,
-// j/k/quick-jump letters for selection, space to fold/expand.
-// Anything that *changes* state (create / rename / delete groups,
-// move orgs, add org, logout, set default, rename alias) lives
-// here so there's room to show the keybindings alongside a wide
-// view of the grouped tree.
-//
-// Layout (term width permitting):
-//
-//   ┌─ Org Manager ─────────────────────────────────────────────────┐
-//   │ Groups & orgs                       │ Actions                  │
-//   │ ─────────────────────────────────── │ ──────────────────────── │
-//   │ ▌ Client A                       3  │  Group keys              │
-//   │ ▌ ● alice@…prod      META           │   n  new group           │
-//   │   Production · alice@…              │   R  rename group        │
-//   │ ▌ ● alice@…uat       REC            │   x  delete group        │
-//   │ ...                                 │   space  fold/expand     │
-//   │                                     │   [/]  reorder groups    │
-//   │ ▷ Internal                       1  │                          │
-//   │ ▌ Ungrouped                      2  │  Org keys                │
-//   │   ● my-scratch       FULL           │   A  add org             │
-//   │     Scratch · me@example.com        │   D  logout              │
-//   │                                     │   *  set default         │
-//   │                                     │   =  rename alias        │
-//   │                                     │   g  move to group       │
-//   │                                     │   <,>  reorder org       │
-//   │                                     │                          │
-//   │ j/k navigate · esc close                                       │
-//   └────────────────────────────────────────────────────────────────┘
 
 import (
 	"fmt"
@@ -46,26 +16,15 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// orgManageModalState is the modal's live state. The cursor is
-// kept here (not on Model) so closing the modal returns the user
-// to the rail with its own cursor unchanged.
 type orgManageModalState struct {
-	// Cursor addresses the modal's row list (built from m.orgs +
-	// m.settings.OrgGroups() — same shape as the rail's row list).
 	Cursor int
 }
 
-// openOrgManageModal returns a bool/cmd matching the onOrgsKey
-// intercept signature. The modal seeds its cursor from the rail's
-// current cursor so users land on whichever row they were looking at.
 func (m *Model) openOrgManageModal() (bool, tea.Cmd) {
 	m.orgManageModal = &orgManageModalState{Cursor: m.orgRailCursor}
 	return true, nil
 }
 
-// closeOrgManageModal dismisses the modal and syncs the rail cursor
-// to whatever row the modal cursor was on, so the rail reflects the
-// user's last-touched row when they return.
 func (m *Model) closeOrgManageModal() {
 	if m.orgManageModal == nil {
 		return
@@ -75,16 +34,11 @@ func (m *Model) closeOrgManageModal() {
 	m.orgManageModal = nil
 }
 
-// renderOrgManageModal draws the modal, or "" when not active.
 func (m Model) renderOrgManageModal() string {
 	if m.orgManageModal == nil {
 		return ""
 	}
 
-	// Prefer wide so there's room for both columns + the keybindings
-	// pane. Org manager packs two columns + dense help text, so we
-	// give it more room than other modals — up to 140 cols, and at
-	// least 75% of the terminal width when available.
 	w := m.width * 3 / 4
 	if w < 90 {
 		w = 90
@@ -107,9 +61,6 @@ func (m Model) renderOrgManageModal() string {
 	if inner < 40 {
 		inner = 40
 	}
-	// Two-column split: ~55% list, ~45% keys. The keys pane has
-	// dense help text (multiple subheaders + key/desc rows) so it
-	// needs more room than a simple 60/40 would give.
 	listW := inner * 55 / 100
 	keysW := inner - listW - 2
 	if keysW < 30 {
@@ -122,7 +73,6 @@ func (m Model) renderOrgManageModal() string {
 		lipgloss.NewStyle().Foreground(theme.Muted).Render(strings.Repeat("─", inner)),
 	}
 
-	// Render both columns into string slices; we'll join row-by-row.
 	listCol := m.renderOrgManageList(listW)
 	keysCol := m.renderOrgManageKeys(keysW)
 
@@ -177,7 +127,6 @@ func (m Model) renderOrgManageList(w int) string {
 		onCursor := i == cursor
 		switch row.Kind {
 		case railRowGroupHeader:
-			// Blank divider above every header except the first.
 			if headersSeen > 0 {
 				b.WriteByte('\n')
 			}
@@ -192,8 +141,6 @@ func (m Model) renderOrgManageList(w int) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// renderManageGroupHeader is the modal's wider variant of the
-// rail's group-header row.
 func (m Model) renderManageGroupHeader(row orgRailRow, onCursor bool, groups []settings.OrgGroupConfig, w int) string {
 	collapsed := groupHeaderCollapsed(groups, row.GroupID)
 	count := groupMemberCount(m.orgs, groups, row.GroupID)
@@ -232,8 +179,6 @@ func (m Model) renderManageGroupHeader(row orgRailRow, onCursor bool, groups []s
 	return left + rendered + strings.Repeat(" ", pad) + countStyle.Render(countStr)
 }
 
-// renderManageOrgRow renders one indented org row in the modal. Two
-// lines per org — main + sub — same shape as the rail but wider.
 func (m Model) renderManageOrgRow(row orgRailRow, onCursor bool, w int) string {
 	o := row.Org
 
@@ -257,9 +202,6 @@ func (m Model) renderManageOrgRow(row orgRailRow, onCursor bool, w int) string {
 	safetyTag := safetyTagInline(m.safetyFor(o))
 	safetyW := lipgloss.Width(safetyTag)
 
-	// ★ marks the sf-deck-level startup pin (distinct from the sf CLI
-	// default). Empty when this org isn't the pinned one — keeps the
-	// row clean when no pin is set anywhere.
 	pinStar := ""
 	if m.settings.DefaultOrgUsername() == o.Username {
 		pinStar = lipgloss.NewStyle().Foreground(theme.Yellow).Render("★ ")
@@ -317,7 +259,6 @@ func (m Model) renderOrgManageKeys(w int) string {
 
 	var lines []string
 
-	// Groups + grouping ops — pure sf-deck state.
 	lines = append(lines, hdr("Groups (sf-deck)"))
 	lines = append(lines, row(firstPretty(Keys.OrgGroupCreate), "new group"))
 	lines = append(lines, row(firstPretty(Keys.OrgGroupRename), "rename group"))
@@ -355,7 +296,6 @@ func (m Model) renderOrgManageKeys(w int) string {
 	lines = append(lines, lipgloss.NewStyle().Foreground(theme.FgDim).Italic(true).
 		Render(ansi.Truncate("Tip: header row = group keys; org row = org keys.", w, "…")))
 
-	// Truncate any over-wide lines.
 	for i, ln := range lines {
 		if lipgloss.Width(ln) > w {
 			lines[i] = ansi.Truncate(ln, w, "…")
@@ -364,10 +304,6 @@ func (m Model) renderOrgManageKeys(w int) string {
 	return strings.Join(lines, "\n")
 }
 
-// handleOrgManageModalKey dispatches input while the org-manage
-// modal is open. Returns (handled, cmd). The caller (handleKey) ALWAYS
-// returns when handled=true — even on no-op keys — so global
-// shortcuts don't leak through.
 func (m *Model) handleOrgManageModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if m.orgManageModal == nil {
 		return false, nil
@@ -385,9 +321,6 @@ func (m *Model) handleOrgManageModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 		m.stepOrgManageCursor(-1)
 		return true, nil
 	case "g", "home":
-		// `g` is the move-to-group key; `g g` would be ambiguous so
-		// we don't double-bind it for go-top here. Use `home` for
-		// jump-to-top inside the modal.
 	case "G", "end":
 		m.orgManageModal.Cursor = 1 << 30
 		m.clampOrgManageCursor()
@@ -432,8 +365,6 @@ func (m *Model) handleOrgManageModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	case matches(key, Keys.OrgUnsetAlias):
 		return m.startUnsetManageCursoredAlias()
 	}
-	// Unrecognised keys are absorbed so global shortcuts don't fire
-	// while the modal is open.
 	return true, nil
 }
 
@@ -470,8 +401,6 @@ func (m *Model) clampOrgManageCursor() {
 	}
 }
 
-// orgManageCursorOnHeader reports whether the modal cursor is on a
-// group-header row.
 func (m *Model) orgManageCursorOnHeader() bool {
 	rows := m.currentOrgRailRows()
 	c := m.orgManageModal.Cursor
@@ -481,8 +410,6 @@ func (m *Model) orgManageCursorOnHeader() bool {
 	return rows[c].Kind == railRowGroupHeader
 }
 
-// orgManageCursoredOrg returns the org under the modal cursor, or
-// (sf.Org{}, false) when cursor is on a header.
 func (m *Model) orgManageCursoredOrg() (sf.Org, bool) {
 	rows := m.currentOrgRailRows()
 	c := m.orgManageModal.Cursor
@@ -495,8 +422,6 @@ func (m *Model) orgManageCursoredOrg() (sf.Org, bool) {
 	return rows[c].Org, true
 }
 
-// orgManageCursoredGroupID returns the group id at the cursor (header
-// row's own id, or the org's containing group id).
 func (m *Model) orgManageCursoredGroupID() string {
 	rows := m.currentOrgRailRows()
 	c := m.orgManageModal.Cursor
@@ -505,8 +430,6 @@ func (m *Model) orgManageCursoredGroupID() string {
 	}
 	return rows[c].GroupID
 }
-
-// --- modal-cursor variants of the rail handlers ----------------
 
 func (m *Model) toggleManageCursoredGroup() (bool, tea.Cmd) {
 	if !m.orgManageCursorOnHeader() {
@@ -585,7 +508,6 @@ func (m *Model) reorderManageCursoredGroup(delta int) (bool, tea.Cmd) {
 	groups[idx], groups[target] = groups[target], groups[idx]
 	m.settings.SetOrgGroups(groups)
 	m.saveSettings("")
-	// Re-find the group's header position so the modal cursor follows it.
 	rows := m.currentOrgRailRows()
 	for i, r := range rows {
 		if r.Kind == railRowGroupHeader && r.GroupID == gid {
@@ -611,8 +533,6 @@ func (m *Model) moveManageCursoredOrg(delta int) (bool, tea.Cmd) {
 	// logic.
 	m.orgRailCursor = m.orgManageModal.Cursor
 	_, _ = m.moveCursoredOrg(delta)
-	// Re-find the org's row index in the (possibly reshaped) row list
-	// and store back to the modal cursor.
 	rows := m.currentOrgRailRows()
 	for i, r := range rows {
 		if r.Kind == railRowOrg && r.Org.Username == username {
@@ -671,9 +591,6 @@ func (m *Model) startUnsetManageCursoredAlias() (bool, tea.Cmd) {
 	return true, m.openUnsetAliasConfirm(o)
 }
 
-// pinStartupManageCursoredOrg toggles the sf-deck-level startup pin
-// on the cursor org. Pinning is exclusive (one default at a time);
-// re-pinning the already-pinned org clears it.
 func (m *Model) pinStartupManageCursoredOrg() (bool, tea.Cmd) {
 	o, ok := m.orgManageCursoredOrg()
 	if !ok {
@@ -682,13 +599,10 @@ func (m *Model) pinStartupManageCursoredOrg() (bool, tea.Cmd) {
 	cur := m.settings.DefaultOrgUsername()
 	target := o.Username
 	if cur == target {
-		// Already pinned → unpin.
 		target = ""
 	}
 	if m.settings.PinDefault(target) {
 		if !m.saveSettings("") {
-			// Save can fail when another sf-deck process changed the file.
-			// Keep this process aligned with the last persisted selection.
 			m.settings.PinDefault(cur)
 			return true, nil
 		}
@@ -715,10 +629,6 @@ func (m *Model) cycleSafetyManageCursoredOrg() (bool, tea.Cmd) {
 	if !ok {
 		return true, nil
 	}
-	// Read the explicit override (NOT the effective resolved level).
-	// If no override is set, we start the cycle from read_only —
-	// matches the visible row label so the first press has an
-	// obvious result.
 	override, hasOverride := m.settings.OrgSafetyOverride(o.Username)
 	next, clear := cycleSafetyOverride(override, hasOverride)
 	m.settings.SetOrg(o.Username, next, clear)
@@ -756,7 +666,6 @@ func (m *Model) cycleSafetyManageCursoredOrg() (bool, tea.Cmd) {
 // with clear=true to drop the override entirely).
 func cycleSafetyOverride(override string, hasOverride bool) (settings.SafetyLevel, bool) {
 	if !hasOverride {
-		// No override → start at read_only.
 		return settings.SafetyReadOnly, false
 	}
 	switch settings.ParseSafetyLevel(override) {
@@ -767,29 +676,17 @@ func cycleSafetyOverride(override string, hasOverride bool) (settings.SafetyLeve
 	case settings.SafetyMetadata:
 		return settings.SafetyFull, false
 	case settings.SafetyFull:
-		// Full → clear (inherit kind default).
 		return settings.SafetyReadOnly, true
 	}
 	return settings.SafetyReadOnly, false
 }
 
-// startReauthManageOrg re-runs the web login flow for the cursored
-// org, preserving its alias — the recovery path for a red-dot org
-// (RefreshTokenAuthError etc.) without retyping anything. Reuses the
-// same tea.ExecProcess shape as the add-org flow: bubbletea suspends,
-// sf prompts + opens the browser, and on return the org list
-// refetches so the status dot goes green.
-//
-// The login host is derived from what we know about the org:
-// instance URL when present (My Domain hosts are valid login hosts),
-// else test.salesforce.com for sandboxes, else sf's default.
 func (m *Model) startReauthManageOrg() (bool, tea.Cmd) {
 	o, ok := m.orgManageCursoredOrg()
 	if !ok {
 		return true, nil
 	}
 	if Demo {
-		// No real `sf org login` in demo mode — open the explainer.
 		browser := ""
 		if m.settings != nil {
 			browser = m.settings.Browser()
@@ -804,8 +701,6 @@ func (m *Model) startReauthManageOrg() (bool, tea.Cmd) {
 		instanceURL = "https://test.salesforce.com"
 	}
 	if err := sf.ValidateInstanceURL(instanceURL); err != nil {
-		// Mangled cached URL — fall back to sf's default login host
-		// rather than failing the whole flow.
 		instanceURL = ""
 	}
 	cmd := sf.LoginWebCommand(o.Alias, instanceURL)

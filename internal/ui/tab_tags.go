@@ -1,18 +1,5 @@
 package ui
 
-// /tags — the tag manager.
-//
-// Columns: PILL · NAME · ICON · COLOR · USAGE · CREATED.
-// Per-row actions:
-//   ↵ → edit (rename / change color / change icon)
-//   d → delete (cascades all bindings) — confirmation modal
-//   r → refresh usage counts (re-query)
-//
-// Tag bindings live in the same SQLite store as Dev Projects; the
-// store API (ListTagsWithUsage, UpdateTag, DeleteTag) provides every
-// operation this tab needs. No async — all SQLite is fast enough to
-// run on the render goroutine.
-
 import (
 	"fmt"
 	"strings"
@@ -24,7 +11,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// renderTags is the main-pane renderer for TabTags.
 func (m Model) renderTags(w, innerH int) string {
 	inner := w - 4
 	if m.devProjects == nil {
@@ -50,10 +36,6 @@ func (m Model) renderTags(w, innerH int) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Pill column sizes to the widest rendered pill so longer tag
-	// labels aren't truncated mid-name. lipgloss.Width measures the
-	// pill's actual on-screen width (counting ANSI escapes correctly)
-	// rather than relying on len(t.Name) + padding heuristics.
 	pillW := 0
 	for _, t := range tags {
 		if w := lipgloss.Width(renderTagPill(t.Tag)); w > pillW {
@@ -61,8 +43,6 @@ func (m Model) renderTags(w, innerH int) string {
 		}
 	}
 	if pillW < 8 {
-		// Floor so the column doesn't collapse when every tag has a
-		// very short name.
 		pillW = 8
 	}
 
@@ -100,8 +80,6 @@ func (m Model) renderTags(w, innerH int) string {
 	return strings.Join(lines, "\n")
 }
 
-// sidebarTags shows usage breakdown for the cursored tag — what kinds
-// of items are tagged with this, and how many of each.
 func (m Model) sidebarTags(inner int) string {
 	if m.devProjects == nil {
 		return sideEmpty("store unavailable")
@@ -120,7 +98,6 @@ func (m Model) sidebarTags(inner int) string {
 	if err != nil {
 		return sideEmpty(err.Error())
 	}
-	// Count by kind.
 	byKind := map[devproject.ItemKind]int{}
 	byOrg := map[string]int{}
 	for _, b := range bindings {
@@ -156,7 +133,6 @@ func (m Model) sidebarTags(inner int) string {
 	return renderKVPanel(inner, title, rows, extra...)
 }
 
-// moveTagsCursor handles ↑/↓/jump on the tags list.
 func (m *Model) moveTagsCursor(delta int) {
 	if m.devProjects == nil {
 		return
@@ -174,8 +150,6 @@ func (m *Model) moveTagsCursor(delta int) {
 	}
 }
 
-// triggerTagEdit opens the tag-edit modal for the cursored tag. Used
-// by Enter on TabTags. Falls through if no tags exist.
 func (m *Model) triggerTagEdit() tea.Cmd {
 	if m.devProjects == nil {
 		return nil
@@ -191,9 +165,6 @@ func (m *Model) triggerTagEdit() tea.Cmd {
 	return m.openTagEditor(tags[idx].Tag)
 }
 
-// triggerTagDelete confirms + deletes the cursored tag. Cascade-
-// deletes all bindings (FK ON DELETE CASCADE). Includes a confirm
-// modal so accidental presses don't nuke data.
 func (m *Model) triggerTagDelete() tea.Cmd {
 	if m.devProjects == nil {
 		return nil
@@ -225,7 +196,6 @@ func (m *Model) triggerTagDelete() tea.Cmd {
 		},
 		SuccessMsg: "tag deleted",
 		OnSuccess: func() tea.Cmd {
-			// Move cursor up one if it now points past the end.
 			if m.tagsCursor > 0 {
 				m.tagsCursor--
 			}
@@ -235,8 +205,6 @@ func (m *Model) triggerTagDelete() tea.Cmd {
 	return m.openChoiceModal(state)
 }
 
-// triggerTagNew opens the tag-edit modal pre-populated for a new
-// tag. Save creates the tag and refreshes the cursor onto it.
 func (m *Model) triggerTagNew() tea.Cmd {
 	return m.openTagEditor(devproject.Tag{Color: "blue"})
 }

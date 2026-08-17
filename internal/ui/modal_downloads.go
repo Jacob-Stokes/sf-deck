@@ -3,18 +3,6 @@ package ui
 // Downloads modal — Ctrl+D global overlay listing in-flight + recent
 // exports. Designed as a "where did my report go" answer panel; works
 // from any tab so the user doesn't have to navigate to /reports first.
-//
-// Two sections: in-flight (top) and history (below). In-flight rows
-// auto-update via the same exportActivityTickMsg that drives the
-// status bar — open the modal during a long export and you can
-// watch the phase change live.
-//
-// Actions per row:
-//   Enter / o   open the file in the default app
-//   r           reveal in Finder (macOS open -R)
-//   d           remove from history (in-flight rows can't be removed)
-//   y           yank the path to clipboard
-//   esc / ctrl+d close
 
 import (
 	"fmt"
@@ -30,8 +18,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// downloadsModalState is the live state of the downloads overlay.
-// Stored on the Model under m.downloadsModal (nil when hidden).
 type downloadsModalState struct {
 	Cursor int
 	// rows is recomputed on every render so the modal mirrors registry
@@ -39,20 +25,14 @@ type downloadsModalState struct {
 	// (e.g. user deletes a row), we clamp on next render.
 }
 
-// openDownloadsModal stashes a fresh state so the renderer kicks in.
-// Pointer receiver — modal lifetime lives on the Model.
 func (m *Model) openDownloadsModal() {
 	if m.downloadsModal != nil {
-		// Toggle behavior: Ctrl+D again closes the modal.
 		m.downloadsModal = nil
 		return
 	}
 	m.downloadsModal = &downloadsModalState{}
 }
 
-// downloadsModalRows is the merged view of in-flight + history. Sorted
-// in-flight-first (so users see "your export is still running" at the
-// top) then history newest-first.
 func (m Model) downloadsModalRows() []*exportJob {
 	if m.exports == nil {
 		return nil
@@ -64,13 +44,6 @@ func (m Model) downloadsModalRows() []*exportJob {
 	return rows
 }
 
-// renderDownloadsModal draws the modal. Returns "" when hidden.
-//
-// Layout is fixed-size: 90-col width, 16-row viewport over the
-// underlying rows slice (which can be up to ~200). The cursor
-// scrolls the viewport so the active row stays roughly 1/3 of
-// the way down — same pattern the choice modal + global search
-// use — keeping context visible above and below.
 func (m Model) renderDownloadsModal() string {
 	if m.downloadsModal == nil {
 		return ""
@@ -99,8 +72,6 @@ func (m Model) renderDownloadsModal() string {
 	lines = append(lines, "")
 
 	if len(rows) == 0 {
-		// Empty state still pads to the fixed body height so the modal
-		// doesn't visibly shrink between "nothing yet" and "first row".
 		lines = append(lines, theme.Subtle.Render(
 			"  no exports yet — press "+firstPretty(Keys.ReportExport)+" on a report to export."))
 		for i := 1; i < visibleRows; i++ {
@@ -108,10 +79,6 @@ func (m Model) renderDownloadsModal() string {
 		}
 	} else {
 		start, end := downloadsViewportWindow(cursor, len(rows), visibleRows)
-		// Section labels render inline only when the visible window
-		// crosses the inflight/history boundary. Putting them above
-		// each row run keeps the header attached to its section even
-		// while scrolling.
 		var sectionInflight, sectionHistory bool
 		bodyLines := 0
 		for i := start; i < end; i++ {
@@ -136,9 +103,6 @@ func (m Model) renderDownloadsModal() string {
 			lines = append(lines, renderDownloadRow(j, i == cursor, inner))
 			bodyLines++
 		}
-		// Pad the body up to the fixed visible-row count so the modal
-		// doesn't grow/shrink with the row count. Section labels +
-		// the spacer-line consume some budget; pad whatever remains.
 		for bodyLines < visibleRows {
 			lines = append(lines, "")
 			bodyLines++
@@ -188,9 +152,6 @@ func downloadsViewportWindow(cursor, n, visible int) (int, int) {
 	return start, end
 }
 
-// renderDownloadRow formats one job row with kind badge + name +
-// phase/elapsed/size on the right. Active row gets a left bar +
-// bold treatment.
 func renderDownloadRow(j *exportJob, active bool, inner int) string {
 	var status, statusColor string
 	switch j.Phase {
@@ -212,8 +173,6 @@ func renderDownloadRow(j *exportJob, active bool, inner int) string {
 		kindBadge = "manifest"
 	}
 
-	// Left: kind badge + name. Right: status. Layout calculated to
-	// fit `inner` minus a 2-col left bar/spacing budget.
 	leftBudget := inner - lipgloss.Width(status) - 6
 	if leftBudget < 20 {
 		leftBudget = 20
@@ -249,9 +208,6 @@ func renderDownloadRow(j *exportJob, active bool, inner int) string {
 	return "    " + row
 }
 
-// handleDownloadsModalKey routes key events while the modal is up.
-// Returns the new model + command. Caller checks m.downloadsModal !=
-// nil to decide whether to dispatch here.
 func (m *Model) handleDownloadsModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.downloadsModal == nil {
 		return *m, nil
@@ -347,8 +303,6 @@ func revealInFinder(path string) error {
 	case "windows":
 		return exec.Command("explorer", "/select,", path).Run()
 	default:
-		// Best-effort: open the containing directory. The file itself
-		// won't be selected but the user lands in the right place.
 		dir := path
 		if i := strings.LastIndex(dir, "/"); i >= 0 {
 			dir = dir[:i]

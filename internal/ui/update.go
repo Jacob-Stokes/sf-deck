@@ -1,17 +1,5 @@
 package ui
 
-// Bubble Tea Update loop + resource message routing.
-//
-// Update() dispatches incoming messages to the right handler; the
-// bulk of per-kind logic lives in sibling files:
-//
-//   update_keys.go   — handleKey, handleSearchInput, handleSOQLKey
-//   update_nav.go    — moveCursor, activate, refreshCurrent,
-//                       currentSearch, resetCursorForCurrentView,
-//                       switchToViewIndex
-//   update_open.go   — openDefault, yankDefault, cursorOpenable
-//   util.go          — flash, itoa, onOff, trimLastWord
-
 import (
 	"strings"
 	"time"
@@ -37,11 +25,6 @@ func (m Model) targetForUsername(username string) string {
 	return target
 }
 
-// ensureOrgData returns the per-org state for `username`, creating it
-// lazily. The current alias is used to wire Fetch closures; if the
-// selected org doesn't have an alias, its username is used as the sf
-// target. If the alias changes mid-session, rebuild the state so the
-// resource closures stop talking to the stale target.
 func (m *Model) ensureOrgData(username string) *orgData {
 	target := m.targetForUsername(username)
 	d, ok := m.data[username]
@@ -49,27 +32,15 @@ func (m *Model) ensureOrgData(username string) *orgData {
 		d = newOrgData(username, target, m.cache, m.settings)
 		m.data[username] = d
 	}
-	// Lazy-load the persisted recent-visits list once per session.
-	// Hitting settings on every ensureOrgData would be wasteful;
-	// this guard keeps it to one read per org per process lifetime.
 	if !d.RecentLoaded {
 		loadRecent(m, d, username)
 		d.RecentList.Set(d.Recent)
-		// Same trigger: hydrate the loaded org-project Scope from
-		// settings + the dev-project store. If the persisted id is
-		// stale (project deleted), the helper clears settings and
-		// leaves Scope nil so surfaces gracefully render no chip.
 		m.hydrateLoadedProjectFromSettings(d, username)
 		d.RecentLoaded = true
 	}
 	return d
 }
 
-// onOrgChanged / onTabChanged both trigger a data-ensure for whatever
-// the active view needs. They also rewire the active chip's predicate
-// onto the current org's list so cached-list filtering reflects the
-// chip selection on first paint (the chip-cycle handler already does
-// this on subsequent cycles).
 func (m *Model) onOrgChanged() tea.Cmd {
 	// Gate the chip registries to the new active org BEFORE any
 	// render runs so the strip never flashes the previous org's
@@ -80,9 +51,6 @@ func (m *Model) onOrgChanged() tea.Cmd {
 	} else {
 		m.setActiveOrgOnChipRegistries("")
 	}
-	// Warm notifications for the new org so the header bell shows an
-	// unread count without the user having to visit /home first. Cached
-	// (TTL-gated), so this only hits the network when stale.
 	var notifCmd tea.Cmd
 	if len(m.orgs) > 0 {
 		o := m.orgs[m.selected]
@@ -106,8 +74,6 @@ func (m *Model) tabRefreshCmd() tea.Cmd {
 			m.applySelectedChipMatcher(d)
 		}
 	}
-	// Restore the active surface's persisted column widths whenever the
-	// surface (tab/org) changes.
 	m.activeListTableContext()
 	cmd := m.ensureDataFor(m.tab())
 	// Kick the home banner animation when entering /home, but ONLY
@@ -133,12 +99,6 @@ func (m *Model) tabRefreshCmd() tea.Cmd {
 	return cmd
 }
 
-// lensSubs gathers the per-org substitutions applied to lens SOQL
-// fragments (the :userId placeholder, etc.). The user id comes from
-// the cached HomeData; if Home hasn't been fetched yet for this org
-// the substitution is empty and lenses that depend on it return an
-// SF parsing error — by then the user has likely visited /home so
-// the value is populated.
 func chipSubs(d *orgData) qchip.Substitutions {
 	if d == nil {
 		return qchip.Substitutions{}
@@ -150,16 +110,6 @@ func chipSubs(d *orgData) qchip.Substitutions {
 	}
 }
 
-// ensureDataFor returns the commands to populate whichever Resources
-// view v needs for the currently-selected org.
-//
-// Data lifecycle is registry-driven: each tab declares TabSpec.EnsureData
-// in tab_registry.go, and subtabs MAY declare their own SubtabSpec
-// .EnsureData for subtab-scoped fetches (e.g. /users · All users
-// fetches its per-chip Resource here). Both run when present — tab-
-// level first (always needed), then subtab-level layered on top.
-//
-// Tabs / subtabs without an EnsureData hook are data-less on entry.
 func (m *Model) ensureDataFor(v Tab) tea.Cmd {
 	if len(m.orgs) == 0 {
 		return nil
@@ -170,9 +120,6 @@ func (m *Model) ensureDataFor(v Tab) tea.Cmd {
 		return nil
 	}
 	if !canUseOrg(o) && !spec.OrgIndependent {
-		// Disconnected org: don't fire fetches that can only fail.
-		// Cached values stay in place (hidden by the renderMain
-		// gate) and re-ensure on reconnect.
 		return nil
 	}
 	d := m.ensureOrgData(o.Username)
@@ -210,11 +157,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// dismissing global search or toggling zen back off).
 	m.observeWalkthrough()
 
-	// Inbound control-channel messages dispatch first so that an IPC
-	// agent can drive the TUI even when another modal/dialogue is
-	// open. The handlers themselves call into the same code keystrokes
-	// would. After handling, re-arm the writes pump so the next
-	// inbound message gets delivered.
 	switch m2 := msg.(type) {
 	case updateCheckMsg:
 		return m, m.applyUpdateCheck(m2)
@@ -276,21 +218,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.MouseWheelMsg:
-		// SOQL autocomplete popup takes wheel priority when the
-		// editor is open with a non-empty suggestion list. The
-		// popup is overlaid on top of the editor (same visual
-		// plane as a modal) so the wheel scrolling the underlying
-		// results table while a popup is on screen would be
-		// disorienting — the popup is what the user is looking at.
 		if s := m.activeAutocompleteSession(); s != nil {
-			// Popup wheel scroll: route through the same rate-limited
-			// accumulator the listtable uses. View() is heavy enough
-			// that feeding raw wheel events at ~120Hz queues Updates
-			// and produces the "lagged + overshoot" feel we already
-			// fixed for list views. See feedback_bubbletea_v2_wheel_scroll
-			// for the full diagnosis. wheelStep batches events into
-			// a single drained delta per minInterval; 0 returns mean
-			// "skip render, accumulate more."
 			step := m.wheelStep(msg)
 			if step == 0 {
 				m.skipNextFrameRender()
@@ -386,11 +314,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.applyResourceMsg(msg)
 
 	case homeBannerTickMsg:
-		// Single-flight: when the user has navigated away, clear the
-		// running flag and stop scheduling. Returning to /home will
-		// kick a fresh tick via tabRefreshCmd. While ON /home, advance
-		// the frame and reschedule — the flag stays true and the
-		// chain continues.
 		if m.tab() != TabHome || m.settings.DisableHomeBanner() {
 			m.homeBadgeTickRunning = false
 			return m, nil
@@ -403,10 +326,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.applyDeployWatchTick()
 
 	case exportActivityTickMsg:
-		// Self-rescheduling tick that drives the status-bar activity
-		// indicator while exports are running. Stops re-arming when
-		// the registry is empty so we don't spin forever after the
-		// last export finishes.
 		m.exportTickRunning = false
 		m.exportActivityFrame++
 		if m.exports != nil && m.exports.hasInflight() {
@@ -419,14 +338,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case fieldDescriptionLoadedMsg:
-		// Lazy field-description fetch (Tooling) completed — cache it so
-		// the field-detail page shows the real value instead of a
-		// placeholder. Errors cache "" so we don't refetch every frame.
 		(&m).applyFieldDescriptionLoaded(msg)
 		return m, nil
 
 	case scheduledJobClassResolvedMsg:
-		// Enter on a scheduled-job row resolved (or didn't) an Apex class.
 		if msg.err != nil {
 			m.flash("couldn't resolve class: " + msg.err.Error())
 			return m, nil
@@ -463,9 +378,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case flowChangedMsg:
-		// A flow-detail write landed (rename / version delete). Refresh
-		// the version list (the changed row) and the Flows list (a label
-		// change surfaces there too).
 		d := m.data[msg.username]
 		if d == nil {
 			return m, nil
@@ -485,10 +397,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.sessionID != 0 && session.id != 0 && msg.sessionID != session.id {
 			return m, nil
 		}
-		// Stale result?  Happens when the user cancelled (ctrl+c)
-		// or started a new query while this one was still in
-		// flight.  Drop the message so the modal's idle state
-		// isn't clobbered.
 		if msg.gen != 0 && msg.gen != session.soqlRunGen {
 			return m, nil
 		}
@@ -517,10 +425,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case searchDebounceTickMsg:
-		// Debounce window elapsed since the last buffer mutation:
-		// promote Buffer → Effective on the current view's search
-		// state. The render that follows this tick is the one
-		// that actually re-runs the (now-batched) filter pass.
 		if s := (&m).currentSearch(); s != nil && s.DebouncePending() {
 			s.SyncEffective()
 		}
@@ -531,8 +435,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.execErr = msg.err
 		if msg.err == nil {
 			m.execResult = msg.data
-			// Auto-flip to Output subtab on success when log was
-			// captured — saves a keystroke to see the debug output.
 			if msg.data.Success && msg.data.LogBody != "" {
 				m.execSubtabIdx = execSubtabIndex(SubtabExecOutput)
 			}
@@ -583,25 +485,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case compareBodyFetchedMsg:
-		// A dropped (over-budget) body was re-fetched for a drill-in.
 		(&m).applyCompareBodyFetched(msg)
 		return m, nil
 
 	case comparePreviewFetchedMsg:
-		// A dropped body was re-fetched for the side-panel preview.
 		(&m).applyComparePreviewFetched(msg)
 		return m, nil
 
 	case compareTypesLoadedMsg:
-		// The scope modal's async type-catalog fetch returned; fill the
-		// open modal (ignored if stale / modal closed).
 		(&m).applyCompareTypesLoaded(msg)
 		return m, nil
 
 	case compareTickMsg:
-		// Self-rescheduling animation tick for the retrieving screen.
-		// Stops re-arming once no run is in flight, so it doesn't spin
-		// forever after the comparison finishes.
 		m.compareTickRunning = false
 		m.compareFrame++
 		if m.compareRetrieveInFlight() {
@@ -610,10 +505,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case execProdConfirmMsg:
-		// User cleared the production confirmation modal. Fire the
-		// actual run with the body the gate captured at open-time
-		// (so even if they typed more into the editor after opening
-		// the modal, we run what they confirmed on).
 		if len(m.orgs) == 0 {
 			return m, nil
 		}
@@ -621,17 +512,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.runExecConfirmed(o, msg.body)
 
 	case recordEditSaveMsg:
-		// PATCH /sobjects/.../<id> completed. applyRecordEditSave
-		// processes success (clear session + refetch the record so
-		// server-side formula / audit / trigger updates land) or
-		// failure (stash per-field errors so the row renders them
-		// inline + leave dirty intact for the user to fix + retry).
 		return m, m.applyRecordEditSave(msg)
 
 	case referenceSearchMsg:
-		// User pressed Enter on a reference editor's query line.
-		// SOSL the target object; result lands as
-		// referenceSearchResultMsg below.
 		return m, m.applyReferenceSearch(msg)
 
 	case referenceSearchResultMsg:
@@ -639,15 +522,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case sources.ReportFoldersLoadedMsg:
-		// Source's Apply hydrates the index. Then we hydrate the
-		// persisted last-path, which couldn't run before the source
-		// had data.
 		msg.Source.Apply(msg)
 		if msg.Err != nil {
 			m.flash("folders: " + msg.Err.Error())
 		}
-		// Find the registry that owns this source so we can hydrate
-		// the path. Walk the orgs map; cheap.
 		for _, d := range m.data {
 			if d.ReportFoldersSrc == msg.Source && d.ReportFolders != nil {
 				if persist := sources.NewSettingsPersister(m.settings, d.username, "report-folders"); persist != nil {
@@ -687,13 +565,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case tea.PasteMsg:
-		// Terminal-level bracketed-paste delivery. Forward to whichever
-		// text input is active so ctrl+v / cmd+v works inside edit
-		// modals + the SOQL editor. Anywhere else it's a no-op.
 		if m.exportSave != nil {
-			// Paste into the export-save path field (the most likely
-			// interaction with this modal). Only when the path field
-			// has focus; ignored on the checkbox.
 			if m.exportSave.focus == 0 {
 				m.exportSave.insertAtCursor(msg.Content)
 			}
@@ -751,7 +623,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.globalSearch.input = newInput
 			return m, cmd
 		}
-		// Search buffer on the current view — /objects, /perms, etc.
 		if s := m.currentSearch(); s != nil && s.Active {
 			newInput, cmd := s.Input.Update(msg)
 			s.Input = newInput
@@ -762,9 +633,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// applyEditModalLoaded folds the outcome of the async LoadCurrent
-// closure into the modal: buffer gets the current value, Loading
-// clears, Err is stashed if the load failed (user can still type).
 func (m Model) applyEditModalLoaded(msg editModalLoadedMsg) (tea.Model, tea.Cmd) {
 	if m.editModal == nil {
 		return m, nil
@@ -808,12 +676,6 @@ func (m Model) applyEditModalPreview(msg editModalPreviewMsg) (tea.Model, tea.Cm
 	return m, nil
 }
 
-// applyEditModalResult folds the outcome of an edit-modal save back
-// into the model. On success: close the modal, flash the caller's
-// SuccessMsg (if any), and fire the OnSuccess tea.Cmd (typically a
-// Resource refresh so the new value appears in the surrounding view).
-// On failure: keep the modal open, unset Saving, render the typed
-// error message so the user can edit + retry.
 func (m Model) applyEditModalResult(msg editModalResultMsg) (tea.Model, tea.Cmd) {
 	if m.editModal == nil {
 		return m, nil
@@ -831,7 +693,6 @@ func (m Model) applyEditModalResult(msg editModalResultMsg) (tea.Model, tea.Cmd)
 		}
 		return m, nil
 	}
-	// Failure: surface typed SFError message + hint if we can.
 	if typed := sf.AsSFError(msg.Err); typed != nil {
 		hint := ""
 		if typed.Hint != "" {
@@ -845,9 +706,6 @@ func (m Model) applyEditModalResult(msg editModalResultMsg) (tea.Model, tea.Cmd)
 	return m, nil
 }
 
-// applyChoiceModalLoaded folds LoadCurrent's result into the choice
-// modal: positions the cursor on whichever option matches the loaded
-// value, clears Loading, or surfaces the error.
 func (m Model) applyChoiceModalLoaded(msg choiceModalLoadedMsg) (tea.Model, tea.Cmd) {
 	if m.choiceModal == nil {
 		return m, nil
@@ -861,8 +719,6 @@ func (m Model) applyChoiceModalLoaded(msg choiceModalLoadedMsg) (tea.Model, tea.
 		}
 		return m, nil
 	}
-	// Position the cursor on the matching option (shallow equality is
-	// fine — options are primitives or small structs).
 	for i, opt := range m.choiceModal.Options {
 		if opt.Value == msg.Value {
 			m.choiceModal.Cursor = i
@@ -872,8 +728,6 @@ func (m Model) applyChoiceModalLoaded(msg choiceModalLoadedMsg) (tea.Model, tea.
 	return m, nil
 }
 
-// applyChoiceModalResult mirrors applyEditModalResult for the choice
-// variant. Close-and-flash on success, keep-open-with-error on fail.
 func (m Model) applyChoiceModalResult(msg choiceModalResultMsg) (tea.Model, tea.Cmd) {
 	if m.choiceModal == nil {
 		return m, nil
@@ -908,14 +762,6 @@ func (m Model) applyChoiceModalResult(msg choiceModalResultMsg) (tea.Model, tea.
 	return m, nil
 }
 
-// applyResourceMsg routes a resource update to the right Resource by
-// (scope, key). Global scope → the orgsRes/projectsRes on the model.
-// Per-org scope → the matching Resource on orgData, then a ListView
-// sync so the view renders the latest items.
-//
-// If the global-search modal is open, every successful apply triggers
-// an index rebuild so lazy scope-in fetches surface as soon as they
-// land.
 func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 	// Surface fetch errors as a flash. Cache-load errors are silent
 	// (they usually mean "no cache yet"); fresh-fetch errors are real
@@ -943,9 +789,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 		case "orgs":
 			if m.orgsRes.Apply(msg) {
 				m.orgs = m.orgsRes.Value()
-				// Re-inject the demo org after every live org reload so a
-				// refresh doesn't drop it from the panel (it isn't in the
-				// sf-CLI org list).
 				m.orgs = mergeDemoOrgs(m.orgs, m.settings.DemoOrgImported())
 				// A live orgs refetch is the only signal we get that an
 				// alias may have been repointed to a different org (via
@@ -957,9 +800,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 				// against the current alias→org mapping. Cache loads can't
 				// reflect an external repoint, so skip them.
 				if !msg.FromCache {
-					// Reconcile the registry: keep clients whose alias→instanceURL
-					// mapping is unchanged and drop only aliases that vanished or
-					// were repointed externally.
 					want := make(map[string]string, len(m.orgs))
 					for _, o := range m.orgs {
 						want[targetArg(o)] = o.InstanceURL
@@ -999,24 +839,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				// Three-step selection resolution:
-				//
-				//   1. FIRST load only: if the user has a pinned default
-				//      org, jump to it. Gated by pinnedDefaultRestored so
-				//      a later refetch doesn't clobber the user's in-
-				//      session switch (the previous "if selected == 0"
-				//      heuristic was unreliable — it re-fired whenever
-				//      the pinned org happened to land at index 0).
-				//
-				//   2. EVERY load: re-anchor m.selected to the row that
-				//      matches selectedUsername. The orgs slice can
-				//      reorder between fetches; without this re-anchor
-				//      the index silently points at a different org and
-				//      the user sees a phantom jump.
-				//
-				//   3. Fall back to index 0 only when the active username
-				//      no longer exists in the list (org logged out via
-				//      the CLI) or no selection has ever been made.
 				if !m.pinnedDefaultRestored {
 					pinned := ""
 					if m.settings != nil {
@@ -1032,17 +854,9 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-					// Do not consume the one-shot startup-pin restore on
-					// an empty/missing cache payload. If the cached org
-					// list is stale and lacks the pinned org, let the live
-					// refresh try once before falling back.
 					if pinned == "" || pinnedFound || !msg.FromCache {
 						m.pinnedDefaultRestored = true
 					}
-					// The LIVE list also lacks the pinned org (logged
-					// out?): say so instead of silently landing on the
-					// first org — a silent fallback reads as "my default
-					// setting stopped working."
 					if pinned != "" && !pinnedFound && !msg.FromCache {
 						m.flash("default org " + pinned + " not found — using first org")
 					}
@@ -1055,11 +869,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 							break
 						}
 					}
-					// The active org was logged out mid-list (e.g. via the
-					// CLI) and the list refetched. A bare `m.selected` is now
-					// in-bounds but points at a DIFFERENT org — re-anchor to
-					// index 0 (which also resets selectedUsername) so we don't
-					// silently teleport the active context to the wrong org.
 					if !found && len(m.orgs) > 0 {
 						(&m).setSelectedOrg(0)
 					}
@@ -1067,14 +876,8 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 				if m.selected >= len(m.orgs) {
 					(&m).setSelectedOrg(0)
 				} else if m.selectedUsername == "" && len(m.orgs) > 0 {
-					// No prior selection AND no pinned default — adopt
-					// whatever index 0 is so future refetches re-anchor.
 					(&m).setSelectedOrg(m.selected)
 				}
-				// Prune stale group members — orgs the user has logged
-				// out of via the CLI while sf-deck wasn't running. Save
-				// only when something actually changed so we don't
-				// rewrite settings.toml on every list refresh.
 				authed := make(map[string]bool, len(m.orgs))
 				for _, o := range m.orgs {
 					authed[o.Username] = true
@@ -1087,8 +890,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 				// default row 0 overwrite a startup pin before first
 				// paint.
 				m.syncOrgRailCursorToSelected()
-				// Kicking off the selected-org's data is a side-effect
-				// of the org list arriving.
 				cmd := m.onOrgChanged()
 				if msg.FromCache {
 					cmd = tea.Batch(cmd, m.orgsRes.MaybeRefreshAfterCacheLoad(m.cache))
@@ -1134,10 +935,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 	if handled, refresh := d.ObjectFlows.ApplyAndMaybeRefresh(msg, m.cache); handled {
 		return m, refresh
 	}
-	// Per-key Apply + (FromCache only) follow-up refresh-if-stale.
-	// Cache loads complete instantly; this conditional refresh fires
-	// the network call only when the cached payload is stale, instead
-	// of running unconditionally in parallel with the cache read.
 	var refresh tea.Cmd
 	switch msg.Key {
 	case "home":
@@ -1148,20 +945,12 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 			refresh = d.Home.MaybeRefreshAfterCacheLoad(m.cache)
 		}
 	case "org_info":
-		// Org identity singleton — drives the Home banner + ORG card.
-		// Read directly via d.OrgInfo.Value(), so there's no derived
-		// list to sync; just Apply (clears Busy) + the cache-load
-		// refresh kick. Without this case the UpdatedMsg was dropped
-		// and the resource stayed Busy forever, so the banner / ORG
-		// card couldn't reliably populate.
 		d.OrgInfo.Apply(msg)
 		if msg.FromCache {
 			refresh = d.OrgInfo.MaybeRefreshAfterCacheLoad(m.cache)
 		}
 	case "networks":
 		if d.Networks.Apply(msg) {
-			// Nothing to sync — Networks is read directly by the
-			// Contact ^O menu builder; no derived view needs a kick.
 		}
 		if msg.FromCache {
 			refresh = d.Networks.MaybeRefreshAfterCacheLoad(m.cache)
@@ -1171,8 +960,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 		if msg.FromCache {
 			refresh = d.PermissionSets.MaybeRefreshAfterCacheLoad(m.cache)
 		}
-		// Auto-select the first permset as soon as the list lands, then fire
-		// the FLS ensure so the grid populates without further input.
 		if landed && d.FLSParentID == "" && d.DescribeCur != "" {
 			perms := d.PermissionSets.Value()
 			if len(perms) > 0 {
@@ -1194,19 +981,12 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 	case "sobjects_v5":
 		if d.SObjects.Apply(msg) {
 			d.SyncSObjectsList()
-			// SOQL autocomplete may be waiting on this catalog
-			// to suggest sObjects after FROM. Force a refresh
-			// (memo-bust) so the next render sees the loaded list.
 			(&m).autocompleteInvalidate()
 		}
 		if msg.FromCache {
 			refresh = d.SObjects.MaybeRefreshAfterCacheLoad(m.cache)
 		}
 	case "deploys_v2":
-		// Snapshot non-terminal ids pre-apply so we can flash a
-		// completion banner for anything that just finished, then
-		// (re-)arm the live-watch tick if the fresh window still
-		// holds in-flight rows.
 		inflight := map[string]bool{}
 		for _, r := range d.Deploys.Value() {
 			if r.InFlight() {
@@ -1238,13 +1018,6 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 		if d.RecentlyViewed.Apply(msg) {
 			d.RecentlyViewedList.Set(d.RecentlyViewed.Value())
 			d.recentGen++
-			// d.RecentSFList lazy-syncs in the /home Recent render
-			// surface; no eager sync needed here.  The synthetic SF
-			// Recently Viewed chip on /records reads from the
-			// per-sObject d.RecentlyViewedPerSObject payload (see
-			// the `recently_viewed_per_sobject:` prefix route), so
-			// this global apply no longer needs to re-fire chip
-			// records — that's handled in update_resource_helpers.go.
 		}
 		if msg.FromCache {
 			refresh = d.RecentlyViewed.MaybeRefreshAfterCacheLoad(m.cache)
@@ -1271,22 +1044,10 @@ func (m Model) applyResourceMsg(msg resource.UpdatedMsg) (tea.Model, tea.Cmd) {
 			refresh = d.Profiles.MaybeRefreshAfterCacheLoad(m.cache)
 		}
 	default:
-		// Every list-backed resource with the plain Apply→sync→refresh
-		// shape is handled generically from its registration (see
-		// list_resource_registrations.go). The explicit cases above are
-		// only the ones with bespoke apply logic. Keyed-prefix resources
-		// (groupmembers:, usersessions:, …) were already handled by
-		// applyOrgPrefixResourceMsg before this switch, so anything
-		// reaching here is either a registered generic resource or an
-		// unknown key (harmless no-op).
 		if handled, r := m.routeListResource(d, msg); handled {
 			refresh = r
 		}
 	}
-	// A resource just landed on the active org — if a Move-to-org is
-	// armed and waiting on this org's data, try to complete it now.
-	// resolvePendingMove is a no-op when nothing is pending or the
-	// target list still hasn't loaded.
 	if drill := m.resolvePendingMove(); drill != nil {
 		if refresh != nil {
 			return m, tea.Batch(refresh, drill)
@@ -1311,9 +1072,6 @@ func (m *Model) applyStartupAutoLayout() {
 	if m.startupLayoutDone {
 		return
 	}
-	// Need a real width before we can decide. The very first
-	// WindowSizeMsg carries it; guard against a 0 that would
-	// mis-classify every terminal as "narrow".
 	if m.width <= 0 {
 		return
 	}

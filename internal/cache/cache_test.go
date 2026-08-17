@@ -85,7 +85,6 @@ func TestPutGetOrgs_RoundTrip(t *testing.T) {
 	if newest.IsZero() {
 		t.Error("newest timestamp should be set")
 	}
-	// Verify boolean round-trip survives the INTEGER↔bool encoding.
 	var alice *OrgRow
 	for i, o := range got {
 		if o.Username == "alice@example.com" {
@@ -207,7 +206,6 @@ func TestPutJSON_UpsertReplaces(t *testing.T) {
 func TestDeleteKeyPrefix(t *testing.T) {
 	c := openTestCache(t)
 	type v struct{ X int }
-	// Mix of records:* keys + other keys.
 	if err := c.PutJSON("a@x", "records:Account", v{X: 1}); err != nil {
 		t.Fatal(err)
 	}
@@ -224,13 +222,11 @@ func TestDeleteKeyPrefix(t *testing.T) {
 	if n != 2 {
 		t.Errorf("deleted %d rows, want 2", n)
 	}
-	// describe:Account should survive.
 	var d v
 	_, ok, _ := c.GetJSON("a@x", "describe:Account", &d)
 	if !ok {
 		t.Error("non-matching key was incorrectly deleted")
 	}
-	// records: keys should be gone.
 	_, ok, _ = c.GetJSON("a@x", "records:Account", &d)
 	if ok {
 		t.Error("records:Account survived prefix-delete")
@@ -270,7 +266,6 @@ func TestDeleteScopeOnlyRemovesSelectedOrg(t *testing.T) {
 func TestClearAll(t *testing.T) {
 	c := openTestCache(t)
 	type v struct{ X int }
-	// Seed kv entries across two orgs + an orgs-table row.
 	if err := c.PutJSON("a@x", "describe:Account", v{X: 1}); err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +287,6 @@ func TestClearAll(t *testing.T) {
 		t.Errorf("cleared %d kv rows, want 3", n)
 	}
 
-	// Every kv entry is gone.
 	var d v
 	for _, key := range []string{"describe:Account", "records:Opportunity"} {
 		if _, ok, _ := c.GetJSON("a@x", key, &d); ok {

@@ -51,8 +51,6 @@ func ValidateID(id string) error {
 	if id == "" {
 		return errors.New("id is required")
 	}
-	// IDs become TOML table keys + JSON keys. Reject characters that
-	// would force quoting or break shell completion.
 	for _, r := range id {
 		if r == ' ' || r == '\t' || r == '\n' || r == '"' || r == '\'' {
 			return fmt.Errorf("id %q contains whitespace or quotes", id)
@@ -266,9 +264,6 @@ func Delete(st *settings.Settings, domain, id string, save Persister) (Result, e
 		return Result{}, err
 	}
 	before := len(st.Chips())
-	// Capture the chip we're about to delete so the response can
-	// include its state under data.chip — consumers want to know what
-	// they killed.
 	var snapshot Chip
 	for _, c := range st.Chips() {
 		if c.Domain == domain && c.ID == id {

@@ -34,8 +34,6 @@ func TestStemMappings(t *testing.T) {
 			t.Errorf("stem(%v) = %v, want %v", drill, got, family)
 		}
 	}
-	// Top-level tabs stem to themselves; spec-less TabRecent via the
-	// identity fallback.
 	for _, top := range []Tab{TabHome, TabSOQL, TabObjects, TabFlows, TabApex, TabCompare, TabRecent} {
 		if got := top.stem(); got != top {
 			t.Errorf("stem(%v) = %v, want identity", top, got)
@@ -160,8 +158,6 @@ func TestMigratedOpenSurfacesWired(t *testing.T) {
 			t.Errorf("%v: no tab-level Open.Openable wired", tab)
 		}
 	}
-	// TabSOQL's Open lives on its Editor subtab (o targets result
-	// rows, which only exist there).
 	if spec := lookupTabSpec(TabSOQL); spec != nil {
 		found := false
 		for _, sub := range spec.Subtabs {
@@ -173,7 +169,6 @@ func TestMigratedOpenSurfacesWired(t *testing.T) {
 			t.Errorf("TabSOQL editor subtab: no Open.Openable wired")
 		}
 	}
-	// The object drill's Records subtab carries its own Open.
 	for _, sub := range objectDrillSubtabSpecs() {
 		if sub.ID == SubtabRecords {
 			if sub.Open == nil || sub.Open.Openable == nil {

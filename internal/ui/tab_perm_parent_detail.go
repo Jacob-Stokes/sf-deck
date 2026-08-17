@@ -19,8 +19,6 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// currentPermParent returns (kind, id, displayName, ok) for the
-// drilled-in parent on TabPermParentDetail.
 func (m Model) currentPermParent() (kind, id, displayName string, ok bool) {
 	if len(m.orgs) == 0 {
 		return "", "", "", false
@@ -60,8 +58,6 @@ func (m Model) currentPermParent() (kind, id, displayName string, ok bool) {
 	return d.PermParentKind, d.PermParentID, d.PermParentID, true
 }
 
-// renderPermParentDetail is the top-level dispatcher for the drill-in.
-// Layout: breadcrumb + subtab strip at the top, then the subtab body.
 func (m Model) renderPermParentDetail(w, innerH int) string {
 	inner := w - 4
 	o, ok := m.currentOrg()
@@ -85,9 +81,6 @@ func (m Model) renderPermParentDetail(w, innerH int) string {
 	strip := renderSubtabStrip(subs, sel, w-4)
 	body := innerH - subtabReserve(strip)
 
-	// Fields are a drill-down from the Objects subtab, not a peer
-	// subtab. When the user has drilled in (PermFieldsSObject set),
-	// show the FLS grid for that object instead of the Objects list.
 	d := m.ensureOrgDataRef(o.Username)
 	isObjectsSubtab := subs[sel].ID == SubtabParentObjects
 	drilledToFields := isObjectsSubtab && d.PermFieldsSObject != ""
@@ -118,8 +111,6 @@ func (m Model) renderPermParentDetail(w, innerH int) string {
 	return strings.Join([]string{strip, content}, "\n")
 }
 
-// renderPermParentOverview — the identity + metadata section. Works
-// for all three kinds; picks the right source struct via PermParentKind.
 func (m Model) renderPermParentOverview(w, inner, innerH int, o sf.Org, kind, name string) string {
 	d := m.ensureOrgDataRef(o.Username)
 
@@ -228,7 +219,6 @@ func stubPane(inner int, name, subtab, desc, note string) string {
 	return strings.Join(lines, "\n")
 }
 
-// helpers
 func boolLabel(b bool) string {
 	if b {
 		return "yes"

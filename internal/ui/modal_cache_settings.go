@@ -1,17 +1,5 @@
 package ui
 
-// Cache & refresh policy modal — the single visible source of truth
-// for "how long does sf-deck consider each resource fresh before it
-// auto-refreshes." Reached from = → Cache & refresh policy.
-//
-// Shape: a list of every Resource the app knows about, with each row
-// showing key · default · effective. Enter on a row opens an edit
-// modal (same primitive Inspector URL uses) accepting a Go duration
-// string (e.g. "5m", "1h", "30s", "0" to disable auto-refresh).
-//
-// Adding a new Resource type is one new entry in cacheResourceCatalog —
-// the modal picks it up automatically.
-
 import (
 	"fmt"
 	"github.com/charmbracelet/x/ansi"
@@ -26,31 +14,17 @@ import (
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
-// cacheResource describes one configurable Resource TTL. The Key is
-// what settings.toml stores under [ui.cache.ttl]; Default is the
-// fallback when the user hasn't overridden it; Description is the
-// row hint shown in the modal.
 type cacheResource struct {
 	Key         string
 	Default     time.Duration
 	Description string
 }
 
-// cacheResourceCatalog enumerates every Resource whose TTL is
-// surfaced in the modal. Order matters — this is the order rows
-// appear. New Resources slot in here; the modal picks them up
-// automatically.
-//
-// Keep this in sync with the actual TTL keys used in newOrgData and
-// the lazy Ensure helpers (search for `ttl(` / `d.ttl(` to find
-// every callsite).
 var cacheResourceCatalog = []cacheResource{
-	// Global (cross-org), loaded eagerly at startup.
 	{Key: "orgs", Default: time.Minute,
 		Description: "the org list shown in the left rail (sf org list)"},
 	{Key: "projects", Default: 10 * time.Minute,
 		Description: "local sfdx project directories discovered for /bundles"},
-	// Org-wide, loaded eagerly at startup.
 	{Key: "home", Default: 10 * time.Minute,
 		Description: "user home: org info, daily API usage, current user id"},
 	{Key: "sobjects", Default: 4 * time.Hour,
@@ -100,9 +74,6 @@ var cacheResourceCatalog = []cacheResource{
 	{Key: "record_detail", Default: 24 * time.Hour,
 		Description: "single record drill-in (per sobject+id) · `r` to refresh"},
 
-	// Lazy per-(sobject, …) Resources. Long TTLs by default — first
-	// fetch lands and stays for the session; user presses `r` to
-	// force a manual refresh.
 	{Key: "records", Default: 24 * time.Hour,
 		Description: "records list (default 'recent') · `r` on the records subtab to refresh"},
 	{Key: "chip_records", Default: 24 * time.Hour,
@@ -115,7 +86,6 @@ var cacheResourceCatalog = []cacheResource{
 		Description: "field-level security per (sobject, parent) combo"},
 }
 
-// cacheSettingsState is the live state of the modal.
 type cacheSettingsState struct {
 	rows   []cacheRow // computed at open time, frozen for the modal
 	cursor int
@@ -127,9 +97,6 @@ type cacheRow struct {
 	effective time.Duration
 }
 
-// openCacheSettingsModal opens the cache-settings overview. Each row
-// is read-only here — pressing enter on one drills into a single-
-// field edit modal that accepts a Go duration string.
 func (m *Model) openCacheSettingsModal() tea.Cmd {
 	rows := buildCacheRows(m.settings)
 	state := &cacheSettingsState{rows: rows}
@@ -137,9 +104,6 @@ func (m *Model) openCacheSettingsModal() tea.Cmd {
 	return nil
 }
 
-// buildCacheRows snapshots the catalogue against the user's current
-// settings. Sorted by key so the modal's row order is stable
-// regardless of how the catalogue is declared.
 func buildCacheRows(s interface {
 	CacheTTL(string, time.Duration) time.Duration
 	CacheTTLOverride(string) string
@@ -159,7 +123,6 @@ func buildCacheRows(s interface {
 	return out
 }
 
-// renderCacheSettings draws the modal, or "" when not open.
 func (m Model) renderCacheSettings() string {
 	if m.cacheSettings == nil {
 		return ""
@@ -202,7 +165,6 @@ func (m Model) renderCacheSettings() string {
 			eff = hilightStyle.Render(effRaw) + strings.Repeat(" ", effCol-len(effRaw))
 		}
 		desc := row.res.Description
-		// Trim description if line is too wide.
 		max := inner - keyCol - defCol - effCol - 4
 		if max > 0 && len(desc) > max {
 			desc = ansi.Truncate(desc, max, "…")
@@ -220,7 +182,6 @@ func (m Model) renderCacheSettings() string {
 	return modalBox(strings.Join(lines, "\n"), w)
 }
 
-// handleCacheSettingsKey is the reducer for the modal.
 func (m Model) handleCacheSettingsKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.cacheSettings == nil {
 		return m, nil
@@ -254,11 +215,6 @@ func (m Model) handleCacheSettingsKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		row := st.rows[st.cursor]
 		return m, m.openCacheTTLEditor(row)
 	case "C":
-		// Clear all cached API data. Empties cache.db, drops every
-		// org's in-memory Resource state, and re-fetches the current
-		// view so the user sees data reload immediately. Other views
-		// re-fetch lazily on next visit. TTL overrides (this modal's
-		// rows) are settings, not cache — they survive.
 		return m.clearAllCache()
 	}
 	if matches(key, Keys.CacheResetTTL) {
@@ -277,9 +233,6 @@ func (m Model) handleCacheSettingsKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// openCacheTTLEditor opens a single-line edit modal for one row. The
-// Save closure parses the input as a Go duration, persists, and
-// re-snapshots the cache rows.
 func (m *Model) openCacheTTLEditor(row cacheRow) tea.Cmd {
 	initial := row.override
 	if initial == "" {
@@ -300,7 +253,6 @@ func (m *Model) openCacheTTLEditor(row cacheRow) tea.Cmd {
 			if val == "" {
 				m.settings.SetCacheTTLOverride(row.res.Key, "")
 			} else {
-				// Validate by parsing.
 				if _, err := time.ParseDuration(val); err != nil {
 					return fmt.Errorf("invalid duration %q: %w", val, err)
 				}
@@ -309,9 +261,6 @@ func (m *Model) openCacheTTLEditor(row cacheRow) tea.Cmd {
 			if err := m.settings.Save(); err != nil {
 				return err
 			}
-			// Re-snapshot the modal's rows so the new value lights
-			// up immediately when the user comes back from the edit
-			// modal.
 			if m.cacheSettings != nil {
 				m.cacheSettings.rows = buildCacheRows(m.settings)
 			}
@@ -336,9 +285,6 @@ func (m Model) clearAllCache() (Model, tea.Cmd) {
 	}
 	n, err := mm.cache.ClearAll()
 	if err != nil {
-		// ClearAll reports a partial success (rows gone, VACUUM failed)
-		// as an error carrying the count — surface it honestly rather
-		// than swallowing the "data did clear" fact.
 		mm.flash("clear cache: " + err.Error())
 	} else {
 		mm.flash(fmt.Sprintf("cache cleared — %d entries dropped, refreshing…", n))
@@ -349,14 +295,9 @@ func (m Model) clearAllCache() (Model, tea.Cmd) {
 	mm.data = map[string]*orgData{}
 	sf.InvalidateRESTClients()
 
-	// Re-fetch whatever the user is currently looking at so the clear
-	// isn't a silent void — the active view reloads in front of them.
 	return mm.refreshCurrent()
 }
 
-// formatDuration renders a duration as a compact human-friendly
-// string ("5m", "1h", "30s") rather than time.Duration's default
-// "1h30m0s" shape.
 func formatDuration(d time.Duration) string {
 	if d == 0 {
 		return "0 (off)"

@@ -6,10 +6,6 @@ package ui
 // inside inline closure bodies is invisible to all of them. Entries
 // must point at named hooks (tab_*_hooks.go etc.); inline closures
 // are for one-line glue only.
-//
-// The ceiling is body LINE COUNT per function literal inside
-// tabRegistry(). Raise it only with a written justification; the
-// right fix is always extracting a named method instead.
 
 import (
 	"fmt"
@@ -47,7 +43,6 @@ func TestRegistryStaysDeclarative(t *testing.T) {
 		}
 		start := fset.Position(lit.Body.Lbrace).Line
 		end := fset.Position(lit.Body.Rbrace).Line
-		// Body lines between the braces (a one-liner has start==end).
 		body := end - start - 1
 		if body < 0 {
 			body = 0
@@ -57,8 +52,6 @@ func TestRegistryStaysDeclarative(t *testing.T) {
 				"tab_registry.go:%d closure body is %d lines (max %d) — extract a named hook",
 				start, body, registryClosureMaxLines))
 		}
-		// Don't descend into the literal: nested literals inside an
-		// already-flagged body would double-report.
 		return false
 	})
 

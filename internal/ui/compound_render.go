@@ -1,30 +1,12 @@
 package ui
 
 // Cell-rendering for Salesforce compound + relationship struct values.
-//
-// SOQL returns three shapes as JSON objects rather than scalars:
-//
-//   1. Relationship lookups — Account.Name returns {Id, Name, attributes}.
-//      Not technically a "compound field" in SF terminology but the same
-//      map[string]any shape, so it lives here for one consistent path.
-//   2. Compound fields — Salesforce's documented set: Address, Person
-//      Name, Geolocation. Each has a fixed subfield vocabulary.
-//   3. Subqueries — {totalSize, done, records: []}. Out of scope here;
-//      caller still falls through to "{…}" for those.
-//
-// Each recogniser returns (rendered, true) when it claims the value or
-// ("", false) otherwise. The cell formatter walks them in order; the
-// first to claim wins. Adding a new shape is one entry — no widening
-// of any switch.
 
 import (
 	"strconv"
 	"strings"
 )
 
-// compoundRenderer attempts to render a map[string]any as a human cell
-// string. Returns ("", false) when it doesn't recognise the shape so
-// the caller can try the next recogniser.
 type compoundRenderer func(map[string]any) (string, bool)
 
 // compoundRenderers is the ordered registry. Order matters when two
@@ -40,9 +22,6 @@ var compoundRenderers = []compoundRenderer{
 	geolocationRenderer,        // {latitude, longitude} only → "lat, lng"
 }
 
-// renderCompound runs the registry. Returns ("", false) when no
-// recogniser claims the value — caller falls back to its own default
-// (typically "{…}" so unknown shapes don't silently render as garbage).
 func renderCompound(x map[string]any) (string, bool) {
 	for _, r := range compoundRenderers {
 		if s, ok := r(x); ok {
@@ -52,10 +31,6 @@ func renderCompound(x map[string]any) (string, bool) {
 	return "", false
 }
 
-// relationshipObjectRenderer covers parent-traversal results: Account.Name
-// returns {Id, Name, attributes}, Owner returns {Id, Name}. Use Name when
-// present (the most useful display); fall back to Id; only claim the value
-// when at least one of them is set so other recognisers get their turn.
 func relationshipObjectRenderer(x map[string]any) (string, bool) {
 	if name, ok := x["Name"].(string); ok && name != "" {
 		return name, true
@@ -124,8 +99,6 @@ func personNameRenderer(x map[string]any) (string, bool) {
 	if first == "" && last == "" {
 		return "", false
 	}
-	// Build "Salutation FirstName MiddleName LastName Suffix",
-	// skipping empties; collapse multi-spaces in case some are blank.
 	var parts []string
 	for _, k := range [...]string{"Salutation", "FirstName", "MiddleName", "LastName", "Suffix"} {
 		if v := mapStr(x, k); v != "" {
@@ -135,10 +108,6 @@ func personNameRenderer(x map[string]any) (string, bool) {
 	return strings.Join(parts, " "), true
 }
 
-// geolocationRenderer renders a pure {latitude, longitude} pair. We
-// gate on "only those keys present" so we don't snatch a value that
-// addressRenderer would have handled (Address also carries lat/lng).
-// Latitude/longitude come through as float64 from JSON.
 func geolocationRenderer(x map[string]any) (string, bool) {
 	lat, latOK := mapFloat(x, "latitude")
 	lng, lngOK := mapFloat(x, "longitude")
@@ -152,15 +121,12 @@ func geolocationRenderer(x map[string]any) (string, bool) {
 	for k := range x {
 		switch k {
 		case "latitude", "longitude":
-			// allowed
 		default:
 			return "", false
 		}
 	}
 	return formatLatLng(lat, lng), true
 }
-
-// --- helpers ---------------------------------------------------------
 
 func mapStr(x map[string]any, key string) string {
 	if v, ok := x[key]; ok {
@@ -185,10 +151,6 @@ func mapFloat(x map[string]any, key string) (float64, bool) {
 	return 0, false
 }
 
-// formatLatLng renders a lat/lng pair as "lat, lng" with up to 4
-// decimals (~11m precision — plenty for a cell). Trailing zeros and
-// the trailing dot are trimmed so "51.5000, -0.1278" reads cleanly
-// rather than "51.5000, -0.1278000".
 func formatLatLng(lat, lng float64) string {
 	return trimFloat(lat) + ", " + trimFloat(lng)
 }

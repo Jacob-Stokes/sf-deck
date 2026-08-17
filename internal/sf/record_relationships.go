@@ -2,22 +2,6 @@ package sf
 
 // record_relationships.go — SOQL helpers that resolve, for a given
 // drilled-in record:
-//
-//   1. The Name (or fallback display field) of every record this
-//      record references via a Lookup / Master-Detail field. ONE
-//      round-trip per record load — drives the RELATIONSHIPS section
-//      of the record detail page so the user sees "→ Account
-//      Acme Corp" instead of just the raw 0014I... Id.
-//
-//   2. The count of child records pointing AT this record (one
-//      (SELECT COUNT() FROM RelN) subquery per child relationship,
-//      capped to avoid SOQL limits). Drives the RELATED panel so
-//      the user can see "5 Opportunities, 12 Contacts" at a
-//      glance.
-//
-// Both helpers consult the parent sObject's describe (passed in)
-// rather than re-fetching it — the UI layer's per-sObject describe
-// cache is the single source of truth.
 
 import (
 	"encoding/json"
@@ -76,10 +60,6 @@ func BuildReferenceNameSOQL(d SObjectDescribe, recordID string) string {
 		if len(f.ReferenceTo) != 1 {
 			continue
 		}
-		// Skip targets that don't have a queryable Name field. SF
-		// rejects the whole SOQL with INVALID_FIELD if a single
-		// `<ref>.Name` is invalid — one bad reference would null
-		// out resolution for every OTHER reference on the record.
 		if !referenceTargetHasNameField(f.ReferenceTo[0]) {
 			continue
 		}
@@ -94,16 +74,6 @@ func BuildReferenceNameSOQL(d SObjectDescribe, recordID string) string {
 	)
 }
 
-// referenceTargetHasNameField reports whether the given sObject
-// has a queryable `Name` field projection. Salesforce's internal /
-// system objects (UserRecordAccess, RecordVisibility, etc.) reject
-// `Foo.Name` SOQL with INVALID_FIELD even though they appear as
-// referenceTo targets on standard fields.
-//
-// Approach: deny-list of known offenders. Faster + simpler than
-// fetching every target's describe to check Fields[].Name. The
-// list is short and grows additively — any new INVALID_FIELD
-// surface lands here.
 func referenceTargetHasNameField(sobject string) bool {
 	switch sobject {
 	case "UserRecordAccess",
