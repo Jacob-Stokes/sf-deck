@@ -156,9 +156,10 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-GitHub Actions builds binaries for macOS arm64/amd64 + Linux
-amd64/arm64, attaches them to a release, and publishes a Homebrew
-cask to `Jacob-Stokes/homebrew-tap`. See `.goreleaser.yaml` +
+GitHub Actions builds binaries for macOS arm64/amd64 and Linux
+amd64/arm64, packages the Linux builds as `.deb` and `.rpm`, attaches all
+artifacts to a release, and publishes a Homebrew cask to
+`Jacob-Stokes/homebrew-tap`. See `.goreleaser.yaml` and
 `.github/workflows/release.yml`.
 
 ## Questions

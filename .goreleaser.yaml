@@ -39,6 +39,38 @@ archives:
       - README.md
       - docs/third_party_licenses/**
 
+# Native Linux packages make a first install straightforward without
+# requiring Homebrew or Go. They are attached to each GitHub release alongside
+# the portable archives. An APT/DNF repository can be added later if automatic
+# package-manager upgrades justify the extra infrastructure.
+nfpms:
+  - id: linux-packages
+    ids:
+      - sf-deck
+    package_name: sf-deck
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: sf-deck
+    homepage: "https://sfdeck.dev"
+    maintainer: "Jacob Stokes <hello@jacobstokes.com>"
+    description: "Keyboard-first Salesforce workspace across multiple orgs"
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/sf-deck/LICENSE
+      - src: NOTICE
+        dst: /usr/share/doc/sf-deck/NOTICE
+      - src: README.md
+        dst: /usr/share/doc/sf-deck/README.md
+      - src: docs/third_party_licenses/
+        dst: /usr/share/doc/sf-deck/third_party_licenses
+        type: tree
+
 checksum:
   name_template: "checksums.txt"
 

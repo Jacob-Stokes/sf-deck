@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-- [Go 1.26.6+](https://go.dev/dl/)
-- [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
-  (`sf`), with at least one authenticated org (`sf org login web`)
+Demo mode has no external prerequisites. To connect a real org, install the
+[Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`)
+and authenticate at least one org with `sf org login web`.
 
 If `sf org list` returns your orgs, you're ready.
 
@@ -17,7 +17,40 @@ brew install --cask Jacob-Stokes/tap/sf-deck
 This installs the pre-built binary for your platform and keeps upgrades on
 Homebrew's normal update path.
 
+## Linux packages
+
+Each [GitHub release](https://github.com/Jacob-Stokes/sf-deck/releases)
+includes packages for x86-64 (`amd64`) and ARM64 (`arm64`) Linux systems.
+Replace `VERSION` and `ARCH` below with the values in the downloaded filename.
+
+On Debian, Ubuntu, and derivatives, download the matching `.deb` and run:
+
+```sh
+sudo apt install ./sf-deck_VERSION_linux_ARCH.deb
+```
+
+On Fedora, RHEL, and derivatives, download the matching `.rpm` and run:
+
+```sh
+sudo dnf install ./sf-deck_VERSION_linux_ARCH.rpm
+```
+
+Both packages install the binary under `/usr/bin`. They do not add an APT or
+DNF repository, so install a future upgrade by downloading its newer package.
+
+## Portable archive
+
+The release page also provides `.tar.gz` archives for macOS and Linux. Extract
+the archive and place the binary on your `PATH`:
+
+```sh
+tar -xzf sf-deck_VERSION_linux_ARCH.tar.gz
+sudo install -m 0755 sf-deck /usr/local/bin/sf-deck
+```
+
 ## Build from source
+
+Building requires [Go 1.26.6+](https://go.dev/dl/).
 
 ```sh
 git clone https://github.com/Jacob-Stokes/sf-deck
@@ -36,8 +69,8 @@ Or put it wherever you keep local binaries — sf-deck doesn't care.
 ## Windows (via WSL)
 
 There's no native Windows binary yet, but sf-deck runs well in WSL2
-under Windows Terminal — build or install the Linux binary inside WSL
-exactly as above. One WSL-specific note:
+under Windows Terminal. Install the Linux `.deb`, portable archive, or source
+build inside WSL exactly as above. One WSL-specific note:
 
 **Install the Linux `sf` CLI inside WSL** and authenticate your orgs
 from there (`sf org login web`). sf-deck uses the CLI's auth store in
@@ -97,6 +130,9 @@ Homebrew users install a discovered update with:
 ```sh
 brew upgrade --cask sf-deck
 ```
+
+Linux package users download and install the newer `.deb` or `.rpm` from the
+release page.
 
 ## Try the demo
 

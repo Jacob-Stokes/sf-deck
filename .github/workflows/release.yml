@@ -80,5 +80,5 @@ jobs:
             echo "::error::Published release notes are empty"
             exit 1
           fi
-      - name: Verify release archive notices
+      - name: Verify release archives
         run: ./.github/scripts/check-release-archives.sh

@@ -52,9 +52,36 @@ sf-deck --demo
 <details>
 <summary><strong>Other installation options</strong></summary>
 
-Download a macOS or Linux archive from the
-[release page](https://github.com/Jacob-Stokes/sf-deck/releases),
-or build from source with [Go 1.26.6+](https://go.dev/dl/):
+Linux users without Homebrew can download a package from the
+[release page](https://github.com/Jacob-Stokes/sf-deck/releases).
+Choose `amd64` for x86-64 systems or `arm64` for ARM systems.
+In the commands below, replace `VERSION` and `ARCH` with the values in the
+downloaded filename.
+
+On Debian, Ubuntu, and derivatives:
+
+```sh
+sudo apt install ./sf-deck_VERSION_linux_ARCH.deb
+```
+
+On Fedora, RHEL, and derivatives:
+
+```sh
+sudo dnf install ./sf-deck_VERSION_linux_ARCH.rpm
+```
+
+These packages install `sf-deck` under `/usr/bin`. They do not configure an
+APT or DNF repository, so upgrades require downloading the newer package.
+
+Portable macOS and Linux archives are also available on the release page.
+Extract an archive and install the binary somewhere on your `PATH`:
+
+```sh
+tar -xzf sf-deck_VERSION_linux_ARCH.tar.gz
+sudo install -m 0755 sf-deck /usr/local/bin/sf-deck
+```
+
+To build from source, install [Go 1.26.6+](https://go.dev/dl/), then run:
 
 ```sh
 git clone https://github.com/Jacob-Stokes/sf-deck
