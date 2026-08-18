@@ -86,14 +86,14 @@ The mouse also works. See the [complete keymap](https://sfdeck.dev/docs/referenc
 - **Find anything and open the right tool.** Search objects, fields, records,
   Flows, Apex, components, and other loaded metadata with `Ctrl+F`. Press `o`
   to open the selected item in Lightning, Setup, Flow Builder, or your editor.
-- **Investigate an org end to end.** Browse schema, records, permissions,
-  field-level security, validation rules, users, automation, and org health
+- **Inspect schema, data, access, and automation together.** Browse records,
+  permissions, field-level security, validation rules, users, and org health
   without crossing a maze of Setup pages.
 - **Query and work with data.** Write SOQL with metadata completion, reuse saved
   queries and history, inspect or edit records, and export CSV, XLSX, or JSON.
-- **Follow work from code to deployment.** Explore Flows, Apex, triggers,
-  Lightning components, tests, debug logs, and deployments. Collect discoveries
-  into tagged dev projects and SFDX bundles when they are ready to move.
+- **Inspect code and ship changes.** Explore Flows, Apex, triggers, Lightning
+  components, tests, debug logs, and deployments. Add related metadata to a dev
+  project, generate an SFDX bundle, then retrieve, validate, or deploy it.
 
 <p align="center">
   <img src="docs/landing/assets/capabilities.png" alt="sf-deck capabilities: SOQL and records, code and automation, users and org health, projects and deploys, and direct links into Salesforce" width="920">
