@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-18
+
+### Added
+
+- Native `.deb` and `.rpm` packages are attached to GitHub releases for
+  straightforward installation on Debian, Ubuntu, Fedora, and related Linux
+  distributions.
+
+### Fixed
+
+- `Ctrl+C` now quits during first-launch modal loading and saving transitions.
+
 ## [0.1.4] - 2026-08-17
 
 ### Security
