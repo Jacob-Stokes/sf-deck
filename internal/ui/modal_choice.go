@@ -263,7 +263,10 @@ func (m Model) handleChoiceModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 	cm := m.choiceModal
 	if cm.Saving || cm.Loading {
-		if msg.String() == "esc" {
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
 			m.choiceModal = nil
 		}
 		return m, nil

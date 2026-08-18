@@ -1,6 +1,10 @@
 package ui
 
-import "testing"
+import (
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // TestChoiceModalCursorSkipsHeadings pins the chip-manager separator
 // behaviour: section headings render but the cursor steps over them in
@@ -38,5 +42,34 @@ func TestChoiceModalCursorSkipsHeadings(t *testing.T) {
 	choiceModalSkipHeading(cm2, -1)
 	if cm2.Cursor != 1 {
 		t.Fatalf("bounce at top: cursor = %d, want 1", cm2.Cursor)
+	}
+}
+
+func TestChoiceModalCtrlCQuitsWhileBusy(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		loading bool
+		saving  bool
+	}{
+		{name: "loading", loading: true},
+		{name: "saving", saving: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := Model{modelTransient: modelTransient{
+				choiceModal: &choiceModalState{
+					Loading: tc.loading,
+					Saving:  tc.saving,
+				},
+			}}
+
+			_, cmd := m.handleChoiceModalKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+			if cmd == nil {
+				t.Fatal("Ctrl+C returned no command")
+			}
+			msg := cmd()
+			if _, ok := msg.(tea.QuitMsg); !ok {
+				t.Fatalf("Ctrl+C command returned %T, want tea.QuitMsg", msg)
+			}
+		})
 	}
 }
