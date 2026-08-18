@@ -7,10 +7,10 @@ coverage: 0.0
 coverage: 0.0
 coverage: 0.0
 github.com/Jacob-Stokes/sf-deck/cmd/sf-deck 35.5
-github.com/Jacob-Stokes/sf-deck/internal/app 55.9
+github.com/Jacob-Stokes/sf-deck/internal/app 56.0
 github.com/Jacob-Stokes/sf-deck/internal/applog 82.7
 github.com/Jacob-Stokes/sf-deck/internal/buildinfo 77.3
-github.com/Jacob-Stokes/sf-deck/internal/cache 70.0
+github.com/Jacob-Stokes/sf-deck/internal/cache 71.1
 github.com/Jacob-Stokes/sf-deck/internal/control 75.1
 github.com/Jacob-Stokes/sf-deck/internal/devproject 60.0
 github.com/Jacob-Stokes/sf-deck/internal/diff 86.9
@@ -19,7 +19,7 @@ github.com/Jacob-Stokes/sf-deck/internal/exporters/bulk 18.0
 github.com/Jacob-Stokes/sf-deck/internal/exporters/devproject 76.1
 github.com/Jacob-Stokes/sf-deck/internal/exporters/soql 96.7
 github.com/Jacob-Stokes/sf-deck/internal/headless 91.2
-github.com/Jacob-Stokes/sf-deck/internal/headless/cli 70.9
+github.com/Jacob-Stokes/sf-deck/internal/headless/cli 71.0
 github.com/Jacob-Stokes/sf-deck/internal/instance 83.8
 github.com/Jacob-Stokes/sf-deck/internal/postprocess 85.2
 github.com/Jacob-Stokes/sf-deck/internal/query 73.4
@@ -36,13 +36,13 @@ github.com/Jacob-Stokes/sf-deck/internal/services/projects 79.7
 github.com/Jacob-Stokes/sf-deck/internal/services/records 76.8
 github.com/Jacob-Stokes/sf-deck/internal/services/tags 73.8
 github.com/Jacob-Stokes/sf-deck/internal/services/userops 83.8
-github.com/Jacob-Stokes/sf-deck/internal/settings 57.3
+github.com/Jacob-Stokes/sf-deck/internal/settings 57.5
 github.com/Jacob-Stokes/sf-deck/internal/sf 21.7
 github.com/Jacob-Stokes/sf-deck/internal/sfurl 75.4
 github.com/Jacob-Stokes/sf-deck/internal/soqlauto 73.6
 github.com/Jacob-Stokes/sf-deck/internal/soqlfmt 87.9
 github.com/Jacob-Stokes/sf-deck/internal/theme 87.7
-github.com/Jacob-Stokes/sf-deck/internal/ui 26.0
+github.com/Jacob-Stokes/sf-deck/internal/ui 26.1
 github.com/Jacob-Stokes/sf-deck/internal/ui/highlight 71.6
 github.com/Jacob-Stokes/sf-deck/internal/ui/keymap 53.9
 github.com/Jacob-Stokes/sf-deck/internal/ui/qchip 47.0

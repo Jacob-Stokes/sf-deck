@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-18
+
+### Fixed
+
+- Importing the built-in demo now writes its cache in one atomic transaction.
+  This prevents the TUI from freezing during hundreds of individual disk
+  commits on slower Linux systems and avoids partially imported demo data if
+  the process exits.
+
 ## [0.1.5] - 2026-08-18
 
 ### Added

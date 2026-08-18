@@ -203,6 +203,48 @@ func TestPutJSON_UpsertReplaces(t *testing.T) {
 	}
 }
 
+func TestPutJSONBatchRoundTripAndRollback(t *testing.T) {
+	c := openTestCache(t)
+	type payload struct {
+		N int `json:"n"`
+	}
+	entries := []JSONEntry{
+		{OrgUsername: "a@x", Key: "one", Value: payload{N: 1}},
+		{OrgUsername: "b@y", Key: "two", Value: payload{N: 2}},
+	}
+	if err := c.PutJSONBatch(entries); err != nil {
+		t.Fatalf("PutJSONBatch: %v", err)
+	}
+	for _, tc := range []struct {
+		org  string
+		key  string
+		want int
+	}{
+		{org: "a@x", key: "one", want: 1},
+		{org: "b@y", key: "two", want: 2},
+	} {
+		var got payload
+		if _, ok, err := c.GetJSON(tc.org, tc.key, &got); err != nil || !ok {
+			t.Fatalf("GetJSON(%s/%s): ok=%v err=%v", tc.org, tc.key, ok, err)
+		}
+		if got.N != tc.want {
+			t.Fatalf("GetJSON(%s/%s) = %d, want %d", tc.org, tc.key, got.N, tc.want)
+		}
+	}
+
+	err := c.PutJSONBatch([]JSONEntry{
+		{OrgUsername: "a@x", Key: "rolled-back", Value: payload{N: 3}},
+		{OrgUsername: "a@x", Key: "invalid", Value: make(chan int)},
+	})
+	if err == nil {
+		t.Fatal("PutJSONBatch accepted an unsupported value")
+	}
+	var got payload
+	if _, ok, getErr := c.GetJSON("a@x", "rolled-back", &got); getErr != nil || ok {
+		t.Fatalf("failed batch was not rolled back: ok=%v err=%v", ok, getErr)
+	}
+}
+
 func TestDeleteKeyPrefix(t *testing.T) {
 	c := openTestCache(t)
 	type v struct{ X int }

@@ -205,6 +205,45 @@ func (c *Cache) PutJSON(orgUsername, key string, v any) error {
 	return err
 }
 
+// JSONEntry is one cache payload written by PutJSONBatch.
+type JSONEntry struct {
+	OrgUsername string
+	Key         string
+	Value       any
+}
+
+// PutJSONBatch writes a group of payloads in one transaction. It is useful for
+// fixture imports where committing every row separately would block the caller
+// on hundreds of filesystem syncs. The batch is atomic.
+func (c *Cache) PutJSONBatch(entries []JSONEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO kv (org_username, key, value, cached_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(org_username, key) DO UPDATE SET value=excluded.value, cached_at=excluded.cached_at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	now := time.Now().Unix()
+	for _, entry := range entries {
+		b, err := json.Marshal(entry.Value)
+		if err != nil {
+			return fmt.Errorf("marshal %s/%s: %w", entry.OrgUsername, entry.Key, err)
+		}
+		if _, err := stmt.Exec(entry.OrgUsername, entry.Key, string(b), now); err != nil {
+			return fmt.Errorf("write %s/%s: %w", entry.OrgUsername, entry.Key, err)
+		}
+	}
+	return tx.Commit()
+}
+
 func (c *Cache) GetJSON(orgUsername, key string, dst any) (time.Time, bool, error) {
 	var value string
 	var cachedAt int64

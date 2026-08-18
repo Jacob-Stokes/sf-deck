@@ -79,12 +79,11 @@ func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 	auraDetails := demoAuraBundleDetails()
 	flowVersionDefs := demoFlowVersionDefs()
 	triggersByTable := demoTriggersByTable(objs)
+	entries := make([]cache.JSONEntry, 0, 512)
 	for _, o := range orgs {
 		u := o.Username
 		seed := func(key string, v any) error {
-			if err := c.PutJSON(u, key, v); err != nil {
-				return fmt.Errorf("seed %s/%s: %w", u, key, err)
-			}
+			entries = append(entries, cache.JSONEntry{OrgUsername: u, Key: key, Value: v})
 			return nil
 		}
 		if err := firstErr(
@@ -182,6 +181,9 @@ func seedDemoOrgData(c *cache.Cache, orgs []sf.Org) error {
 				return err
 			}
 		}
+	}
+	if err := c.PutJSONBatch(entries); err != nil {
+		return fmt.Errorf("seed demo cache: %w", err)
 	}
 	return nil
 }
