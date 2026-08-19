@@ -29,11 +29,15 @@ You want to know "is the `Account.Phone` field the same in dev,
 UAT, and prod?" — or "is the `Shipment_Status_Change` flow active
 everywhere?"
 
-The fast way is the dedicated `/compare` tab: pick a source org and a
-target org, choose the metadata types to diff, and sf-deck lays the two
-side by side so you can scan for drift. For a single field or object,
-open `/objects` on the source org, drill in, then run the comparison
-from `/compare` against the other org.
+Open the object, field, Flow, Apex class, or LWC bundle in the first org,
+then press `Ctrl+O` and choose **Find in another org…**. Select the target
+org. sf-deck confirms that the matching item exists before switching orgs
+and opening it, so you can inspect the same item without retracing the
+navigation path.
+
+Repeat for each org you want to check. The dedicated side-by-side Compare
+workspace shown on the website is coming soon and is not part of the
+current release.
 
 ## Pattern 3: pull data from one org, push to another
 

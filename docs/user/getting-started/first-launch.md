@@ -53,9 +53,9 @@ add-org picker.
 The safety pill in the left rail changes colour as you switch — your
 first signal that you're now looking at production.
 
-To compare metadata *across* orgs without leaving the active one, use
-the [`/compare` tab](../tasks/cross-org-workflow.md) rather than the
-org rail.
+For supported metadata, press `Ctrl+O` and choose **Find in another
+org…** to open the same item in a different org. A dedicated side-by-side
+Compare workspace is coming soon.
 
 ## Where to go next
 

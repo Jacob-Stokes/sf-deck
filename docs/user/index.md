@@ -2,10 +2,10 @@
 
 A terminal UI for working across your Salesforce orgs.
 
-sf-deck shows you schema, field-level security, SOQL, records,
-deploys, users, and metadata diffs — all on one screen, for every
-org you're authenticated to. Switch orgs with a keystroke, and reach
-most things in a few more.
+sf-deck shows you schema, field-level security, SOQL, records, Flows,
+Apex, deploys, and users — all on one screen, for every org you're
+authenticated to. Switch orgs with a keystroke, and reach most things
+in a few more.
 
 It runs on the `sf` CLI session you already have. No connected app,
 no Setup changes, no new credentials. If `sf org list` works on your
@@ -43,9 +43,9 @@ registry for exact support.
 ## Status
 
 sf-deck is at **v0.1** — built and used daily against real orgs, but
-solo-maintained and young. Most surfaces are stable; a few are **beta**
-(Compare, Reports export, Deploys/metadata writes, Dev projects &
-bundles) and will hit rough edges. See the
+solo-maintained and young. Most surfaces are stable; Reports export,
+Deploys/metadata writes, and Dev projects & bundles are **beta** and may
+have rough edges. Side-by-side Compare is coming soon. See the
 [maturity table in the README](https://github.com/Jacob-Stokes/sf-deck#platform-support-and-maturity)
 for the per-area breakdown. Issues and PRs welcome on
 [GitHub](https://github.com/Jacob-Stokes/sf-deck).

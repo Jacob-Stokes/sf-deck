@@ -52,7 +52,9 @@ between.
 | then `space` | Fold / unfold an org group |
 | then `a` | Open the add-org picker |
 
-Comparing metadata across orgs is the `/compare` tab, not the org rail.
+On a supported metadata item, press `Ctrl+O` and choose **Find in another
+org…** to open the matching item there. Side-by-side Compare is coming
+soon.
 
 ## Panes
 
