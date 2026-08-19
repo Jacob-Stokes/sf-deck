@@ -164,7 +164,7 @@ type UIConfig struct {
 // scroll feel.
 type InputConfig struct {
 	// JumpRows is the row count for ctrl+arrow / J / K nav. 0 falls
-	// back to the package default (5). Negatives clamp to 1.
+	// back to the package default (10). Negatives clamp to 1.
 	JumpRows int `toml:"jump_rows,omitempty"`
 
 	// WheelQuietGapMs is the idle time (in ms) after which the wheel
@@ -515,12 +515,12 @@ const (
 	APICLITimeoutSecFallback      = 30
 	APIRetrieveTimeoutSecFallback = 1200 // 20 min — covers most validates with Apex test runs
 	APIDeployTimeoutSecFallback   = 60
-	// Deploy status polls every 5s once past the 500ms fast-start —
+	// Deploy status polls every 10s once past the 500ms fast-start —
 	// quick deploys still land on the fast-start polls; anything
 	// slower is minutes-scale on Salesforce's side, where the old 1s
 	// steady poll bought nothing but API calls.
-	APIDeployPollMsFallback   = 5000
-	APIDeployWatchSecFallback = 5 // /deploys live watch — one tooling SOQL per tick
+	APIDeployPollMsFallback   = 10000
+	APIDeployWatchSecFallback = 20 // /deploys live watch — one tooling SOQL per tick
 	APIBulkPollMsFallback     = 5000
 )
 
@@ -1820,12 +1820,14 @@ func (s *Settings) SetRecentExcludedSFTypes(types []string) {
 	s.UI.Recent.ExcludedSFTypes = out
 }
 
+// DefaultJumpRows is the navigation distance used by ctrl+arrow / J / K.
+const DefaultJumpRows = 10
+
 // JumpRows returns the configured jump-step size for shift+arrow /
-// J / K navigation. Defaults to 5 when unset; clamps to >= 1.
+// J / K navigation. Defaults to DefaultJumpRows when unset; clamps to >= 1.
 func (s *Settings) JumpRows() int {
-	const def = 5
 	if s == nil || s.UI.Input.JumpRows == 0 {
-		return def
+		return DefaultJumpRows
 	}
 	if s.UI.Input.JumpRows < 1 {
 		return 1

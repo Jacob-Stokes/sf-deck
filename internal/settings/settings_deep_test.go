@@ -365,6 +365,9 @@ func TestLoadedDevProjectForOrg_RoundTrip(t *testing.T) {
 
 func TestTunables_DefaultsWhenUnset(t *testing.T) {
 	s := &Settings{}
+	if got := s.JumpRows(); got != DefaultJumpRows {
+		t.Errorf("JumpRows default: got %d, want %d", got, DefaultJumpRows)
+	}
 	if got := s.WheelQuietGapMs(); got != DefaultWheelQuietGapMs {
 		t.Errorf("WheelQuietGapMs default: got %d, want %d", got, DefaultWheelQuietGapMs)
 	}

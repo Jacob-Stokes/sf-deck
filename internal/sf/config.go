@@ -14,7 +14,7 @@ var (
 		CLITimeout:      30 * time.Second,
 		RetrieveTimeout: 20 * time.Minute,
 		DeployDeadline:  60 * time.Second,
-		DeployPoll:      5 * time.Second,
+		DeployPoll:      10 * time.Second,
 		BulkPoll:        5 * time.Second,
 		APIVersion:      "", // "" = use the org-reported version
 	}

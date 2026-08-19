@@ -160,8 +160,8 @@ Default movement bindings are defined in `internal/ui/keymap/commands.go`:
 
 - `j` / Down: move down one row.
 - `k` / Up: move up one row.
-- `ctrl+down`: jump down by `settings.JumpRows()`, default `5`.
-- `ctrl+up`: jump up by `settings.JumpRows()`, default `5`.
+- `ctrl+down`: jump down by `settings.JumpRows()`, default `10`.
+- `ctrl+up`: jump up by `settings.JumpRows()`, default `10`.
 - `ctrl+d` / PageDown: jump by roughly half the terminal height.
 - `ctrl+u` / PageUp: jump up by roughly half the terminal height.
 - `G` / End: huge positive delta, clamped to bottom.
@@ -196,7 +196,7 @@ Used when pagination is off. This uses `wheelStep`: wheel events accumulate in `
 
 Wheel settings live on `settings.UI.Input` and are exposed through:
 
-- `JumpRows()`, default `5`;
+- `JumpRows()`, default `10`;
 - `WheelQuietGapMs()`, default `80`;
 - `WheelMinIntervalMs()`, default `12`;
 - `WheelMaxStep()`, default `20`.
