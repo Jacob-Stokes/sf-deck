@@ -134,6 +134,14 @@ complete workflows.
 Run `sf-deck` for interactive work. Use headless commands in scripts and CI,
 or the local IPC socket to drive a running TUI.
 
+The same interfaces support agent-assisted investigation. The bundled skill
+shows agents how to discover available commands and respect the same per-org
+safety gates as the TUI. This example uses only fictional Northwind demo data.
+
+<p align="center">
+  <img src="docs/landing/assets/ai-agent-workflow.png" alt="An AI coding agent investigating fictional Northwind Flow metadata alongside the sf-deck demo" width="920">
+</p>
+
 Core commands return a stable JSON envelope and scriptable exit codes:
 
 ```sh
