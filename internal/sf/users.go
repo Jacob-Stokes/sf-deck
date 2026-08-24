@@ -63,9 +63,12 @@ func UsersForSOQL(target, soql string, cap int) (UsersList, error) {
 // list query projects. Used by the User detail surface to refresh the
 // header card after an action mutates state.
 func FetchUser(target, userID string) (UserRow, error) {
+	if err := ValidateSalesforceID(userID); err != nil {
+		return UserRow{}, fmt.Errorf("user id: %w", err)
+	}
 	soql := fmt.Sprintf(
 		"SELECT Id, Name, Username, Profile.Name, UserRole.Name, LastLoginDate, IsActive "+
-			"FROM User WHERE Id = '%s' LIMIT 1", userID)
+			"FROM User WHERE Id = '%s' LIMIT 1", sqlEscape(userID))
 	q, err := Query(target, soql, false)
 	if err != nil {
 		return UserRow{}, err
@@ -97,6 +100,9 @@ func FetchUser(target, userID string) (UserRow, error) {
 // generated temp password to the user's email and forces a change
 // on next login. Returns nil on success; the API returns 204.
 func ResetUserPassword(target, userID string) error {
+	if err := ValidateSalesforceID(userID); err != nil {
+		return fmt.Errorf("user id: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err
@@ -111,6 +117,9 @@ func ResetUserPassword(target, userID string) error {
 // SetUserActive flips IsActive on the given User. Used to deactivate
 // (and reactivate) accounts from the User detail action menu.
 func SetUserActive(target, userID string, active bool) error {
+	if err := ValidateSalesforceID(userID); err != nil {
+		return fmt.Errorf("user id: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err
@@ -138,8 +147,11 @@ type UserLoginRow struct {
 // login attempt, so brand-new users won't have one and freezing
 // before first login isn't supported.
 func FetchUserLogin(target, userID string) (UserLoginRow, error) {
+	if err := ValidateSalesforceID(userID); err != nil {
+		return UserLoginRow{}, fmt.Errorf("user id: %w", err)
+	}
 	soql := fmt.Sprintf(
-		"SELECT Id, UserId, IsFrozen FROM UserLogin WHERE UserId = '%s' LIMIT 1", userID)
+		"SELECT Id, UserId, IsFrozen FROM UserLogin WHERE UserId = '%s' LIMIT 1", sqlEscape(userID))
 	q, err := Query(target, soql, false)
 	if err != nil {
 		return UserLoginRow{}, err
@@ -187,6 +199,9 @@ func SetUserFrozen(target, userID string, frozen bool) error {
 // to the user directly — distinct from DELETE which emails a temp
 // password.
 func GenerateUserPasswordResetLink(target, userID string) (string, error) {
+	if err := ValidateSalesforceID(userID); err != nil {
+		return "", fmt.Errorf("user id: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return "", err

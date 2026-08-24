@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 // ErrSFNotFound is returned by every shell-out helper when the `sf`
@@ -90,10 +92,11 @@ func runSFCtx(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("sf %s cancelled", argsLabel(args))
 	}
 	if typed := parseCLIError(out); typed != nil {
+		typed.Message = redact.String(typed.Message)
 		return nil, typed
 	}
 	if msg := parseStructuredError(out); msg != "" {
-		return nil, fmt.Errorf("%s", msg)
+		return nil, errors.New(redact.String(msg))
 	}
 	if ee, ok := err.(*exec.ExitError); ok {
 		cleaned := cleanStderr(string(ee.Stderr))
@@ -101,9 +104,9 @@ func runSFCtx(ctx context.Context, args ...string) ([]byte, error) {
 			return nil, fmt.Errorf("sf %s exited with code %d",
 				argsLabel(args), ee.ExitCode())
 		}
-		return nil, errors.New(cleaned)
+		return nil, errors.New(redact.String(cleaned))
 	}
-	return nil, err
+	return nil, errors.New(redact.String(err.Error()))
 }
 
 func argsLabel(args []string) string {

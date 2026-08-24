@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/cache"
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 	"github.com/Jacob-Stokes/sf-deck/internal/services/metadataops"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
@@ -404,5 +405,5 @@ func logDeploy(format string, args ...any) {
 		return
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "[ui] "+format+"\n", args...)
+	_, _ = fmt.Fprintln(f, redact.String(fmt.Sprintf("[ui] "+format, args...)))
 }

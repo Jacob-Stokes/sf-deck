@@ -169,7 +169,7 @@ func TestListMetadataHTTPError(t *testing.T) {
 
 func TestReadMetadataRetriesInvalidSession(t *testing.T) {
 	var calls int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := atomic.AddInt32(&calls, 1)
 		raw, _ := io.ReadAll(r.Body)
 		switch n {

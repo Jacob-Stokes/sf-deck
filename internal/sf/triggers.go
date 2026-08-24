@@ -169,6 +169,9 @@ func GetTrigger(target, id string) (TriggerDetail, error) {
 // in the patch. We sort them into the right slot on the PATCH envelope
 // so the caller can think in terms of "a key I want to change".
 func UpdateTriggerMetadata(target, id string, patch map[string]any) error {
+	if err := ValidateSalesforceID(id); err != nil {
+		return fmt.Errorf("trigger id: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err

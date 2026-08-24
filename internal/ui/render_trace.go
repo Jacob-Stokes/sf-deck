@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/applog"
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 const (
@@ -129,6 +130,11 @@ func newRenderTracerFromEnv() *renderTracer {
 	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
+		applog.Warn("render_trace.open_failed", map[string]any{"path": path, "err": err.Error()})
+		return nil
+	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
 		applog.Warn("render_trace.open_failed", map[string]any{"path": path, "err": err.Error()})
 		return nil
 	}
@@ -318,7 +324,7 @@ func (t *renderTracer) writeLocked(v any) {
 	if err != nil {
 		return
 	}
-	b = append(b, '\n')
+	b = append(redact.Bytes(b), '\n')
 	_, _ = t.file.Write(b)
 }
 

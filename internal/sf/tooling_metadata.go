@@ -11,6 +11,9 @@ import (
 // description). Light wrapper around the same GET that
 // UpdateToolingMetadata performs internally.
 func GetToolingMetadata(target, sobjectType, id string) (map[string]any, error) {
+	if err := validateToolingReference(sobjectType, id); err != nil {
+		return nil, err
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return nil, err
@@ -42,6 +45,9 @@ func GetToolingMetadata(target, sobjectType, id string) (map[string]any, error) 
 //	            the same strict way as update, so callers should send
 //	            everything the new record needs to be well-formed.
 func CreateToolingMetadata(target, sobjectType, fullName string, metadata map[string]any) (string, error) {
+	if err := ValidateSOQLIdentifier(sobjectType); err != nil {
+		return "", fmt.Errorf("tooling metadata type: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return "", err
@@ -76,6 +82,9 @@ func CreateToolingMetadata(target, sobjectType, fullName string, metadata map[st
 // custom field, etc.). Caller is responsible for the destructive
 // confirmation UX + the safety gate.
 func DeleteToolingMetadata(target, sobjectType, id string) error {
+	if err := validateToolingReference(sobjectType, id); err != nil {
+		return err
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err
@@ -103,6 +112,9 @@ func DeleteToolingMetadata(target, sobjectType, id string) error {
 // Returns an *SFError on 4xx/5xx so callers get the typed Kind +
 // Hint without re-parsing. Safety gating is the caller's job.
 func UpdateToolingMetadata(target, sobjectType, id string, patch map[string]any) error {
+	if err := validateToolingReference(sobjectType, id); err != nil {
+		return err
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err
@@ -137,6 +149,16 @@ func UpdateToolingMetadata(target, sobjectType, id string, patch map[string]any)
 	}
 	if _, err := c.patch(path, body); err != nil {
 		return upgradeToSFError(err)
+	}
+	return nil
+}
+
+func validateToolingReference(sobjectType, id string) error {
+	if err := ValidateSOQLIdentifier(sobjectType); err != nil {
+		return fmt.Errorf("tooling metadata type: %w", err)
+	}
+	if err := ValidateSalesforceID(id); err != nil {
+		return fmt.Errorf("tooling metadata id: %w", err)
 	}
 	return nil
 }

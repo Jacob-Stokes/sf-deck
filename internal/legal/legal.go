@@ -6,7 +6,7 @@ const (
 	// PolicyVersion changes only when users need to acknowledge materially
 	// revised terms or data handling. A date keeps the value readable in
 	// settings.toml and avoids coupling policy acceptance to app releases.
-	PolicyVersion = "2026-07-23"
+	PolicyVersion = "2026-08-24"
 
 	PrivacyURL  = "https://sfdeck.dev/privacy.html"
 	TermsURL    = "https://sfdeck.dev/terms.html"

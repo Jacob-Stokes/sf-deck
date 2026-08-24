@@ -204,7 +204,7 @@ func TestMetadataUpdate_SafetyBlockedOnProd(t *testing.T) {
 	a := newMetadataTestApp()
 	code, got := runMetadataCLI(t, a, "--json", "metadata", "update",
 		"--org", "prod", "--type", "CustomField",
-		"--id", "00Nxxx00000abc",
+		"--id", "00N000000000001",
 		"--patch", `{"description":"new"}`)
 	if code != headless.ExitSafetyBlocked {
 		t.Fatalf("exit = %d, want %d", code, headless.ExitSafetyBlocked)
@@ -219,7 +219,7 @@ func TestMetadataDelete_SafetyBlockedOnSandbox(t *testing.T) {
 	a := newMetadataTestApp()
 	code, got := runMetadataCLI(t, a, "--json", "metadata", "delete",
 		"--org", "sand", "--type", "ValidationRule",
-		"--id", "03Dxxx")
+		"--id", "03D000000000001")
 	if code != headless.ExitSafetyBlocked {
 		t.Fatalf("exit = %d, want %d", code, headless.ExitSafetyBlocked)
 	}
@@ -251,13 +251,13 @@ func TestMetadataDelete_BlockedAtMetadataTier(t *testing.T) {
 	}
 	code, _ := runMetadataCLI(t, a, "--json", "metadata", "update",
 		"--org", "sand", "--type", "CustomField",
-		"--id", "00Nxxx", "--patch", `{"description":"x"}`)
+		"--id", "00N000000000001", "--patch", `{"description":"x"}`)
 	if code == headless.ExitSafetyBlocked {
 		t.Errorf("metadata update on metadata-tier org was blocked; should be allowed")
 	}
 	// Delete must still be blocked.
 	code, got := runMetadataCLI(t, a, "--json", "metadata", "delete",
-		"--org", "sand", "--type", "CustomField", "--id", "00Nxxx")
+		"--org", "sand", "--type", "CustomField", "--id", "00N000000000001")
 	if code != headless.ExitSafetyBlocked {
 		t.Fatalf("delete on metadata-tier org exit = %d, want safety_blocked", code)
 	}
@@ -282,9 +282,9 @@ func TestMetadata_SafetyBlockBeforeNetwork(t *testing.T) {
 			"--full-name", "X.Y", "--patch", `{}`}},
 		{"update", []string{"--json", "metadata", "update",
 			"--org", "prod", "--type", "CustomField",
-			"--id", "00N", "--patch", `{}`}},
+			"--id", "00N000000000001", "--patch", `{}`}},
 		{"delete", []string{"--json", "metadata", "delete",
-			"--org", "prod", "--type", "ValidationRule", "--id", "03D"}},
+			"--org", "prod", "--type", "ValidationRule", "--id", "03D000000000001"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

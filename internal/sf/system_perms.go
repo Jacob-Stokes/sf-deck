@@ -103,6 +103,12 @@ func ListSystemPermissions(target, parentID string) ([]SystemPermission, error) 
 // PermissionSet record. fieldAPIName is the full Permissions* name
 // (e.g. "PermissionsApiEnabled").
 func TogglePermissionSetBool(target, parentID, fieldAPIName string, val bool) error {
+	if err := validatePermissionReference(parentID, "", fieldAPIName); err != nil {
+		return err
+	}
+	if !strings.HasPrefix(fieldAPIName, "Permissions") || len(fieldAPIName) == len("Permissions") {
+		return fmt.Errorf("invalid system permission field %q", fieldAPIName)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err

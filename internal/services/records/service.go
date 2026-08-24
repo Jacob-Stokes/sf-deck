@@ -205,18 +205,7 @@ func (s *Service) resolveSObject(target orgwrite.Target, sobject, id string) (st
 }
 
 func validateID(id string) error {
-	if id == "" {
-		return errors.New("record id is required")
-	}
-	if len(id) != 15 && len(id) != 18 {
-		return fmt.Errorf("invalid record id %q (must be 15 or 18 chars)", id)
-	}
-	for _, c := range []byte(id) {
-		if !isASCIIAlpha(c) && (c < '0' || c > '9') {
-			return fmt.Errorf("invalid record id %q (must be ASCII alphanumeric)", id)
-		}
-	}
-	return nil
+	return sf.ValidateSalesforceID(id)
 }
 
 func validateSObject(name string) error {

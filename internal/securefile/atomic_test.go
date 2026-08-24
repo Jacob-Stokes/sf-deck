@@ -55,3 +55,32 @@ func TestFailedWriteLeavesNoDestinationOrTemporaryFile(t *testing.T) {
 		t.Fatalf("left files behind: %v", entries)
 	}
 }
+
+func TestOverwriteReplacesSymlinkWithoutTouchingTarget(t *testing.T) {
+	dir := t.TempDir()
+	victim := filepath.Join(dir, "victim.txt")
+	path := filepath.Join(dir, "export.csv")
+	if err := os.WriteFile(victim, []byte("keep me"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(victim, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFile(path, []byte("new output"), true); err != nil {
+		t.Fatal(err)
+	}
+	victimBody, err := os.ReadFile(victim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(victimBody) != "keep me" {
+		t.Fatalf("symlink target changed: %q", victimBody)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("destination remained a symlink")
+	}
+}

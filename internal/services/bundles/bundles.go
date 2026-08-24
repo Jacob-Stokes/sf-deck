@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
 	dpexport "github.com/Jacob-Stokes/sf-deck/internal/exporters/devproject"
+	"github.com/Jacob-Stokes/sf-deck/internal/securefile"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 )
 
@@ -187,17 +189,13 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 	}
 
 	manifestPath := filepath.Join(path, "package.xml")
-	mf, err := os.Create(manifestPath)
-	if err != nil {
-		return CreateResult{}, fmt.Errorf("create package.xml: %w", err)
-	}
-	result, perr := dpexport.WritePackageXML(mf, items, dpexport.PackageXMLOptions{APIVersion: sf.APIVersionForAlias(versionOrg)})
-	closeErr := mf.Close()
-	if perr != nil {
-		return CreateResult{}, fmt.Errorf("write package.xml: %w", perr)
-	}
-	if closeErr != nil {
-		return CreateResult{}, fmt.Errorf("close package.xml: %w", closeErr)
+	var result dpexport.PackageXMLResult
+	if err := securefile.Write(manifestPath, true, func(w io.Writer) error {
+		var writeErr error
+		result, writeErr = dpexport.WritePackageXML(w, items, dpexport.PackageXMLOptions{APIVersion: sf.APIVersionForAlias(versionOrg)})
+		return writeErr
+	}); err != nil {
+		return CreateResult{}, fmt.Errorf("write package.xml: %w", err)
 	}
 	if result.IncludedCount == 0 {
 		return CreateResult{}, fmt.Errorf("no items mapped to MetadataAPI types (records / unsupported only)")
@@ -205,8 +203,8 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 
 	if in.FullProject {
 		projectJSON := dpexport.SfdxProjectJSON(dp.Name, sf.APIVersionForAlias(versionOrg))
-		if err := os.WriteFile(filepath.Join(path, "sfdx-project.json"),
-			[]byte(projectJSON), 0o644); err != nil {
+		if err := securefile.WriteFile(filepath.Join(path, "sfdx-project.json"),
+			[]byte(projectJSON), true); err != nil {
 			return CreateResult{}, fmt.Errorf("write sfdx-project.json: %w", err)
 		}
 		if err := os.MkdirAll(filepath.Join(path, "force-app", "main", "default"),
@@ -215,9 +213,11 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 		}
 	}
 
-	_ = os.WriteFile(filepath.Join(path, "README.md"),
+	if err := securefile.WriteFile(filepath.Join(path, "README.md"),
 		[]byte(dpexport.SuggestedReadme(dp.Name, orgFilter, result, in.FullProject)),
-		0o644)
+		true); err != nil {
+		return CreateResult{}, fmt.Errorf("write README.md: %w", err)
+	}
 
 	bundleRow, err := store.CreateBundle(in.ProjectID, path, in.OrgAlias)
 	if err != nil {

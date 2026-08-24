@@ -83,7 +83,7 @@ func TestUpdateRequiresMetadata(t *testing.T) {
 	remote := &fakeRemote{}
 	s := serviceAt(settings.SafetyMetadata, remote)
 	got, err := s.Update(context.Background(), UpdateInput{
-		Type: "ValidationRule", ID: "03d-rule", Patch: map[string]any{"active": true},
+		Type: "ValidationRule", ID: "03d000000000001", Patch: map[string]any{"active": true},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestDeleteRequiresFull(t *testing.T) {
 	} {
 		remote := &fakeRemote{}
 		s := serviceAt(tc.level, remote)
-		got, err := s.Delete(context.Background(), DeleteInput{Type: "CustomField", ID: "01I-field"})
+		got, err := s.Delete(context.Background(), DeleteInput{Type: "CustomField", ID: "01I000000000001"})
 		if tc.allowed {
 			if err != nil || got.Target.CLIArg != "resolved" || !reflect.DeepEqual(remote.calls, []string{"delete"}) {
 				t.Fatalf("full delete result=%#v err=%v remote=%#v", got, err, remote)
@@ -139,7 +139,7 @@ func TestValidationPrecedesResolutionAndRemote(t *testing.T) {
 }
 
 func TestMissingDependenciesFailClosed(t *testing.T) {
-	valid := DeleteInput{Type: "CustomField", ID: "01I-field"}
+	valid := DeleteInput{Type: "CustomField", ID: "01I000000000001"}
 	for _, s := range []*Service{nil, NewWithRemote(nil, &fakeRemote{}), NewWithRemote(
 		orgwrite.NewGate(func(string) (sf.Org, error) { return sf.Org{}, nil },
 			func(sf.Org) settings.SafetyLevel { return settings.SafetyFull }), nil)} {
@@ -153,7 +153,7 @@ func TestContextCancellationPreventsRemote(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	remote := &fakeRemote{}
-	_, err := serviceAt(settings.SafetyFull, remote).Delete(ctx, DeleteInput{Type: "CustomField", ID: "x"})
+	_, err := serviceAt(settings.SafetyFull, remote).Delete(ctx, DeleteInput{Type: "CustomField", ID: "01I000000000001"})
 	if !errors.Is(err, context.Canceled) || len(remote.calls) != 0 {
 		t.Fatalf("err=%v remote=%v", err, remote.calls)
 	}

@@ -62,7 +62,9 @@ func TestLegalAndDataTextAndErrors(t *testing.T) {
 	if code, got, _ := runCLI(t, nil, "legal", "wat", "--json"); code != 2 || got["ok"] != false {
 		t.Fatalf("unknown legal: code=%d response=%#v", code, got)
 	}
-	if code, _, out := runCLI(t, nil, "data", "inspect"); code != 0 || !strings.Contains(out, "record payloads persisted: no") {
+	if code, _, out := runCLI(t, nil, "data", "inspect"); code != 0 ||
+		!strings.Contains(out, "record/query result cache: disabled") ||
+		!strings.Contains(out, "diagnostic payloads: may be stored locally") {
 		t.Fatalf("data inspect: code=%d out=%q", code, out)
 	}
 	if code, got, _ := runCLI(t, nil, "data", "erase", "--json"); code != 2 || got["ok"] != false {
@@ -98,7 +100,8 @@ func TestDataInspectAndErase(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("inspect code = %d", code)
 	}
-	if got["data"].(map[string]any)["record_payloads_persisted"] != false {
+	data := got["data"].(map[string]any)
+	if data["record_query_results_cached"] != false || data["diagnostic_payloads_may_persist"] != true {
 		t.Fatalf("inspect data = %#v", got["data"])
 	}
 

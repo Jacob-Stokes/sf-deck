@@ -311,6 +311,13 @@ func TestListen_ClaimsInstanceAndRemovesSocketOnClose(t *testing.T) {
 	if entry.Number != 1 {
 		t.Errorf("expected instance #1, got %d", entry.Number)
 	}
+	info, err := os.Stat(entry.Socket)
+	if err != nil {
+		t.Fatalf("stat socket: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("socket mode = %o, want 600", got)
+	}
 	if _, err := net.Dial("unix", entry.Socket); err != nil {
 		t.Errorf("socket not bound: %v", err)
 	}

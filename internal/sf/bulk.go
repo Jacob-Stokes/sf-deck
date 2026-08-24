@@ -194,6 +194,7 @@ func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, include
 	c.mu.Lock()
 	token := c.accessToken
 	base := c.instanceURL
+	httpc := c.http
 	c.mu.Unlock()
 
 	path := c.APIPath("jobs/query/" + jobID + "/results")
@@ -222,7 +223,7 @@ func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, include
 	req.Header.Set("Accept", "text/csv")
 	req.Header.Set("User-Agent", "sf-deck/0.1")
 
-	resp, err := c.http.Do(req)
+	resp, err := httpc.Do(req)
 	if err != nil {
 		return 0, "", err
 	}

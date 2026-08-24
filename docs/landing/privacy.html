@@ -23,9 +23,9 @@
     </div>
   </header>
   <main class="legal-content">
-    <p class="eyebrow">Policy version 2026-07-23</p>
+    <p class="eyebrow">Policy version 2026-08-24</p>
     <h1>Privacy notice</h1>
-    <p class="legal-date">Effective 23 July 2026</p>
+    <p class="legal-date">Effective 24 August 2026</p>
     <p class="legal-lede">sf-deck is a free, open-source application maintained by Jacob Stokes. It runs on your computer. There is no sf-deck account, hosted application backend, analytics service, advertising system, or application telemetry.</p>
 
     <h2>What the maintainer receives</h2>
@@ -35,9 +35,10 @@
     <h2>How Salesforce data is processed</h2>
     <p>sf-deck uses Salesforce orgs already authenticated through Salesforce CLI. It may request the current access token from the CLI, hold it in process memory, and use it for direct Salesforce REST or SOAP requests. It does not write the token to its own databases or logs.</p>
     <p><strong>Salesforce record payloads are not persistently cached.</strong> Record lists and details, SOQL and report result rows, list-view results, Salesforce RecentlyViewed rows, and related-record lookups remain in process memory and disappear when the process ends.</p>
+    <p>This cache rule does not cover every user-invoked or diagnostic file. Anonymous Apex history can contain submitted code, errors, and captured debug-log bodies. Saved comparisons contain metadata snapshots. Failed exports can create private response dumps, and explicitly enabled diagnostic traces can record request paths, org aliases, errors, and UI structure. These files remain local and are not sent to the maintainer.</p>
 
     <h2>Local data</h2>
-    <p>Working state under <code>~/.sf-deck/</code> can include settings, safety levels, chips, recently visited item references, org catalogue details, metadata/schema caches, saved SOQL text and history (not returned rows), saved Apex and history, dev projects, tags, bundle registrations, usage counters, logs, and optional update-check state.</p>
+    <p>Working state under <code>~/.sf-deck/</code> can include settings, safety levels, chips, recently visited item references, org catalogue details, metadata/schema caches, saved SOQL text and history (not returned rows), saved Apex and execution history, saved metadata comparisons, dev projects, tags, bundle registrations, usage counters, logs, private error-response dumps, explicitly enabled traces, and optional update-check state.</p>
     <p>Exports and SFDX bundles are written to paths you choose. The default bundle path is <code>~/sf-deck-bundles/</code>. Local files are intended to be readable only by your operating-system user.</p>
 
     <h2>Network requests</h2>

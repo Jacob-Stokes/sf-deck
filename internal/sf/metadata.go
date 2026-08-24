@@ -14,6 +14,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 func dlogf(format string, args ...any) {
@@ -27,7 +29,7 @@ func dlogf(format string, args ...any) {
 		return
 	}
 	defer f.Close()
-	log.New(f, "", log.LstdFlags|log.Lmicroseconds).Printf(format, args...)
+	log.New(f, "", log.LstdFlags|log.Lmicroseconds).Print(redact.String(fmt.Sprintf(format, args...)))
 }
 
 // MetadataFile is one file to ship inside the deploy ZIP. Path is

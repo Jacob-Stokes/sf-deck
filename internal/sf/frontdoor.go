@@ -22,6 +22,7 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 	c.mu.Lock()
 	token := c.accessToken
 	base := strings.TrimRight(c.instanceURL, "/")
+	baseHTTPClient := c.http
 	c.mu.Unlock()
 
 	jar, err := cookiejar.New(nil)
@@ -29,8 +30,9 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 		return nil, fmt.Errorf("cookie jar: %w", err)
 	}
 	httpc := &http.Client{
-		Timeout: c.http.Timeout,
-		Jar:     jar,
+		Timeout:   baseHTTPClient.Timeout,
+		Transport: baseHTTPClient.Transport,
+		Jar:       jar,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -93,12 +95,11 @@ func (c *Client) classicExportViaFrontdoor(reportID string) ([]byte, error) {
 		return nil, fmt.Errorf("frontdoor didn't return a session cookie — the connected app's OAuth scopes likely don't include 'web'. sf org login web typically grants it; api-only or jwt-only apps won't")
 	}
 
-	httpc.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return fmt.Errorf("too many redirects")
-		}
-		return nil
+	origin, err := validateSalesforceInstanceURL(base)
+	if err != nil {
+		return nil, err
 	}
+	httpc.CheckRedirect = sameOriginRedirectPolicy(origin)
 
 	// Step 2: GET the classic export URL with the cookie jar. NO
 	// Authorization header — sending both confuses SF.

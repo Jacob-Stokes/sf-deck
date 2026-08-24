@@ -46,7 +46,7 @@ func TestControlMetadataDeleteUsesServiceFullGate(t *testing.T) {
 	remote := &controlMetadataRemote{}
 	s := metadataControlState(settings.SafetyMetadata, remote)
 	_, err := s.MetadataDelete(control.MetadataDeleteArgs{
-		OrgAlias: "input", Type: "CustomField", ID: "01I-field",
+		OrgAlias: "input", Type: "CustomField", ID: "01I000000000001",
 	})
 	var blocked orgwrite.BlockedError
 	if !errors.As(err, &blocked) || blocked.Required != settings.WriteAnonymous {
@@ -66,7 +66,7 @@ func TestControlMetadataUpdateUsesResolvedServiceTarget(t *testing.T) {
 	remote := &controlMetadataRemote{}
 	s := metadataControlState(settings.SafetyMetadata, remote)
 	_, err := s.MetadataUpdate(control.MetadataUpdateArgs{
-		OrgAlias: "input", Type: "CustomField", ID: "01I-field",
+		OrgAlias: "input", Type: "CustomField", ID: "01I000000000001",
 		Patch: map[string]any{"description": "updated"},
 	})
 	if err != nil {

@@ -2,15 +2,16 @@ package query
 
 import (
 	"strings"
+	"time"
 )
 
 // ToSOQLWhere walks a predicate tree and emits the SOQL fragment that
 // goes after WHERE. A nil node returns the empty string — callers
 // concatenate with " WHERE " only when the result is non-empty.
 //
-// String literals are single-quote-escaped. SOQL has no parameter
-// binding so escaping has to be airtight; we double up apostrophes
-// (the only escaping SOQL accepts inside a string literal). Other
+// String literals are backslash-escaped. SOQL has no parameter
+// binding so escaping has to be airtight; backslashes and apostrophes
+// are escaped before the literal is wrapped. Other
 // literal types — int, bool, ISO date — render verbatim without
 // quoting since their grammar is unambiguous.
 //
@@ -20,6 +21,9 @@ import (
 // readable on disk + safe across SOQL parser quirks.
 func ToSOQLWhere(node Node) string {
 	if node == nil {
+		return ""
+	}
+	if !validSOQLNode(node) {
 		return ""
 	}
 	return emitNode(node, 0)
@@ -34,6 +38,9 @@ func ToSOQLWhere(node Node) string {
 // Returns "" when the Query carries no clauses. Each present clause
 // includes its keyword ("WHERE", "ORDER BY", "LIMIT").
 func ToSOQLClauses(q Query) string {
+	if !validSOQLQuery(q, false) {
+		return ""
+	}
 	var parts []string
 	if where := ToSOQLWhere(q.Where); where != "" {
 		parts = append(parts, "WHERE "+where)
@@ -74,6 +81,9 @@ func ToSOQLClauses(q Query) string {
 // `Query` — round-tripping through the parser (parse.go) returns the
 // same QueryExpr we started with.
 func ToSOQL(q Query, fromSObject string) string {
+	if !validSOQLIdentifier(fromSObject) || !validSOQLQuery(q, true) {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString("SELECT ")
 	if len(q.Columns) == 0 {
@@ -242,25 +252,130 @@ func emitStringLiteral(s string) string {
 }
 
 func looksLikeDate(s string) bool {
-	if len(s) < 10 || len(s) > 30 {
-		return false
-	}
-	if s[4] != '-' || s[7] != '-' {
-		return false
-	}
-	for i, r := range s[:10] {
-		if i == 4 || i == 7 {
-			continue
+	for _, layout := range []string{
+		"2006-01-02",
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05-0700",
+		"2006-01-02T15:04:05.000-0700",
+	} {
+		if _, err := time.Parse(layout, s); err == nil {
+			return true
 		}
-		if r < '0' || r > '9' {
+	}
+	return false
+}
+
+func validSOQLQuery(q Query, includeColumns bool) bool {
+	if q.Where != nil && !validSOQLNode(q.Where) {
+		return false
+	}
+	for _, ob := range q.OrderBy {
+		if !validSOQLIdentifier(ob.Field) {
 			return false
 		}
 	}
-	if len(s) == 10 {
-		return true
+	if includeColumns {
+		for _, column := range q.Columns {
+			if !validSOQLIdentifier(column) {
+				return false
+			}
+		}
 	}
-	if s[10] != 'T' {
+	return q.Limit >= 0
+}
+
+func validSOQLNode(node Node) bool {
+	switch n := node.(type) {
+	case CompareNode:
+		if !validSOQLIdentifier(n.Field) {
+			return false
+		}
+		switch n.Op {
+		case OpDateLiteral:
+			value, ok := n.Value.(string)
+			return ok && validDateLiteral(value)
+		case OpEq, OpNotEq, OpGT, OpGTE, OpLT, OpLTE,
+			OpContains, OpStartsWith, OpEndsWith, OpIn, OpIsNull:
+			return true
+		}
+		return false
+	case AndNode:
+		for _, child := range n.Children {
+			if !validSOQLNode(child) {
+				return false
+			}
+		}
+		return true
+	case OrNode:
+		for _, child := range n.Children {
+			if !validSOQLNode(child) {
+				return false
+			}
+		}
+		return true
+	case NotNode:
+		return n.Child != nil && validSOQLNode(n.Child)
+	}
+	return false
+}
+
+func validSOQLIdentifier(name string) bool {
+	if name == "" {
 		return false
 	}
+	segmentStart := true
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if c == '.' {
+			if segmentStart || i == len(name)-1 {
+				return false
+			}
+			segmentStart = true
+			continue
+		}
+		if segmentStart {
+			if !asciiAlpha(c) {
+				return false
+			}
+			segmentStart = false
+			continue
+		}
+		if !asciiAlpha(c) && (c < '0' || c > '9') && c != '_' {
+			return false
+		}
+	}
 	return true
+}
+
+func validDateLiteral(value string) bool {
+	if value == "" {
+		return false
+	}
+	colonSeen := false
+	digitSeen := false
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if c == ':' {
+			if colonSeen || i == 0 || i == len(value)-1 {
+				return false
+			}
+			colonSeen = true
+			continue
+		}
+		if colonSeen {
+			if c < '0' || c > '9' {
+				return false
+			}
+			digitSeen = true
+			continue
+		}
+		if !asciiAlpha(c) && c != '_' {
+			return false
+		}
+	}
+	return !colonSeen || digitSeen
+}
+
+func asciiAlpha(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }

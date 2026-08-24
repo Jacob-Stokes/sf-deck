@@ -1,15 +1,23 @@
 package ui
 
 import (
+	"errors"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
 	"github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout"
 )
 
-func sectionTitle(s string) string              { return uilayout.SectionTitle(s) }
-func kvLine(k, v string, width int) string      { return uilayout.KvLine(k, v, width) }
-func dimLine(s string, width int) string        { return uilayout.DimLine(s, width) }
-func redLine(s string) string                   { return uilayout.RedLine(s) }
-func stateSuffix(busy bool, err error) string   { return uilayout.StateSuffix(busy, err) }
+func sectionTitle(s string) string         { return uilayout.SectionTitle(s) }
+func kvLine(k, v string, width int) string { return uilayout.KvLine(k, v, width) }
+func dimLine(s string, width int) string   { return uilayout.DimLine(s, width) }
+func redLine(s string) string              { return uilayout.RedLine(redact.String(s)) }
+func stateSuffix(busy bool, err error) string {
+	if err != nil {
+		err = errors.New(redact.String(err.Error()))
+	}
+	return uilayout.StateSuffix(busy, err)
+}
 func searchBar(s searchState, width int) string { return uilayout.SearchBar(s, width) }
 func headerWithSearchPill(title string, s searchState) string {
 	return uilayout.HeaderWithSearchPill(title, s)

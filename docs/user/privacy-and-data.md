@@ -8,6 +8,16 @@ Salesforce record payloads stay in process memory and are not written to the
 persistent cache. That includes record lists and details, SOQL/report rows,
 list-view results, and related-record lookups.
 
+Some user-invoked or diagnostic features intentionally write other
+Salesforce-derived content locally. Anonymous Apex history can include the
+submitted code, errors, and captured debug-log body. Saved comparisons contain
+metadata snapshots. Failed exports can create private response dumps, and
+diagnostic traces enabled through environment variables can record request
+paths, aliases, errors, and UI structure. These files are local and are not
+sent to the maintainer. sf-deck centrally removes the active Salesforce access
+tokens and recognised credential formats before writing diagnostics. The files
+can still contain metadata names and user-authored text, so keep them private.
+
 Metadata/schema caches and user-authored working state can be stored locally
 under `~/.sf-deck/`. Saved SOQL text and history are local; the rows returned by
 those queries are not persisted.

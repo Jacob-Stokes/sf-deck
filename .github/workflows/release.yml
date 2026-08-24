@@ -9,33 +9,78 @@ on:
 permissions: {}
 
 jobs:
-  tap-smoke-test:
+  release-credentials-smoke-test:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Verify Homebrew tap access
+      - name: Verify release credentials
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
+          if [ -z "$HOMEBREW_TAP_GITHUB_TOKEN" ]; then
             echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured"
             exit 1
           fi
+
+          apple_configured=0
+          for name in \
+            MACOS_SIGN_P12 \
+            MACOS_SIGN_PASSWORD \
+            MACOS_NOTARY_KEY \
+            MACOS_NOTARY_KEY_ID \
+            MACOS_NOTARY_ISSUER_ID
+          do
+            if [ -n "${!name}" ]; then apple_configured=1; fi
+          done
+          if [ "$apple_configured" -eq 1 ]; then
+            for name in \
+              MACOS_SIGN_P12 \
+              MACOS_SIGN_PASSWORD \
+              MACOS_NOTARY_KEY \
+              MACOS_NOTARY_KEY_ID \
+              MACOS_NOTARY_ISSUER_ID
+            do
+              if [ -z "${!name}" ]; then
+                echo "::error::$name is missing from the partial Apple configuration"
+                exit 1
+              fi
+            done
+            credential_dir="$RUNNER_TEMP/sf-deck-release-credentials"
+            mkdir -m 700 "$credential_dir"
+            printf '%s' "$MACOS_SIGN_P12" | base64 --decode >"$credential_dir/certificate.p12"
+            printf '%s' "$MACOS_NOTARY_KEY" | base64 --decode >"$credential_dir/notary.p8"
+            chmod 600 "$credential_dir/certificate.p12" "$credential_dir/notary.p8"
+            openssl pkcs12 -in "$credential_dir/certificate.p12" \
+              -passin env:MACOS_SIGN_PASSWORD -noout
+            openssl pkey -in "$credential_dir/notary.p8" -noout
+            echo "Apple signing and notarisation credentials parse successfully."
+          else
+            echo "Apple signing is not configured; releases will remain unsigned for now."
+          fi
+
           # Creating an unreachable Git blob exercises the exact Contents write
           # permission GoReleaser needs without changing a branch or file.
+          export GH_TOKEN="$HOMEBREW_TAP_GITHUB_TOKEN"
           gh api \
             --method POST \
             repos/Jacob-Stokes/homebrew-tap/git/blobs \
             -f content="sf-deck Homebrew tap token smoke test" \
             -f encoding="utf-8" \
             >/dev/null
-          echo "Homebrew tap token has write access."
+          echo "The Homebrew tap token has write access."
 
   goreleaser:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,9 +95,33 @@ jobs:
       - name: Check release prerequisites
         env:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
         run: |
           if [ -z "$HOMEBREW_TAP_GITHUB_TOKEN" ]; then
             echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured"
+            exit 1
+          fi
+          apple_present=0
+          apple_missing=0
+          for name in \
+            MACOS_SIGN_P12 \
+            MACOS_SIGN_PASSWORD \
+            MACOS_NOTARY_KEY \
+            MACOS_NOTARY_KEY_ID \
+            MACOS_NOTARY_ISSUER_ID
+          do
+            if [ -n "${!name}" ]; then
+              apple_present=$((apple_present + 1))
+            else
+              apple_missing=$((apple_missing + 1))
+            fi
+          done
+          if [ "$apple_present" -ne 0 ] && [ "$apple_missing" -ne 0 ]; then
+            echo "::error::Apple signing must be configured with all five secrets or none"
             exit 1
           fi
           release_notes=".github/release-notes/${GITHUB_REF_NAME}.md"
@@ -69,6 +138,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+      - name: Attest release artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/checksums.txt
       - name: Publish and verify release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -4,7 +4,11 @@
 // write/subscribe verbs that drive the running TUI.
 package control
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
+)
 
 // Request is the inbound envelope. One per line, terminated by \n.
 //
@@ -57,7 +61,9 @@ func success(req Request, data any) Response {
 
 func fail(req Request, code, message string, details map[string]any) Response {
 	return Response{
-		ID: req.ID, OK: false, Command: req.Command,
-		Error: &ResponseError{Code: code, Message: message, Details: details},
+		ID: redact.String(req.ID), OK: false, Command: redact.String(req.Command),
+		Error: &ResponseError{
+			Code: redact.String(code), Message: redact.String(message), Details: redact.Map(details),
+		},
 	}
 }

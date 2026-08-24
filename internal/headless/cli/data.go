@@ -65,11 +65,14 @@ func dataInspect(rest []string, stdout io.Writer, mode headless.WriteMode) int {
 			location(appDir, "settings, metadata cache, histories, logs, and local working state"),
 			location(bundlesDir, "default user-created SFDX bundle directory"),
 		},
-		"record_payloads_persisted": false,
-		"note":                      "Exports and bundles created at custom paths remain at those user-selected paths.",
+		"record_query_results_cached":         false,
+		"diagnostic_payloads_may_persist":     true,
+		"diagnostic_payloads_description":     "Apex execution history can include submitted code and debug-log bodies. Error-response dumps and explicitly enabled diagnostic traces can also be stored locally.",
+		"custom_exports_require_manual_erase": true,
+		"note":                                "Normal record and query results are not cached. Exports and bundles created at custom paths remain at those user-selected paths.",
 	}
 	if mode == headless.TextMode {
-		fmt.Fprintf(stdout, "app data: %s\nbundles:  %s\nrecord payloads persisted: no\n",
+		fmt.Fprintf(stdout, "app data: %s\nbundles:  %s\nrecord/query result cache: disabled\ndiagnostic payloads: may be stored locally by Apex history, error dumps, or explicitly enabled traces\n",
 			appDir, bundlesDir)
 		return headless.ExitOK
 	}

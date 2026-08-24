@@ -70,7 +70,7 @@ func (m *Model) openAboutModal() tea.Cmd {
 		{Body: "sf-deck is not affiliated with, endorsed by, or sponsored by Salesforce."},
 		{},
 		{Body: "No hosted backend, telemetry, or analytics. The developer does not receive Salesforce org data."},
-		{Body: "Salesforce record payloads stay in memory and are not written to the persistent cache."},
+		{Body: "Normal record and query results stay in memory and are not written to the persistent cache. User-created histories, exports, and diagnostics remain local."},
 		{Body: "Update checks are anonymous, cached, optional, and never install software."},
 	}
 	if m.updateResult.UpdateAvailable {

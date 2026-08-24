@@ -14,6 +14,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 // maxResponseBytes caps how much of an org HTTP response body we
@@ -218,9 +220,15 @@ func (c *Client) bootstrap() error {
 		}
 		accessToken = token
 	}
+	redact.RegisterSecret(accessToken)
+	httpc, err := authenticatedHTTPClient(c.http, parsed.Result.InstanceURL)
+	if err != nil {
+		return fmt.Errorf("reject Salesforce instance URL: %w", err)
+	}
 	c.mu.Lock()
 	c.accessToken = accessToken
 	c.instanceURL = parsed.Result.InstanceURL
+	c.http = httpc
 	// A user-forced API version (settings [ui.api] api_version) wins;
 	// otherwise use what the org reported; otherwise the package default.
 	if forced := cfgAPIVersion(); forced != "" {
@@ -328,6 +336,7 @@ func (c *Client) doOnceWithAccept(path string, query url.Values, accept string, 
 	c.mu.Lock()
 	token := c.accessToken
 	base := c.instanceURL
+	httpc := c.http
 	c.mu.Unlock()
 
 	u := strings.TrimRight(base, "/") + path
@@ -354,9 +363,8 @@ func (c *Client) doOnceWithAccept(path string, query url.Values, accept string, 
 	startedAt := time.Now()
 	defer func() { fireOnCall(c.alias, []string{"GET", logPath}, err, time.Since(startedAt)) }()
 
-	httpc := c.http
-	if timeout > 0 && (c.http.Timeout == 0 || timeout > c.http.Timeout) {
-		httpc = &http.Client{Timeout: timeout, Transport: c.http.Transport}
+	if timeout > 0 && (httpc.Timeout == 0 || timeout > httpc.Timeout) {
+		httpc = clientWithTimeout(httpc, timeout)
 	}
 	resp, err := httpc.Do(req)
 	if err != nil {
@@ -405,6 +413,7 @@ func (c *Client) doOnceMultipart(path, contentType string, body []byte) (out []b
 	c.mu.Lock()
 	token := c.accessToken
 	base := c.instanceURL
+	httpc := c.http
 	c.mu.Unlock()
 
 	u := strings.TrimRight(base, "/") + path
@@ -420,7 +429,7 @@ func (c *Client) doOnceMultipart(path, contentType string, body []byte) (out []b
 	mpStart := time.Now()
 	defer func() { fireOnCall(c.alias, []string{"POST", path}, err, time.Since(mpStart)) }()
 
-	resp, err := c.http.Do(req)
+	resp, err := httpc.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -487,6 +496,7 @@ func (c *Client) doOnceCtx(ctx context.Context, method, path string, query url.V
 	c.mu.Lock()
 	token := c.accessToken
 	base := c.instanceURL
+	httpc := c.http
 	c.mu.Unlock()
 
 	u := strings.TrimRight(base, "/") + path
@@ -515,7 +525,7 @@ func (c *Client) doOnceCtx(ctx context.Context, method, path string, query url.V
 	doStart := time.Now()
 	defer func() { fireOnCall(c.alias, []string{method, logPath}, err, time.Since(doStart)) }()
 
-	resp, err := c.http.Do(req)
+	resp, err := httpc.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -597,11 +607,11 @@ func (e *sfHTTPError) Error() string {
 	}
 	if err := json.Unmarshal(e.Body, &arr); err == nil && len(arr) > 0 {
 		if arr[0].ErrorCode != "" {
-			return fmt.Sprintf("%s: %s", arr[0].ErrorCode, arr[0].Message)
+			return redact.String(fmt.Sprintf("%s: %s", arr[0].ErrorCode, arr[0].Message))
 		}
-		return arr[0].Message
+		return redact.String(arr[0].Message)
 	}
-	return fmt.Sprintf("HTTP %d: %s", e.Status, string(e.Body))
+	return redact.String(fmt.Sprintf("HTTP %d: %s", e.Status, string(e.Body)))
 }
 
 func isSessionExpired(err error) bool {

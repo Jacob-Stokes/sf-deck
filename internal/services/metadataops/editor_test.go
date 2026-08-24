@@ -38,7 +38,7 @@ func editorAt(level settings.SafetyLevel, remote EditorRemote) *EditorService {
 func TestEditorWritesRequireMetadataBeforeRemote(t *testing.T) {
 	remote := &fakeEditorRemote{}
 	service := editorAt(settings.SafetyRecords, remote)
-	_, err := service.UpdateTrigger(context.Background(), TriggerUpdateInput{ID: "01q", Patch: map[string]any{"status": "Active"}})
+	_, err := service.UpdateTrigger(context.Background(), TriggerUpdateInput{ID: "01q000000000001", Patch: map[string]any{"status": "Active"}})
 	var blocked orgwrite.BlockedError
 	if !errors.As(err, &blocked) || len(remote.calls) != 0 {
 		t.Fatalf("trigger err=%#v calls=%v", err, remote.calls)
@@ -53,7 +53,7 @@ func TestEditorWritesRequireMetadataBeforeRemote(t *testing.T) {
 func TestEditorWritesUseResolvedTarget(t *testing.T) {
 	remote := &fakeEditorRemote{}
 	service := editorAt(settings.SafetyMetadata, remote)
-	if _, err := service.UpdateTrigger(context.Background(), TriggerUpdateInput{ID: "01q", Patch: map[string]any{"body": "trigger X"}}); err != nil || remote.target != "resolved" {
+	if _, err := service.UpdateTrigger(context.Background(), TriggerUpdateInput{ID: "01q000000000001", Patch: map[string]any{"body": "trigger X"}}); err != nil || remote.target != "resolved" {
 		t.Fatalf("trigger err=%v remote=%#v", err, remote)
 	}
 	result, err := service.DeployObject(context.Background(), ObjectDeployInput{
@@ -68,7 +68,7 @@ func TestEditorInvalidAndMissingDependenciesFailClosed(t *testing.T) {
 	if _, err := editorAt(settings.SafetyMetadata, &fakeEditorRemote{}).UpdateTrigger(context.Background(), TriggerUpdateInput{}); err == nil {
 		t.Fatal("empty trigger update accepted")
 	}
-	valid := TriggerUpdateInput{ID: "01q", Patch: map[string]any{"status": "Active"}}
+	valid := TriggerUpdateInput{ID: "01q000000000001", Patch: map[string]any{"status": "Active"}}
 	for _, service := range []*EditorService{nil, NewEditorWithRemote(nil, &fakeEditorRemote{}), NewEditorWithRemote(
 		orgwrite.NewGate(func(string) (sf.Org, error) { return sf.Org{}, nil }, func(sf.Org) settings.SafetyLevel { return settings.SafetyMetadata }), nil)} {
 		if _, err := service.UpdateTrigger(context.Background(), valid); err == nil {

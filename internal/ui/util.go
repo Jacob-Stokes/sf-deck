@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 func (m *Model) flash(msg string) {
@@ -50,7 +52,7 @@ func (m Model) anyModalActive() bool {
 }
 
 func (m *Model) flashFor(msg string, d time.Duration) {
-	m.banner = msg
+	m.banner = redact.String(msg)
 	m.bannerUntil = time.Now().Add(d)
 }
 
@@ -85,7 +87,7 @@ func resourceFetchErrorMsg(key string, err error) string {
 	if i := strings.IndexByte(key, ':'); i >= 0 {
 		label = key[:i]
 	}
-	msg := err.Error()
+	msg := redact.String(err.Error())
 	const maxLen = 140
 	if len(msg) > maxLen {
 		msg = ansi.Truncate(msg, maxLen, "…")

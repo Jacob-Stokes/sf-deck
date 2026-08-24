@@ -630,7 +630,12 @@ func (s *Server) Listen(ctx context.Context) (instance.Entry, error) {
 	// Lock down to 0600 so other users can't reach the socket. The
 	// kernel already enforces directory perms via ~/.sf-deck/, but
 	// belt and braces.
-	_ = os.Chmod(socketPath, 0o600)
+	if err := os.Chmod(socketPath, 0o600); err != nil {
+		_ = lst.Close()
+		_ = os.Remove(socketPath)
+		_ = instance.Release(pid)
+		return instance.Entry{}, fmt.Errorf("secure control socket: %w", err)
+	}
 	entry, err := instance.Claim(pid, socketPath, s.Label)
 	if err != nil {
 		_ = lst.Close()

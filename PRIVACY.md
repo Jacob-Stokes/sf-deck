@@ -1,8 +1,8 @@
 # Privacy notice
 
-Effective: 23 July 2026
+Effective: 24 August 2026
 
-Policy version: 2026-07-23
+Policy version: 2026-08-24
 
 sf-deck is a free, open-source application maintained by Jacob Stokes. It runs
 on your computer. There is no sf-deck account, hosted application backend,
@@ -35,6 +35,17 @@ lists and details, SOQL and report result rows, list-view results, and related
 record lookups. They are held in process memory while needed and disappear when
 the process ends.
 
+This cache rule does not mean that every Salesforce-derived value is forbidden
+from all local files. Anonymous Apex execution history can include submitted
+code, errors, and captured debug-log bodies. Failed exports can preserve a raw
+server response in a private diagnostic dump. Diagnostic traces enabled through
+environment variables can record request paths, org aliases, errors, and UI
+structure. Before these diagnostics are written, sf-deck removes the active
+Salesforce access tokens and recognised credential formats. These files stay
+local and are never sent to the maintainer. Diagnostic content can still
+contain Salesforce-derived metadata and user-authored text, so treat it as
+private.
+
 ## Local data
 
 sf-deck stores working state on your computer under `~/.sf-deck/`. Depending on
@@ -43,9 +54,13 @@ the features you use, this can include:
 - settings, per-org safety levels, chips, and recently visited item references
 - authenticated-org catalogue details and metadata/schema caches
 - saved SOQL text and query history, but not returned query rows
-- saved anonymous Apex text and execution history
+- saved anonymous Apex text and execution history, including captured debug-log
+  bodies when log capture is used
 - dev projects, tags, bundle registrations, usage counters, and application
   logs
+- saved metadata comparisons, including the retrieved metadata snapshots used
+  to create them
+- private error-response dumps and explicitly enabled diagnostic traces
 - the cached result of the optional update check
 
 User-requested exports and SFDX bundles are written to paths you choose.
@@ -53,7 +68,9 @@ The default bundle path is `~/sf-deck-bundles/`. Custom paths cannot be
 discovered reliably by sf-deck after you choose them.
 
 Local application files are intended to be readable only by your operating
-system user. Anyone who can access your user account may be able to read them.
+system user. The usage database, logs, dumps, traces, and live-control socket
+are explicitly restricted to that user. Anyone who can access your user
+account may still be able to read them.
 
 ## Network requests
 

@@ -94,8 +94,8 @@ func (s *Service) SetFrozen(ctx context.Context, in Input, frozen bool) (Result,
 }
 
 func (s *Service) require(ctx context.Context, in Input) (orgwrite.Target, error) {
-	if strings.TrimSpace(in.UserID) == "" {
-		return orgwrite.Target{}, errors.New("user id is required")
+	if err := sf.ValidateSalesforceID(strings.TrimSpace(in.UserID)); err != nil {
+		return orgwrite.Target{}, errors.New("valid user id is required")
 	}
 	if err := ctx.Err(); err != nil {
 		return orgwrite.Target{}, err

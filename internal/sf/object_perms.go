@@ -66,6 +66,9 @@ func mapObjectPermission(r map[string]any) ObjectPermission {
 // When id is empty, POSTs a new row; otherwise PATCHes the existing one.
 // Returns the resulting row Id.
 func UpsertObjectPermission(target, id, parentID, sobject string, r, c2, e, d, va, ma bool) (string, error) {
+	if err := validatePermissionReference(parentID, id, sobject); err != nil {
+		return "", err
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return "", err
@@ -123,6 +126,9 @@ func UpsertObjectPermission(target, id, parentID, sobject string, r, c2, e, d, v
 // all six flags are being turned off — Salesforce prefers "no row"
 // over an all-false row.
 func DeleteObjectPermission(target, id string) error {
+	if err := ValidateSalesforceID(id); err != nil {
+		return fmt.Errorf("object permission id: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err

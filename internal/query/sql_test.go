@@ -125,6 +125,25 @@ func TestToSOQLEscaping(t *testing.T) {
 	}
 }
 
+func TestToSOQLRejectsInjectedIdentifiersAndDateLiterals(t *testing.T) {
+	if got := ToSOQL(Query{Columns: []string{"Id"}, Where: Cmp("Name OR Id", OpEq, "x")}, "Account"); got != "" {
+		t.Fatalf("injected field emitted as SOQL: %q", got)
+	}
+	if got := ToSOQL(Query{Columns: []string{"Id"}}, "Account WHERE Name != null"); got != "" {
+		t.Fatalf("injected FROM emitted as SOQL: %q", got)
+	}
+	if got := ToSOQLWhere(Cmp("CreatedDate", OpDateLiteral, "TODAY OR Name != null")); got != "" {
+		t.Fatalf("injected raw date emitted as SOQL: %q", got)
+	}
+	if got := ToSOQL(Query{Where: Cmp("Name", Op("unknown"), "x")}, "Account"); got != "" {
+		t.Fatalf("unknown operator broadened query: %q", got)
+	}
+	want := "CreatedDate = '2026-01-01T00:00:00Z OR Name != null'"
+	if got := ToSOQLWhere(Cmp("CreatedDate", OpEq, "2026-01-01T00:00:00Z OR Name != null")); got != want {
+		t.Fatalf("malformed date-like value was not quoted\nwant %q\ngot  %q", want, got)
+	}
+}
+
 // TestToSOQLFull builds full SELECT statements end-to-end.
 func TestToSOQLFull(t *testing.T) {
 	q := Query{

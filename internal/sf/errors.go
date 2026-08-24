@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 // ErrorKind classifies a Salesforce error by what the user can do
@@ -70,10 +72,10 @@ func (e *SFError) Error() string {
 		return "<nil sf error>"
 	}
 	if e.Code != "" {
-		return fmt.Sprintf("%s: %s", e.Code, e.Message)
+		return redact.String(fmt.Sprintf("%s: %s", e.Code, e.Message))
 	}
 	if e.Message != "" {
-		return e.Message
+		return redact.String(e.Message)
 	}
 	return fmt.Sprintf("HTTP %d", e.HTTPCode)
 }

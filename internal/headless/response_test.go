@@ -218,3 +218,16 @@ func TestJSONFieldNamesArePinned(t *testing.T) {
 		}
 	}
 }
+
+func TestFailRedactsSecretsFromErrorEnvelope(t *testing.T) {
+	secret := "00D000000000001!AQ0AQK9abcdefghijklmnopqrstuvwxyz012345"
+	r := Fail("record.update", "demo", ErrInternal, "Bearer "+secret,
+		map[string]any{"nested": map[string]any{"token": secret}})
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), secret) {
+		t.Fatalf("error envelope retained secret: %s", b)
+	}
+}

@@ -3,7 +3,10 @@ package usage
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 func TestRedactSOQL(t *testing.T) {
@@ -30,6 +33,28 @@ func TestRedactSOQL(t *testing.T) {
 		if got != c.want {
 			t.Errorf("redactSOQL(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+func TestAPITraceWriteRedactsRegisteredSecrets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "api-trace.jsonl")
+	file, err := openAPITraceFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "api-trace-runtime-secret-redaction-test"
+	redact.RegisterSecret(secret)
+	tracer := &apiTracer{file: file}
+	tracer.write(apiTraceRecord{Event: "api_call", Err: "Bearer " + secret})
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), secret) {
+		t.Fatalf("trace retained registered secret: %s", body)
 	}
 }
 

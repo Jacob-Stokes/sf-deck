@@ -90,6 +90,9 @@ func (s *Service) SetField(ctx context.Context, in FieldInput) (Result, error) {
 	if strings.TrimSpace(in.SObject) == "" || strings.TrimSpace(in.Field) == "" || strings.TrimSpace(in.ParentID) == "" {
 		return Result{}, errors.New("sobject, field, and permission parent id are required")
 	}
+	if err := validatePermissionInput(in.ParentID, in.ID, in.SObject, in.Field); err != nil {
+		return Result{}, err
+	}
 	target, err := s.require(ctx, in.Target)
 	if err != nil {
 		return Result{}, err
@@ -108,6 +111,9 @@ func (s *Service) SetField(ctx context.Context, in FieldInput) (Result, error) {
 func (s *Service) SetObject(ctx context.Context, in ObjectInput) (Result, error) {
 	if strings.TrimSpace(in.SObject) == "" || strings.TrimSpace(in.ParentID) == "" {
 		return Result{}, errors.New("sobject and permission parent id are required")
+	}
+	if err := validatePermissionInput(in.ParentID, in.ID, in.SObject); err != nil {
+		return Result{}, err
 	}
 	target, err := s.require(ctx, in.Target)
 	if err != nil {
@@ -133,12 +139,32 @@ func (s *Service) SetSystem(ctx context.Context, in SystemInput) (Result, error)
 	if !strings.HasPrefix(in.Field, "Permissions") || len(in.Field) == len("Permissions") {
 		return Result{}, errors.New("system permission field must start with Permissions")
 	}
+	if err := validatePermissionInput(in.ParentID, "", in.Field); err != nil {
+		return Result{}, err
+	}
 	target, err := s.require(ctx, in.Target)
 	if err != nil {
 		return Result{}, err
 	}
 	err = s.remote.SetSystem(target.CLIArg, in.ParentID, in.Field, in.Value)
 	return Result{Target: target, ID: in.ParentID}, err
+}
+
+func validatePermissionInput(parentID, id string, identifiers ...string) error {
+	if err := sf.ValidateSalesforceID(strings.TrimSpace(parentID)); err != nil {
+		return errors.New("valid permission parent id is required")
+	}
+	if strings.TrimSpace(id) != "" {
+		if err := sf.ValidateSalesforceID(strings.TrimSpace(id)); err != nil {
+			return errors.New("valid permission record id is required")
+		}
+	}
+	for _, identifier := range identifiers {
+		if err := sf.ValidateSOQLIdentifier(strings.TrimSpace(identifier)); err != nil {
+			return errors.New("valid permission API names are required")
+		}
+	}
+	return nil
 }
 
 func (s *Service) require(ctx context.Context, target string) (orgwrite.Target, error) {

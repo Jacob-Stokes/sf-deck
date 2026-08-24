@@ -4,10 +4,13 @@
 package headless
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 // Response is the standard envelope every headless command renders.
@@ -148,25 +151,33 @@ func (r *Response) Write(w io.Writer, mode WriteMode) error {
 	}
 	switch mode {
 	case JSONMode:
-		enc := json.NewEncoder(w)
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
 		enc.SetIndent("", "  ")
-		return enc.Encode(r)
+		if err := enc.Encode(r); err != nil {
+			return err
+		}
+		_, err := w.Write(redact.Bytes(buf.Bytes()))
+		return err
 	case TextMode:
+		var line string
 		if r.OK {
 			if r.Changed {
-				fmt.Fprintf(w, "ok · %s · changed\n", r.Command)
+				line = fmt.Sprintf("ok · %s · changed\n", r.Command)
 			} else {
-				fmt.Fprintf(w, "ok · %s\n", r.Command)
+				line = fmt.Sprintf("ok · %s\n", r.Command)
 			}
-			return nil
+			_, err := io.WriteString(w, redact.String(line))
+			return err
 		}
 		if r.Error != nil {
-			fmt.Fprintf(w, "error · %s · %s · %s\n",
+			line = fmt.Sprintf("error · %s · %s · %s\n",
 				r.Command, r.Error.Code, r.Error.Message)
 		} else {
-			fmt.Fprintf(w, "error · %s\n", r.Command)
+			line = fmt.Sprintf("error · %s\n", r.Command)
 		}
-		return nil
+		_, err := io.WriteString(w, redact.String(line))
+		return err
 	}
 	return fmt.Errorf("unknown write mode: %d", mode)
 }
@@ -187,12 +198,12 @@ func Success(command, org, target string, changed bool, data any) *Response {
 func Fail(command, org string, code, message string, details map[string]any) *Response {
 	return &Response{
 		OK:      false,
-		Command: command,
-		Org:     org,
+		Command: redact.String(command),
+		Org:     redact.String(org),
 		Error: &Error{
-			Code:    code,
-			Message: message,
-			Details: details,
+			Code:    redact.String(code),
+			Message: redact.String(message),
+			Details: redact.Map(details),
 		},
 	}
 }

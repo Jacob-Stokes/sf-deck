@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 	"github.com/Jacob-Stokes/sf-deck/internal/theme"
 )
 
@@ -640,7 +641,7 @@ func sideDim(s string, width int) string {
 }
 
 func sideEmpty(s string) string {
-	return lipgloss.NewStyle().Foreground(theme.Muted).Italic(true).Render("  " + s)
+	return lipgloss.NewStyle().Foreground(theme.Muted).Italic(true).Render("  " + redact.String(s))
 }
 
 type actionRow struct {

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 const (
@@ -67,7 +69,10 @@ func openAPITraceFile(path string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = file.Chmod(0o600)
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return nil, err
+	}
 	return file, nil
 }
 
@@ -98,7 +103,7 @@ func (t *apiTracer) write(rec apiTraceRecord) {
 	if err != nil {
 		return
 	}
-	b = append(b, '\n')
+	b = append(redact.Bytes(b), '\n')
 	_, _ = t.file.Write(b)
 }
 
@@ -113,7 +118,7 @@ func (t *apiTracer) writeRaw(m map[string]any) {
 	if err != nil {
 		return
 	}
-	b = append(b, '\n')
+	b = append(redact.Bytes(b), '\n')
 	_, _ = t.file.Write(b)
 }
 

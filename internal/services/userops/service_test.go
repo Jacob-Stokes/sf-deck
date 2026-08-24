@@ -16,6 +16,8 @@ type fakeRemote struct {
 	url    string
 }
 
+const testUserID = "005000000000001"
+
 func (f *fakeRemote) ResetPassword(target, userID string) error {
 	f.calls, f.target = append(f.calls, "reset"), target
 	return nil
@@ -46,19 +48,19 @@ func TestEveryOperationRequiresFullBeforeRemote(t *testing.T) {
 		run  func(*Service) error
 	}{
 		{"reset", func(s *Service) error {
-			_, err := s.ResetPassword(context.Background(), Input{UserID: "005"})
+			_, err := s.ResetPassword(context.Background(), Input{UserID: testUserID})
 			return err
 		}},
 		{"link", func(s *Service) error {
-			_, err := s.GenerateResetLink(context.Background(), Input{UserID: "005"})
+			_, err := s.GenerateResetLink(context.Background(), Input{UserID: testUserID})
 			return err
 		}},
 		{"active", func(s *Service) error {
-			_, err := s.SetActive(context.Background(), Input{UserID: "005"}, true)
+			_, err := s.SetActive(context.Background(), Input{UserID: testUserID}, true)
 			return err
 		}},
 		{"frozen", func(s *Service) error {
-			_, err := s.SetFrozen(context.Background(), Input{UserID: "005"}, true)
+			_, err := s.SetFrozen(context.Background(), Input{UserID: testUserID}, true)
 			return err
 		}},
 	}
@@ -80,17 +82,17 @@ func TestEveryOperationRequiresFullBeforeRemote(t *testing.T) {
 func TestOperationsUseResolvedTarget(t *testing.T) {
 	remote := &fakeRemote{url: "https://example.test/reset"}
 	service := serviceAt(settings.SafetyFull, remote)
-	if _, err := service.ResetPassword(context.Background(), Input{Target: "input", UserID: "005"}); err != nil || remote.target != "resolved" {
+	if _, err := service.ResetPassword(context.Background(), Input{Target: "input", UserID: testUserID}); err != nil || remote.target != "resolved" {
 		t.Fatalf("reset err=%v remote=%#v", err, remote)
 	}
-	result, err := service.GenerateResetLink(context.Background(), Input{Target: "input", UserID: "005"})
+	result, err := service.GenerateResetLink(context.Background(), Input{Target: "input", UserID: testUserID})
 	if err != nil || result.URL != remote.url || result.Target.Username != "admin@example.com" {
 		t.Fatalf("link result=%#v err=%v", result, err)
 	}
-	if _, err := service.SetActive(context.Background(), Input{UserID: "005"}, false); err != nil {
+	if _, err := service.SetActive(context.Background(), Input{UserID: testUserID}, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.SetFrozen(context.Background(), Input{UserID: "005"}, true); err != nil {
+	if _, err := service.SetFrozen(context.Background(), Input{UserID: testUserID}, true); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -99,7 +101,7 @@ func TestInvalidAndMissingDependenciesFailClosed(t *testing.T) {
 	if _, err := serviceAt(settings.SafetyFull, &fakeRemote{}).ResetPassword(context.Background(), Input{}); err == nil {
 		t.Fatal("empty user id accepted")
 	}
-	valid := Input{UserID: "005"}
+	valid := Input{UserID: testUserID}
 	for _, service := range []*Service{nil, NewWithRemote(nil, &fakeRemote{}), NewWithRemote(
 		orgwrite.NewGate(func(string) (sf.Org, error) { return sf.Org{}, nil }, func(sf.Org) settings.SafetyLevel { return settings.SafetyFull }), nil)} {
 		if _, err := service.ResetPassword(context.Background(), valid); err == nil {

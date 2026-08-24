@@ -2,12 +2,14 @@ package usage
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 	_ "modernc.org/sqlite"
 )
 
@@ -111,6 +113,10 @@ func openAt(path string) (*Tracker, error) {
 	if err := migrate(db); err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("secure usage database: %w", err)
 	}
 	return &Tracker{db: db, path: path}, nil
 }
@@ -238,15 +244,15 @@ func (t *Tracker) Bump(alias string, args []string, callErr error, dur time.Dura
 
 	entry := Call{
 		At:      time.Now(),
-		Alias:   alias,
+		Alias:   redact.String(alias),
 		Command: cmd,
-		Args:    append([]string(nil), args...),
+		Args:    redact.Strings(args),
 		OK:      callErr == nil,
 		Caller:  caller,
 		Dur:     dur,
 	}
 	if callErr != nil {
-		entry.Err = callErr.Error()
+		entry.Err = redact.String(callErr.Error())
 	}
 	t.recent = append(t.recent, entry)
 	if len(t.recent) > recentBufferSize {

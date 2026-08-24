@@ -62,8 +62,11 @@ type ObjectDeployResult struct {
 }
 
 func (s *EditorService) UpdateTrigger(ctx context.Context, in TriggerUpdateInput) (orgwrite.Target, error) {
-	if strings.TrimSpace(in.ID) == "" || len(in.Patch) == 0 {
-		return orgwrite.Target{}, errors.New("trigger id and patch are required")
+	if err := sf.ValidateSalesforceID(strings.TrimSpace(in.ID)); err != nil {
+		return orgwrite.Target{}, errors.New("valid trigger id is required")
+	}
+	if len(in.Patch) == 0 {
+		return orgwrite.Target{}, errors.New("trigger patch is required")
 	}
 	target, err := s.require(ctx, in.Target)
 	if err != nil {
@@ -73,7 +76,7 @@ func (s *EditorService) UpdateTrigger(ctx context.Context, in TriggerUpdateInput
 }
 
 func (s *EditorService) DeployObject(ctx context.Context, in ObjectDeployInput) (ObjectDeployResult, error) {
-	if strings.TrimSpace(in.APIName) == "" || !in.Patch.HasChanges() {
+	if sf.ValidateSOQLIdentifier(strings.TrimSpace(in.APIName)) != nil || !in.Patch.HasChanges() {
 		return ObjectDeployResult{}, errors.New("custom object api name and patch are required")
 	}
 	target, err := s.require(ctx, in.Target)

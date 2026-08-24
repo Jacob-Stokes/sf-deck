@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 // Level is the severity tag stamped on each line.
@@ -162,7 +164,7 @@ func Log(level Level, event string, fields map[string]any) {
 		}
 	}
 	sb.WriteByte('\n')
-	_, _ = file.WriteString(sb.String())
+	_, _ = file.WriteString(redact.String(sb.String()))
 }
 
 // Info / Warn / Error are convenience wrappers over Log.
@@ -197,7 +199,7 @@ func Dump(tags []string, ext string, body []byte) string {
 	ts := time.Now().Format("20060102-150405.000")
 	name := fmt.Sprintf("%s-%s.%s", ts, label, ext)
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, body, 0o600); err != nil {
+	if err := os.WriteFile(path, redact.Bytes(body), 0o600); err != nil {
 		return ""
 	}
 	Info("dump", map[string]any{"path": path, "bytes": len(body), "tags": tags})

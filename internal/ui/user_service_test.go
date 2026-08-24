@@ -32,7 +32,7 @@ func TestUserSetActiveCmdUsesInjectedService(t *testing.T) {
 		return sf.Org{Alias: "resolved", Username: "admin@example.com"}, nil
 	}, func(sf.Org) settings.SafetyLevel { return settings.SafetyFull })
 	m := Model{modelServices: modelServices{users: userops.NewWithRemote(gate, remote)}}
-	msg, ok := userSetActiveCmd(&m, "input", "005-user", true)().(userActionDoneMsg)
+	msg, ok := userSetActiveCmd(&m, "input", "005000000000001", true)().(userActionDoneMsg)
 	if !ok || msg.Err != nil || msg.Action != "activate" {
 		t.Fatalf("message=%#v", msg)
 	}

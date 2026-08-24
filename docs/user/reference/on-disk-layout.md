@@ -6,12 +6,14 @@ sf-deck stores its own settings and state under `~/.sf-deck/`.
 ~/.sf-deck/
 ├── settings.toml             chips, theme, per-org safety overrides
 ├── cache.db                  local read-cache (SQLite)
-├── devprojects.db            dev projects, items, bundles, tags, ...
+├── usage.db                  aggregate API-call counters (SQLite)
+├── devprojects.db            projects, tags, histories, saved comparisons, ...
 ├── keybindings.toml          optional user keymap overrides
 ├── update-state.json         cached stable-release check
 ├── instances.json            running-instance registry
 ├── control-<N>.sock          per-instance IPC socket (when --control is on)
-└── logs/                     app log (gitignored by default)
+├── deploy.log                optional metadata-deploy diagnostics
+└── log/                      private session logs, dumps, and optional traces
 ```
 
 ## settings.toml
@@ -71,8 +73,20 @@ SQLite. Holds the modern feature set:
 - **`saved_apex`** — your apex snippet library
 - **`soql_history`** — every SOQL run (both TUI and CLI)
 - **`apex_history`** — every anonymous Apex execution
+- **`saved_comparisons`** — saved comparison definitions and compressed
+  metadata snapshots
+
+`apex_history` includes submitted Apex, status and error details, and the full
+debug-log body when log capture is enabled for that execution.
 
 Schema migrations are applied automatically on `Store.Open`.
+
+## usage.db
+
+SQLite. Holds daily aggregate API-call counts by org alias, command bucket, and
+success status. It does not store request or response bodies, Salesforce access
+tokens, SOQL text, or record rows. The file is forced to owner-only (`0600`)
+permissions whenever it is opened.
 
 ## keybindings.toml
 
@@ -124,6 +138,26 @@ Disable automatic checks in **Settings → Updates** or with
 `SF_DECK_NO_UPDATE_CHECK=1`. An explicit `sf-deck update check --force` bypasses
 the cache but still never downloads or installs anything.
 
+## Logs, dumps, and diagnostic traces
+
+Session logs live under `~/.sf-deck/log/`. Failed report or browser-session
+exports can also preserve a raw Salesforce response under
+`~/.sf-deck/log/dumps/` so the failure can be inspected. Dumps are private
+files and are pruned automatically, but may contain Salesforce-derived values
+from the failed response.
+
+Diagnostic environment variables such as `SF_DECK_API_TRACE`,
+`SF_DECK_RENDER_TRACE`, and `SFDECK_DEBUG_DEPLOY` create additional private
+files. They are off by default. API traces redact SOQL text but can contain org
+aliases, request paths, and errors. Render traces contain layout and timing
+information rather than rendered screen text. `deploy.log` can contain
+metadata names, deployment IDs, response details, and errors.
+
+The diagnostic output boundary removes active Salesforce access tokens and
+recognised credential formats before writing. This is defence in depth, not a
+reason to publish diagnostic files: metadata names, aliases, errors, and
+user-authored values may still be sensitive.
+
 ## Bundle directories
 
 By default sf-deck writes bundles into
@@ -140,9 +174,10 @@ link`.
 - Salesforce session tokens — those stay in the `sf` CLI's keychain
   / `~/.sfdx/`. sf-deck reuses the `sf` session.
 - Org credentials — same.
-- Salesforce record payloads in its persistent cache. Metadata/schema and
-  catalogue data may be cached; saved query text/history is stored separately,
-  but returned query rows are not.
+- Normal Salesforce record and query-result payloads in its persistent cache.
+  Metadata/schema and catalogue data may be cached, and the histories,
+  comparisons, exports, dumps, and explicitly enabled diagnostics described
+  above are stored separately.
 
 ## Inspect and erase
 

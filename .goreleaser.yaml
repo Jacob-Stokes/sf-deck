@@ -28,6 +28,25 @@ builds:
       - -X main.commit={{ .Commit }}
       - -X main.date={{ .Date }}
 
+# GoReleaser signs and notarises the raw macOS executables before they enter
+# the archives, so the cask and direct downloads contain the same verified
+# binaries. This cross-platform path is designed for command-line binaries and
+# can run on the Linux release runner.
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      ids:
+        - sf-deck
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        timeout: 20m
+
 archives:
   - id: tarball
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -123,6 +142,8 @@ homebrew_casks:
     directory: Casks
     homepage: "https://github.com/Jacob-Stokes/sf-deck"
     description: "Keyboard-first Salesforce workspace across multiple orgs"
+    # Temporary compatibility path while releases are not Apple-notarised.
+    # Remove this hook once the optional Apple credentials are configured.
     hooks:
       post:
         install: |

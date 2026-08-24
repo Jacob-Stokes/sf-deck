@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
 )
 
 func TestLogAndDumpFilesArePrivate(t *testing.T) {
@@ -28,8 +31,18 @@ func TestLogAndDumpFilesArePrivate(t *testing.T) {
 	if got := info.Mode().Perm(); got != 0o600 {
 		t.Fatalf("log mode = %o, want 600", got)
 	}
+	secret := "applog-runtime-secret-redaction-test"
+	redact.RegisterSecret(secret)
+	Info("redaction_test", map[string]any{"error": "Bearer " + secret})
+	logBody, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read log: %v", err)
+	}
+	if strings.Contains(string(logBody), secret) {
+		t.Fatalf("log retained registered secret: %s", logBody)
+	}
 
-	dump := Dump([]string{"frontdoor", "test"}, "html", []byte("<html>secret</html>"))
+	dump := Dump([]string{"frontdoor", "test"}, "html", []byte("<html>"+secret+"</html>"))
 	if dump == "" {
 		t.Fatal("Dump returned empty path")
 	}
@@ -42,6 +55,13 @@ func TestLogAndDumpFilesArePrivate(t *testing.T) {
 	}
 	if got := info.Mode().Perm(); got != 0o600 {
 		t.Fatalf("dump mode = %o, want 600", got)
+	}
+	dumpBody, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("read dump: %v", err)
+	}
+	if strings.Contains(string(dumpBody), secret) {
+		t.Fatalf("dump retained registered secret: %s", dumpBody)
 	}
 }
 

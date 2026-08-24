@@ -322,24 +322,17 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 		msg.Format == exporters.FormatSfdxProjectRetrieve
 
 	manifestPath := filepath.Join(msg.Path, "package.xml")
-	mf, err := os.Create(manifestPath)
-	if err != nil {
-		m.exports.markFailed(job.ID, err)
-		m.flash("export: " + err.Error())
-		return nil
-	}
-	result, err := dpexport.WritePackageXML(mf, items, dpexport.PackageXMLOptions{
-		APIVersion: sf.APIVersionForAlias(orgFilter),
+	var result dpexport.PackageXMLResult
+	err := securefile.Write(manifestPath, true, func(w io.Writer) error {
+		var writeErr error
+		result, writeErr = dpexport.WritePackageXML(w, items, dpexport.PackageXMLOptions{
+			APIVersion: sf.APIVersionForAlias(orgFilter),
+		})
+		return writeErr
 	})
-	closeErr := mf.Close()
 	if err != nil {
 		m.exports.markFailed(job.ID, err)
 		m.flash("export: " + err.Error())
-		return nil
-	}
-	if closeErr != nil {
-		m.exports.markFailed(job.ID, closeErr)
-		m.flash("export: " + closeErr.Error())
 		return nil
 	}
 	if result.IncludedCount == 0 {
@@ -351,7 +344,7 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 	if fullProject {
 		projectJSON := dpexport.SfdxProjectJSON(msg.DevName, sf.APIVersionForAlias(orgFilter))
 		jsonPath := filepath.Join(msg.Path, "sfdx-project.json")
-		if err := os.WriteFile(jsonPath, []byte(projectJSON), 0o644); err != nil {
+		if err := securefile.WriteFile(jsonPath, []byte(projectJSON), true); err != nil {
 			m.exports.markFailed(job.ID, err)
 			m.flash("export: " + err.Error())
 			return nil
@@ -378,7 +371,7 @@ func (m *Model) exportProjectBundle(msg exportProjectPathPickedMsg, items []devp
 	}
 
 	readmePath := filepath.Join(msg.Path, "README.md")
-	if err := os.WriteFile(readmePath, []byte(dpexport.SuggestedReadme(msg.DevName, orgFilter, result, fullProject)), 0o644); err != nil {
+	if err := securefile.WriteFile(readmePath, []byte(dpexport.SuggestedReadme(msg.DevName, orgFilter, result, fullProject)), true); err != nil {
 		m.exports.markFailed(job.ID, err)
 		m.flash("export: " + err.Error())
 		return nil

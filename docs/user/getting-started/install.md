@@ -100,8 +100,9 @@ these directly, but it's good to know they exist:
 | Path | What |
 |---|---|
 | `~/.sf-deck/settings.toml` | chips, theme, per-org safety overrides |
-| `~/.sf-deck/cache.db` | local read-cache: org list, describes, list results |
-| `~/.sf-deck/devprojects.db` | dev projects, items, bundles, tags, saved queries, snippets |
+| `~/.sf-deck/cache.db` | org catalogue and metadata/schema cache |
+| `~/.sf-deck/devprojects.db` | projects, tags, saved queries/Apex, histories, and saved comparisons |
+| `~/.sf-deck/log/` | private session logs, error dumps, and any explicitly enabled traces |
 | `~/.sf-deck/update-state.json` | timestamp and result of the last stable-release check |
 | `~/.sf-deck/instances.json` | running-instance registry |
 | `~/.sf-deck/control-<N>.sock` | per-instance IPC socket (when started with `--control`) |

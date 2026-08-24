@@ -6,11 +6,29 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- Authenticated Salesforce HTTP clients now require HTTPS instance URLs and
+  refuse redirects to a different origin.
+- Salesforce IDs, API names, generated SOQL identifiers, and date literals are
+  validated before they reach request paths or generated queries.
+- Forced bundle updates now replace leaf symlinks atomically instead of
+  writing through them.
+- Runtime credentials and recognised secret formats are centrally redacted
+  from logs, diagnostic dumps, API/render traces, and error envelopes.
+- The usage database is forced to owner-only permissions, and startup now
+  fails if the live-control socket cannot be secured to its owner.
+- Release archives receive GitHub/Sigstore provenance attestations. The release
+  pipeline is ready to Developer ID sign and Apple-notarise macOS binaries when
+  the optional Apple credentials become available.
+
 ### Changed
 
 - The default navigation jump is now ten rows with `Ctrl+Arrow`, `J`, or `K`.
 - Deploy-job polling now settles at ten-second intervals, while the live
   deploys view refreshes every twenty seconds to reduce Salesforce API usage.
+- Privacy and local-data reports now describe Apex debug-log history, saved
+  metadata comparisons, error-response dumps, and optional diagnostic traces.
 
 ## [0.1.6] - 2026-08-18
 

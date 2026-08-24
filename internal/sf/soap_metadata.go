@@ -147,6 +147,7 @@ func (c *Client) doSOAPOnce(action, logLabel string, timeout time.Duration, enve
 	token := c.accessToken
 	base := c.instanceURL
 	ver := c.apiVersion
+	httpc := c.http
 	c.mu.Unlock()
 	if ver == "" {
 		ver = defaultAPIVersion
@@ -162,9 +163,8 @@ func (c *Client) doSOAPOnce(action, logLabel string, timeout time.Duration, enve
 	req.Header.Set("SOAPAction", action)
 	req.Header.Set("User-Agent", "sf-deck/0.1")
 
-	httpc := c.http
-	if timeout > 0 && c.http.Timeout < timeout {
-		httpc = &http.Client{Timeout: timeout, Transport: c.http.Transport}
+	if timeout > 0 && httpc.Timeout < timeout {
+		httpc = clientWithTimeout(httpc, timeout)
 	}
 	started := time.Now()
 	defer func() {

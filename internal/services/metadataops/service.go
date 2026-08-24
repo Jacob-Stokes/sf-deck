@@ -117,8 +117,8 @@ func (s *Service) Delete(ctx context.Context, in DeleteInput) (DeleteResult, err
 	if err := ValidateType(in.Type); err != nil {
 		return DeleteResult{}, err
 	}
-	if strings.TrimSpace(in.ID) == "" {
-		return DeleteResult{}, errors.New("metadata id is required")
+	if err := sf.ValidateSalesforceID(strings.TrimSpace(in.ID)); err != nil {
+		return DeleteResult{}, fmt.Errorf("metadata id: %w", err)
 	}
 	// Metadata deletion is destructive and has no undo. Keep it at the
 	// full tier until settings grows a dedicated destructive-metadata kind.
@@ -162,8 +162,8 @@ func validateUpdate(in UpdateInput) error {
 	if err := ValidateType(in.Type); err != nil {
 		return err
 	}
-	if strings.TrimSpace(in.ID) == "" {
-		return errors.New("metadata id is required")
+	if err := sf.ValidateSalesforceID(strings.TrimSpace(in.ID)); err != nil {
+		return fmt.Errorf("metadata id: %w", err)
 	}
 	if in.Patch == nil {
 		return errors.New("metadata patch is required")

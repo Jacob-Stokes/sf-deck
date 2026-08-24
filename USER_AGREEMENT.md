@@ -1,8 +1,8 @@
 # User agreement
 
-Effective: 23 July 2026
+Effective: 24 August 2026
 
-Policy version: 2026-07-23
+Policy version: 2026-08-24
 
 This agreement applies when you use sf-deck to access a real Salesforce org.
 The software itself remains licensed under the

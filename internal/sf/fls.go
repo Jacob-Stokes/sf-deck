@@ -101,6 +101,9 @@ func mapFieldPermissionRow(r map[string]any) FieldPermissionRow {
 // here so callers can set either flag without worrying about the
 // invariant.
 func UpsertFieldPermission(target, id, sobject, field, parentID string, read, edit bool) (string, error) {
+	if err := validatePermissionReference(parentID, id, sobject, field); err != nil {
+		return "", err
+	}
 	if edit {
 		read = true
 	}
@@ -155,6 +158,9 @@ func UpsertFieldPermission(target, id, sobject, field, parentID string, read, ed
 // and Salesforce prefers "no row" to "row with everything false"
 // for cleanliness + reduced storage.
 func DeleteFieldPermission(target, id string) error {
+	if err := ValidateSalesforceID(id); err != nil {
+		return fmt.Errorf("field permission id: %w", err)
+	}
 	c, err := RESTClient(target)
 	if err != nil {
 		return err
@@ -162,6 +168,23 @@ func DeleteFieldPermission(target, id string) error {
 	path := c.APIPath("sobjects/FieldPermissions/" + id)
 	if _, err := c.delete(path); err != nil {
 		return upgradeToSFError(err)
+	}
+	return nil
+}
+
+func validatePermissionReference(parentID, id string, identifiers ...string) error {
+	if err := ValidateSalesforceID(parentID); err != nil {
+		return fmt.Errorf("permission parent id: %w", err)
+	}
+	if id != "" {
+		if err := ValidateSalesforceID(id); err != nil {
+			return fmt.Errorf("permission record id: %w", err)
+		}
+	}
+	for _, identifier := range identifiers {
+		if err := ValidateSOQLIdentifier(identifier); err != nil {
+			return fmt.Errorf("permission API name: %w", err)
+		}
 	}
 	return nil
 }
