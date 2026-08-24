@@ -3,6 +3,7 @@ package records
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/services/orgwrite"
@@ -193,6 +194,41 @@ func TestRecordIdentifiersAreStrictlyValidated(t *testing.T) {
 	for _, object := range []string{"Account/001", "../User", "Account?x", ""} {
 		if _, err := service.Create(context.Background(), CreateInput{SObject: object, Fields: map[string]any{"Name": "x"}}); err == nil {
 			t.Errorf("invalid object %q accepted", object)
+		}
+	}
+}
+
+func TestRecordEmptyFieldsAndRemoteErrors(t *testing.T) {
+	s := serviceAt(settings.SafetyFull, &fakeRemote{})
+	if _, err := s.Create(context.Background(), CreateInput{SObject: "Account"}); err == nil {
+		t.Fatal("create without fields accepted")
+	}
+	if _, err := s.Update(context.Background(), UpdateInput{SObject: "Account", ID: "001000000000000"}); err == nil {
+		t.Fatal("update without fields accepted")
+	}
+	boom := errors.New("remote failed")
+	remote := &fakeRemote{err: boom}
+	s = serviceAt(settings.SafetyFull, remote)
+	if result, err := s.Create(context.Background(), CreateInput{SObject: "Account", Fields: map[string]any{"Name": "x"}}); !errors.Is(err, boom) || result.SObject != "Account" {
+		t.Fatalf("create result=%#v err=%v", result, err)
+	}
+	remote.calls = nil
+	if result, err := s.Delete(context.Background(), DeleteInput{SObject: "Account", ID: "001000000000000"}); !errors.Is(err, boom) || result.ID == "" {
+		t.Fatalf("delete result=%#v err=%v", result, err)
+	}
+}
+
+func TestResolvedObjectErrorsAndInvalidNames(t *testing.T) {
+	boom := errors.New("resolve failed")
+	remote := &fakeRemote{err: boom}
+	result, err := serviceAt(settings.SafetyFull, remote).Update(context.Background(), UpdateInput{ID: "001000000000000", Fields: map[string]any{"Name": "x"}})
+	if !errors.Is(err, boom) || result.ID == "" {
+		t.Fatalf("resolve result=%#v err=%v", result, err)
+	}
+	longName := "A" + strings.Repeat("x", 255)
+	for _, name := range []string{"1Account", longName} {
+		if err := validateSObject(name); err == nil {
+			t.Errorf("invalid name accepted: %q", name)
 		}
 	}
 }

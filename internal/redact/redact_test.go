@@ -1,6 +1,8 @@
 package redact
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -46,5 +48,32 @@ func TestMapRedactsNestedStringsWithoutMutatingInput(t *testing.T) {
 	}
 	if got := in["error"].(map[string]any)["message"]; got != secret {
 		t.Fatalf("input was mutated: %v", got)
+	}
+}
+
+func TestCollectionHelpersCoverJSONLikeValues(t *testing.T) {
+	secret := "collection-runtime-secret-redact-test"
+	RegisterSecret(secret)
+	if got := Strings([]string{"ok", secret}); got[0] != "ok" || got[1] != replacement {
+		t.Fatalf("Strings() = %v", got)
+	}
+	if Map(nil) != nil {
+		t.Fatal("Map(nil) must remain nil")
+	}
+	in := map[string]any{
+		secret:    secret,
+		"error":   errors.New(secret),
+		"strings": []string{secret},
+		"items":   []any{secret, map[string]any{"token": secret}},
+		"number":  42,
+	}
+	out := Map(in)
+	if _, ok := out[replacement]; !ok {
+		t.Fatalf("secret map key not redacted: %#v", out)
+	}
+	for _, key := range []string{"error", "strings", "items"} {
+		if strings.Contains(fmt.Sprint(out[key]), secret) {
+			t.Errorf("%s retained secret: %#v", key, out[key])
+		}
 	}
 }

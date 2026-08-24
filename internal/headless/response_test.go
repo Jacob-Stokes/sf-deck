@@ -3,9 +3,14 @@ package headless
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }
 
 func TestSuccess_JSONShape(t *testing.T) {
 	r := Success("chip.create", "dev@example.com", "dev", true, map[string]any{
@@ -229,5 +234,20 @@ func TestFailRedactsSecretsFromErrorEnvelope(t *testing.T) {
 	}
 	if strings.Contains(string(b), secret) {
 		t.Fatalf("error envelope retained secret: %s", b)
+	}
+}
+
+func TestWriteErrorsAndUnknownMode(t *testing.T) {
+	for _, mode := range []WriteMode{JSONMode, TextMode} {
+		if err := Success("x", "", "", false, nil).Write(failingWriter{}, mode); err == nil {
+			t.Fatalf("mode %v did not return writer error", mode)
+		}
+	}
+	if err := Success("x", "", "", false, nil).Write(&bytes.Buffer{}, WriteMode(99)); err == nil {
+		t.Fatal("unknown mode accepted")
+	}
+	var buf bytes.Buffer
+	if err := (&Response{Command: "x"}).Write(&buf, TextMode); err != nil || buf.String() != "error · x\n" {
+		t.Fatalf("error without envelope: output=%q err=%v", buf.String(), err)
 	}
 }

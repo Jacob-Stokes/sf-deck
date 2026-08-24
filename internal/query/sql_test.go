@@ -188,3 +188,71 @@ func TestEvalAndToSOQLLockstep(t *testing.T) {
 		}
 	}
 }
+
+func TestToSOQLClausesAndLiteralEdges(t *testing.T) {
+	q := Query{
+		Where:   Cmp("Active", OpEq, false),
+		OrderBy: []OrderBy{{Field: "Name", Direction: Ascending, NullsLast: true}},
+		Limit:   5,
+	}
+	if got, want := ToSOQLClauses(q), "WHERE Active = false ORDER BY Name ASC NULLS LAST LIMIT 5"; got != want {
+		t.Fatalf("ToSOQLClauses() = %q, want %q", got, want)
+	}
+	if got := ToSOQLClauses(Query{OrderBy: []OrderBy{{Field: "Name", Direction: Descending}}}); got != "ORDER BY Name DESC" {
+		t.Fatalf("descending clauses = %q", got)
+	}
+	if got := ToSOQLWhere(Cmp("Count__c", OpIn, nil)); got != "Count__c IN ('')" {
+		t.Fatalf("empty IN = %q", got)
+	}
+	for value, want := range map[any]string{
+		int64(7): "Count__c = 7",
+		2.5:      "Count__c = 2.500000",
+		nil:      "Count__c = null",
+	} {
+		if got := ToSOQLWhere(Cmp("Count__c", OpEq, value)); got != want {
+			t.Errorf("literal %#v = %q, want %q", value, got, want)
+		}
+	}
+	if got := ToSOQLWhere(And()); got != "Id != null" {
+		t.Fatalf("empty AND = %q", got)
+	}
+	if got := ToSOQLWhere(Or()); got != "Id = null" {
+		t.Fatalf("empty OR = %q", got)
+	}
+}
+
+func TestSOQLValidationEdges(t *testing.T) {
+	for _, name := range []string{"", ".Name", "Account.", "Account..Name", "1Name", "Name-Other"} {
+		if validSOQLIdentifier(name) {
+			t.Errorf("invalid identifier accepted: %q", name)
+		}
+	}
+	for _, name := range []string{"Name", "Account.Owner.Name", "Field_2__c"} {
+		if !validSOQLIdentifier(name) {
+			t.Errorf("valid identifier rejected: %q", name)
+		}
+	}
+	for _, value := range []string{"", ":1", "TODAY:", "TODAY:1:2", "TODAY:x", "TODAY-1"} {
+		if validDateLiteral(value) {
+			t.Errorf("invalid date literal accepted: %q", value)
+		}
+	}
+	for _, value := range []string{"TODAY", "LAST_N_DAYS:30"} {
+		if !validDateLiteral(value) {
+			t.Errorf("valid date literal rejected: %q", value)
+		}
+	}
+	invalidQueries := []Query{
+		{Limit: -1},
+		{OrderBy: []OrderBy{{Field: "Name DESC LIMIT 1"}}},
+		{Columns: []string{"Id, Password__c"}},
+		{Where: NotNode{}},
+		{Where: AndNode{Children: []Node{Cmp("bad field", OpEq, 1)}}},
+		{Where: OrNode{Children: []Node{Cmp("bad field", OpEq, 1)}}},
+	}
+	for i, q := range invalidQueries {
+		if got := ToSOQL(q, "Account"); got != "" {
+			t.Errorf("invalid query %d emitted %q", i, got)
+		}
+	}
+}

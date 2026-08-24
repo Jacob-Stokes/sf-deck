@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/services/orgwrite"
@@ -156,5 +158,51 @@ func TestContextCancellationPreventsRemote(t *testing.T) {
 	_, err := serviceAt(settings.SafetyFull, remote).Delete(ctx, DeleteInput{Type: "CustomField", ID: "01I000000000001"})
 	if !errors.Is(err, context.Canceled) || len(remote.calls) != 0 {
 		t.Fatalf("err=%v remote=%v", err, remote.calls)
+	}
+}
+
+func TestValidationBranchesAndKnownTypes(t *testing.T) {
+	for _, in := range []CreateInput{
+		{},
+		{Type: "CustomField", Metadata: map[string]any{}},
+		{Type: "CustomField", FullName: "Account.Test__c"},
+	} {
+		if err := validateCreate(in); err == nil {
+			t.Errorf("invalid create accepted: %#v", in)
+		}
+	}
+	for _, in := range []UpdateInput{
+		{},
+		{Type: "CustomField", ID: "bad", Patch: map[string]any{}},
+		{Type: "CustomField", ID: "01I000000000001"},
+	} {
+		if err := validateUpdate(in); err == nil {
+			t.Errorf("invalid update accepted: %#v", in)
+		}
+	}
+	types := KnownTypes()
+	if len(types) == 0 || !sort.StringsAreSorted(types) {
+		t.Fatalf("KnownTypes not sorted: %v", types)
+	}
+	if got := (ErrInvalidType{Type: "Bad"}).Error(); !strings.Contains(got, "Bad") {
+		t.Fatalf("ErrInvalidType.Error() = %q", got)
+	}
+}
+
+func TestRemoteErrorsReturnResolvedTarget(t *testing.T) {
+	boom := errors.New("remote failed")
+	remote := &fakeRemote{err: boom}
+	s := serviceAt(settings.SafetyFull, remote)
+	created, err := s.Create(context.Background(), CreateInput{Type: "CustomField", FullName: "Account.Test__c", Metadata: map[string]any{}})
+	if !errors.Is(err, boom) || created.Target.CLIArg != "resolved" {
+		t.Fatalf("create result=%#v err=%v", created, err)
+	}
+	updated, err := s.Update(context.Background(), UpdateInput{Type: "CustomField", ID: "01I000000000001", Patch: map[string]any{}})
+	if !errors.Is(err, boom) || updated.Target.CLIArg != "resolved" {
+		t.Fatalf("update result=%#v err=%v", updated, err)
+	}
+	deleted, err := s.Delete(context.Background(), DeleteInput{Type: "CustomField", ID: "01I000000000001"})
+	if !errors.Is(err, boom) || deleted.Target.CLIArg != "resolved" {
+		t.Fatalf("delete result=%#v err=%v", deleted, err)
 	}
 }

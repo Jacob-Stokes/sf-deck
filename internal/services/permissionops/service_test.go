@@ -13,6 +13,7 @@ import (
 type fakeRemote struct {
 	calls  []string
 	target string
+	err    error
 }
 
 const (
@@ -22,23 +23,23 @@ const (
 
 func (f *fakeRemote) UpsertField(target, id, sobject, field, parentID string, read, edit bool) (string, error) {
 	f.calls, f.target = append(f.calls, "upsert-field"), target
-	return "field-id", nil
+	return "field-id", f.err
 }
 func (f *fakeRemote) DeleteField(target, id string) error {
 	f.calls, f.target = append(f.calls, "delete-field"), target
-	return nil
+	return f.err
 }
 func (f *fakeRemote) UpsertObject(target, id, parentID, sobject string, read, create, edit, delete, viewAll, modifyAll bool) (string, error) {
 	f.calls, f.target = append(f.calls, "upsert-object"), target
-	return "object-id", nil
+	return "object-id", f.err
 }
 func (f *fakeRemote) DeleteObject(target, id string) error {
 	f.calls, f.target = append(f.calls, "delete-object"), target
-	return nil
+	return f.err
 }
 func (f *fakeRemote) SetSystem(target, parentID, field string, value bool) error {
 	f.calls, f.target = append(f.calls, "set-system"), target
-	return nil
+	return f.err
 }
 
 func serviceAt(level settings.SafetyLevel, remote Remote) *Service {
@@ -123,5 +124,53 @@ func TestInvalidAndMissingDependenciesFailClosed(t *testing.T) {
 		if _, err := service.SetSystem(context.Background(), valid); err == nil {
 			t.Fatal("missing dependency accepted")
 		}
+	}
+}
+
+func TestPermissionValidationAndDeleteBranches(t *testing.T) {
+	s := serviceAt(settings.SafetyMetadata, &fakeRemote{})
+	for _, in := range []FieldInput{
+		{},
+		{SObject: "Account", Field: "Account.Name", ParentID: "bad", Read: true},
+		{SObject: "Account", Field: "Account.Name", ParentID: testParentID, ID: "bad", Read: true},
+		{SObject: "Account/evil", Field: "Account.Name", ParentID: testParentID, Read: true},
+	} {
+		if _, err := s.SetField(context.Background(), in); err == nil {
+			t.Errorf("invalid field input accepted: %#v", in)
+		}
+	}
+	if _, err := s.SetObject(context.Background(), ObjectInput{}); err == nil {
+		t.Fatal("empty object input accepted")
+	}
+	if _, err := s.SetSystem(context.Background(), SystemInput{}); err == nil {
+		t.Fatal("empty system input accepted")
+	}
+	remote := &fakeRemote{}
+	s = serviceAt(settings.SafetyMetadata, remote)
+	result, err := s.SetField(context.Background(), FieldInput{ID: testObjectID, SObject: "Account", Field: "Account.Name", ParentID: testParentID})
+	if err != nil || !result.Deleted || remote.calls[0] != "delete-field" {
+		t.Fatalf("field delete result=%#v err=%v calls=%v", result, err, remote.calls)
+	}
+	result, err = s.SetObject(context.Background(), ObjectInput{SObject: "Account", ParentID: testParentID})
+	if err != nil || !result.Noop {
+		t.Fatalf("object noop result=%#v err=%v", result, err)
+	}
+}
+
+func TestPermissionContextAndRemoteErrors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	remote := &fakeRemote{}
+	if _, err := serviceAt(settings.SafetyMetadata, remote).SetSystem(ctx, SystemInput{ParentID: testParentID, Field: "PermissionsApiEnabled"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled request err=%v", err)
+	}
+	boom := errors.New("remote failed")
+	remote.err = boom
+	s := serviceAt(settings.SafetyMetadata, remote)
+	if _, err := s.SetField(context.Background(), FieldInput{SObject: "Account", Field: "Account.Name", ParentID: testParentID, Read: true}); !errors.Is(err, boom) {
+		t.Fatalf("upsert error=%v", err)
+	}
+	if _, err := s.SetSystem(context.Background(), SystemInput{ParentID: testParentID, Field: "PermissionsApiEnabled"}); !errors.Is(err, boom) {
+		t.Fatalf("system error=%v", err)
 	}
 }
