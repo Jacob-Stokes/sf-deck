@@ -32,6 +32,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Bubble Tea, Bubbles, Lip Gloss, ANSI handling, and SQLite are updated to their
+  latest compatible releases.
 - The default navigation jump is now ten rows with `Ctrl+Arrow`, `J`, or `K`.
 - Deploy-job polling now settles at ten-second intervals, while the live
   deploys view refreshes every twenty seconds to reduce Salesforce API usage.
