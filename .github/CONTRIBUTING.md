@@ -29,7 +29,7 @@ go build -o sf-deck ./cmd/sf-deck
 
 Requirements:
 
-- Go 1.26.6+
+- Go 1.26.7+
 - `sf` CLI installed and authenticated to at least one org (for
   anything beyond `--demo`)
 - macOS or Linux (Windows isn't supported yet — see

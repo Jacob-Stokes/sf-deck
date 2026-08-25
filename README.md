@@ -81,7 +81,7 @@ tar -xzf sf-deck_VERSION_linux_ARCH.tar.gz
 sudo install -m 0755 sf-deck /usr/local/bin/sf-deck
 ```
 
-To build from source, install [Go 1.26.6+](https://go.dev/dl/), then run:
+To build from source, install [Go 1.26.7+](https://go.dev/dl/), then run:
 
 ```sh
 git clone https://github.com/Jacob-Stokes/sf-deck

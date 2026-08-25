@@ -6,8 +6,14 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-25
+
 ### Security
 
+- Release binaries are built with Go 1.26.7, including the latest `net/http`
+  fixes in the Go 1.26 release line.
+- `golang.org/x/text` is updated to 0.39.0, removing the final fixable
+  dependency advisory reported by `govulncheck`.
 - Authenticated Salesforce HTTP clients now require HTTPS instance URLs and
   refuse redirects to a different origin.
 - Salesforce IDs, API names, generated SOQL identifiers, and date literals are
@@ -21,6 +27,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release archives receive GitHub/Sigstore provenance attestations. The release
   pipeline is ready to Developer ID sign and Apple-notarise macOS binaries when
   the optional Apple credentials become available.
+- The manual live-org test has been removed, so the automated test suite cannot
+  contact a Salesforce org through a locally configured test target.
 
 ### Changed
 
@@ -174,7 +182,8 @@ Or download a binary from the
 See the [documentation](https://sfdeck.dev/docs/) for
 feature-specific limitations.
 
-[Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.3...v0.1.4

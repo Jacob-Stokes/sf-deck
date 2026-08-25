@@ -50,7 +50,7 @@ sudo install -m 0755 sf-deck /usr/local/bin/sf-deck
 
 ## Build from source
 
-Building requires [Go 1.26.6+](https://go.dev/dl/).
+Building requires [Go 1.26.7+](https://go.dev/dl/).
 
 ```sh
 git clone https://github.com/Jacob-Stokes/sf-deck
