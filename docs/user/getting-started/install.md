@@ -108,8 +108,9 @@ these directly, but it's good to know they exist:
 | `~/.sf-deck/control-<N>.sock` | per-instance IPC socket (when started with `--control`) |
 
 There is no telemetry. Normal data traffic goes to Salesforce. By default,
-release builds also make at most one anonymous request to GitHub Releases every
-24 hours to discover newer stable sf-deck versions. The request does not include
+release builds also check GitHub Releases anonymously for newer stable versions.
+Successful and failed automatic attempts are cached locally for 24 hours.
+Manual checks bypass the cache. The request does not include
 your current version, and sf-deck never downloads or installs an update.
 
 Manage this under **Settings → Updates**, or disable automatic checks for a

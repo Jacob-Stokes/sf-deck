@@ -129,8 +129,8 @@ Stale entries (pid no longer running) are pruned on read.
 ## update-state.json
 
 A non-sensitive cache containing the last GitHub Releases check time and the
-latest stable release metadata. Automatic checks use it to make at most one
-anonymous request every 24 hours. It contains no Salesforce data, credentials,
+latest stable release metadata or a failed-attempt flag. Automatic checks reuse
+successful and failed attempts for 24 hours. It contains no Salesforce data, credentials,
 machine identifier, or analytics.
 
 Safe to delete at any time. The next enabled automatic check recreates it.

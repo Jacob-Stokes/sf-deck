@@ -42,7 +42,7 @@
     <p>Exports and SFDX bundles are written to paths you choose. The default bundle path is <code>~/sf-deck-bundles/</code>. Local files are intended to be readable only by your operating-system user.</p>
 
     <h2>Network requests</h2>
-    <p>Normal data traffic goes directly from your computer to the selected Salesforce instance. When enabled, the update checker makes at most one request every 24 hours to GitHub Releases. It sends no installed version, Salesforce data, credentials, or sf-deck identifier and never installs software. GitHub may receive ordinary network information such as an IP address under its own privacy terms.</p>
+    <p>Normal data traffic goes directly from your computer to the selected Salesforce instance. Automatic update checks cache successful and failed GitHub Releases lookup attempts locally for 24 hours. Manual checks bypass the cache. Separate instances checking simultaneously or an unavailable cache can cause additional requests. The checker sends no installed version, Salesforce data, credentials, or sf-deck identifier and never installs software. GitHub may receive ordinary network information such as an IP address under its own privacy terms.</p>
 
     <h2>Inspect, delete, and revoke</h2>
     <pre><code>sf-deck data inspect

@@ -77,8 +77,10 @@ account may still be able to read them.
 Normal data traffic goes directly from your computer to the Salesforce
 instance selected through Salesforce CLI.
 
-When enabled, the update checker makes at most one request every 24 hours to
-GitHub Releases. It does not send your installed sf-deck version, Salesforce
+When enabled, automatic update checks use a local 24-hour cache for successful
+and failed attempts to contact GitHub Releases. Manual checks bypass that cache.
+Separate instances checking simultaneously or an unavailable cache can cause
+additional requests. The checker does not send your installed sf-deck version, Salesforce
 data, credentials, or an sf-deck identifier, and it never downloads or installs
 an update. GitHub may receive ordinary network information such as your IP
 address under GitHub's own privacy terms. Disable automatic checks in

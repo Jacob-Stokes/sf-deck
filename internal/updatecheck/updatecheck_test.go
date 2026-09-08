@@ -39,6 +39,38 @@ func TestEvaluateUpdateKinds(t *testing.T) {
 	}
 }
 
+func TestFailedChecksBackOffAcrossLaunches(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	now := time.Now()
+	path := filepath.Join(t.TempDir(), "state.json")
+	check := func(force bool) {
+		t.Helper()
+		c := &Checker{Client: srv.Client(), URL: srv.URL, StatePath: path, Now: func() time.Time { return now }}
+		if _, err := c.Check(context.Background(), "v0.1.0", Options{Force: force}); err == nil {
+			t.Fatal("failed lookup reported success")
+		}
+	}
+	check(false)
+	check(false)
+	if calls.Load() != 1 {
+		t.Fatal("failed check was not cached")
+	}
+	check(true)
+	if calls.Load() != 2 {
+		t.Fatal("manual retry was blocked")
+	}
+	now = now.Add(CheckInterval)
+	check(false)
+	if calls.Load() != 3 {
+		t.Fatal("automatic retry remained blocked after 24 hours")
+	}
+}
+
 func TestCheckerCachesForTwentyFourHours(t *testing.T) {
 	t.Parallel()
 	var calls atomic.Int32

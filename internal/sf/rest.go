@@ -62,9 +62,10 @@ var (
 )
 
 type clientEntry struct {
-	once   sync.Once
-	client *Client
-	err    error
+	once            sync.Once
+	client          *Client
+	err             error
+	wantInstanceURL string // guarded by clientsMu, including while bootstrap is pending
 }
 
 // RESTClient returns a REST client for the given org alias, bootstrapping
@@ -106,8 +107,15 @@ func RESTClient(alias string) (*Client, error) {
 				Timeout: cfgHTTPTimeout(),
 			},
 		}
-		if err := c.bootstrap(); err != nil {
+		err := c.bootstrap()
+		clientsMu.Lock()
+		defer clientsMu.Unlock()
+		if err != nil {
 			entry.err = err
+			return
+		}
+		if entry.wantInstanceURL != "" && !sameInstanceHost(c.instanceURL, entry.wantInstanceURL) {
+			entry.err = errors.New("org changed during authentication; retry the request")
 			return
 		}
 		entry.client = c
@@ -116,7 +124,9 @@ func RESTClient(alias string) (*Client, error) {
 		// Reset the entry so a future call can retry — sync.Once
 		// would otherwise pin the error forever.
 		clientsMu.Lock()
-		delete(clients, alias)
+		if clients[alias] == entry {
+			delete(clients, alias)
+		}
 		clientsMu.Unlock()
 		return nil, entry.err
 	}
@@ -157,7 +167,7 @@ func ReconcileRESTClients(wantInstanceURL map[string]string) {
 			continue
 		}
 		if entry.client == nil {
-			delete(clients, alias)
+			entry.wantInstanceURL = want
 			continue
 		}
 		entry.client.mu.Lock()

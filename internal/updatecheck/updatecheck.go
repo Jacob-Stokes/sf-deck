@@ -1,8 +1,8 @@
 // Package updatecheck discovers newer stable sf-deck releases.
 //
 // It deliberately does not download or install anything. Automatic callers
-// use a small on-disk cache so normal TUI launches make at most one anonymous
-// GitHub Releases request per 24 hours.
+// use a small on-disk cache to reuse successful and failed lookup attempts
+// for 24 hours between normal TUI launches.
 package updatecheck
 
 import (
@@ -82,6 +82,7 @@ type release struct {
 type state struct {
 	CheckedAt time.Time `json:"checked_at"`
 	Release   release   `json:"release"`
+	Failed    bool      `json:"failed,omitempty"`
 }
 
 // Check returns the latest stable release relative to currentVersion.
@@ -104,12 +105,18 @@ func (c *Checker) Check(ctx context.Context, currentVersion string, opts Options
 			!cached.CheckedAt.IsZero() &&
 			checkedAt.Sub(cached.CheckedAt) >= 0 &&
 			checkedAt.Sub(cached.CheckedAt) < CheckInterval {
+			if cached.Failed {
+				return Result{}, errors.New("previous update check failed; automatic retry deferred for 24 hours (check manually to retry now)")
+			}
 			return evaluate(currentVersion, cached.Release, cached.CheckedAt, true)
 		}
 	}
 
 	rel, err := c.fetch(ctx)
 	if err != nil {
+		if path != "" {
+			_ = saveState(path, state{CheckedAt: checkedAt, Failed: true})
+		}
 		return Result{}, err
 	}
 	st := state{CheckedAt: checkedAt, Release: rel}

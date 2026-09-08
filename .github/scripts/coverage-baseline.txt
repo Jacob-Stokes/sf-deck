@@ -51,6 +51,6 @@ github.com/Jacob-Stokes/sf-deck/internal/ui/qchip/migrate 64.4
 github.com/Jacob-Stokes/sf-deck/internal/ui/resource 55.6
 github.com/Jacob-Stokes/sf-deck/internal/ui/tablemodel 73.1
 github.com/Jacob-Stokes/sf-deck/internal/ui/uilayout 32.7
-github.com/Jacob-Stokes/sf-deck/internal/updatecheck 72.4
+github.com/Jacob-Stokes/sf-deck/internal/updatecheck 76.3
 github.com/Jacob-Stokes/sf-deck/internal/usage 54.2
 github.com/Jacob-Stokes/sf-deck/internal/verbs 88.0

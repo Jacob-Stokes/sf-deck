@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep pending authentication synchronized during org refreshes, without duplicate CLI lookups.
+- Back off failed automatic update checks for 24 hours. Manual checks can still retry immediately.
+
 ## [0.1.7] - 2026-08-25
 
 ### Security
