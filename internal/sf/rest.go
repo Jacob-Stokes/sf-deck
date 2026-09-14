@@ -45,6 +45,7 @@ type Client struct {
 	apiVersion  string
 	http        *http.Client
 	mu          sync.Mutex
+	authMu      sync.Mutex
 }
 
 // clients is a per-alias singleton registry. First call to RESTClient
@@ -206,6 +207,8 @@ func TokenFetchInFlight() bool { return tokenFetchInFlight.Load() > 0 }
 // on newer CLIs where display redacts it. Older CLIs still work because
 // display may return a usable accessToken and avoid the second command.
 func (c *Client) bootstrap() error {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
 	tokenFetchInFlight.Add(1)
 	defer tokenFetchInFlight.Add(-1)
 	out, err := runSF("org", "display", "--verbose", "-o", c.alias, "--json")
@@ -231,7 +234,10 @@ func (c *Client) bootstrap() error {
 		accessToken = token
 	}
 	redact.RegisterSecret(accessToken)
-	httpc, err := authenticatedHTTPClient(c.http, parsed.Result.InstanceURL)
+	c.mu.Lock()
+	baseHTTP := c.http
+	c.mu.Unlock()
+	httpc, err := authenticatedHTTPClient(baseHTTP, parsed.Result.InstanceURL)
 	if err != nil {
 		return fmt.Errorf("reject Salesforce instance URL: %w", err)
 	}
@@ -250,7 +256,7 @@ func (c *Client) bootstrap() error {
 		c.apiVersion = defaultAPIVersion
 	}
 	c.mu.Unlock()
-	if c.accessToken == "" {
+	if accessToken == "" {
 		return fmt.Errorf("sf returned no access token for %s", c.alias)
 	}
 	return nil
@@ -557,12 +563,18 @@ func (c *Client) doOnceCtx(ctx context.Context, method, path string, query url.V
 // returns an absolute-to-instance path for callers that want to build
 // a URL themselves.
 func (c *Client) APIPath(suffix string) string {
-	return "/services/data/v" + c.apiVersion + "/" + strings.TrimLeft(suffix, "/")
+	return "/services/data/v" + c.apiVersionSnapshot() + "/" + strings.TrimLeft(suffix, "/")
 }
 
 // ToolingPath is the tooling-API equivalent of APIPath.
 func (c *Client) ToolingPath(suffix string) string {
-	return "/services/data/v" + c.apiVersion + "/tooling/" + strings.TrimLeft(suffix, "/")
+	return "/services/data/v" + c.apiVersionSnapshot() + "/tooling/" + strings.TrimLeft(suffix, "/")
+}
+
+func (c *Client) apiVersionSnapshot() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.apiVersion
 }
 
 const defaultAPIVersion = "62.0"
@@ -579,8 +591,10 @@ func APIVersionForAlias(alias string) string {
 	if alias == "" {
 		return defaultAPIVersion
 	}
-	if c, ok := lookupClient(alias); ok && c.apiVersion != "" {
-		return c.apiVersion
+	if c, ok := lookupClient(alias); ok {
+		if version := c.apiVersionSnapshot(); version != "" {
+			return version
+		}
 	}
 	// Fresh shell-out as a last resort. Result isn't cached here
 	// because callers on this path are already in the CLI-fallback
@@ -597,8 +611,8 @@ func APIVersionForAlias(alias string) string {
 // RESTClient bootstrap on the CLI-fallback path.
 func lookupClient(alias string) (*Client, bool) {
 	clientsMu.Lock()
+	defer clientsMu.Unlock()
 	entry, ok := clients[alias]
-	clientsMu.Unlock()
 	if !ok || entry == nil || entry.client == nil {
 		return nil, false
 	}

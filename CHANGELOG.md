@@ -6,10 +6,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-09-14
+
 ### Fixed
 
 - Keep pending authentication synchronized during org refreshes, without duplicate CLI lookups.
 - Back off failed automatic update checks for 24 hours. Manual checks can still retry immediately.
+- Synchronize expired-session refreshes with concurrent API-version readers.
+
+### Changed
+
+- Update Bubbles to 2.2.1 and SQLite to 1.58.0.
+- Clarify automatic update-check caching and its exceptions in the security documentation.
 
 ## [0.1.7] - 2026-08-25
 
@@ -189,7 +197,8 @@ Or download a binary from the
 See the [documentation](https://sfdeck.dev/docs/) for
 feature-specific limitations.
 
-[Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.4...v0.1.5

@@ -100,9 +100,12 @@ func DeployMetadata(target, version string, members []PackageMember, files []Met
 		return nil, err
 	}
 	if version == "" {
-		version = c.apiVersion
+		version = c.apiVersionSnapshot()
 	}
-	dlogf("DeployMetadata using version=%s instanceURL=%s", version, c.instanceURL)
+	c.mu.Lock()
+	instanceURL := c.instanceURL
+	c.mu.Unlock()
+	dlogf("DeployMetadata using version=%s instanceURL=%s", version, instanceURL)
 
 	zipBytes, err := buildDeployZip(version, members, files)
 	if err != nil {

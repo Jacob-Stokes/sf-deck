@@ -22,9 +22,10 @@ sf-deck's threat model is narrow because the surface is small:
 - **No telemetry or analytics.** Normal data-plane traffic goes to the
   Salesforce instance selected through the `sf` CLI. User-invoked browser
   actions may also open documented links in the user's browser. Release builds
-  make at most one anonymous, version-free GitHub Releases request every 24
-  hours when automatic update checks are enabled. The check is optional,
-  cached, and never downloads or installs software.
+  cache successful and failed automatic GitHub Releases checks for 24 hours.
+  Manual checks bypass the cache. Simultaneous instances or an unavailable
+  cache can cause additional requests. Checks are anonymous, version-free,
+  optional, and never download or install software.
 - **Credentials remain owned by the `sf` CLI.** sf-deck does not persist
   credentials itself, but it does request the current access token from `sf`,
   holds it in process memory, and uses it for direct Salesforce REST/SOAP
