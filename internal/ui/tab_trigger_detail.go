@@ -24,7 +24,7 @@ func (m *Model) triggerDetailDrill(sobject, id string, returnTab Tab) tea.Cmd {
 	d.DescribeCur = sobject
 	d.Triggers.DrillID = id
 	m.triggerActionCur = 0
-	m.bodyFocus = false
+	m.bodyFocus = true
 	if returnTab != TabTriggerDetail {
 		m.triggerDetailReturnTab = returnTab
 	} else {
