@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-09-28
+
 ### Fixed
 
 - Apply record-save completion to the originating org and preserve newer unsaved edits.
@@ -15,6 +17,10 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Write the record-reference CSV sidecar during headless bundle creation.
 - Keep identical metadata from different orgs when importing project bundles.
 - Focus trigger code immediately on drill-down so keyboard and mouse scrolling work.
+
+### Changed
+
+- Update Bubble Tea to 2.0.10 and SQLite to 1.59.0.
 
 ## [0.1.8] - 2026-09-14
 
@@ -207,7 +213,8 @@ Or download a binary from the
 See the [documentation](https://sfdeck.dev/docs/) for
 feature-specific limitations.
 
-[Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Jacob-Stokes/sf-deck/compare/v0.1.5...v0.1.6
