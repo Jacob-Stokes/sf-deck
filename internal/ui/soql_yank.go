@@ -97,9 +97,9 @@ func (m *Model) yankToClipboard(s, successFlash string) tea.Cmd {
 func formatINValue(v any, formatted string) string {
 	switch v.(type) {
 	case string:
-		return "'" + strings.ReplaceAll(formatted, "'", "''") + "'"
+		return "'" + sf.EscapeSOQLString(formatted) + "'"
 	case bool, float64, int, int64, float32:
 		return formatted
 	}
-	return "'" + strings.ReplaceAll(formatted, "'", "''") + "'"
+	return "'" + sf.EscapeSOQLString(formatted) + "'"
 }

@@ -108,7 +108,7 @@ func (s *Service) deploy(ctx context.Context, in OperationInput, async bool) (Op
 		out, err = s.remote.Deploy(bundle.Path, target.CLIArg, in.Opts)
 	}
 	result := OperationResult{Target: target, Output: out}
-	if err == nil {
+	if err == nil && !async {
 		_ = s.store.MarkDeployed(in.BundleID)
 	}
 	return result, err

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Jacob-Stokes/sf-deck/internal/devproject"
+	"github.com/Jacob-Stokes/sf-deck/internal/exporters"
 	dpexport "github.com/Jacob-Stokes/sf-deck/internal/exporters/devproject"
 	"github.com/Jacob-Stokes/sf-deck/internal/securefile"
 	"github.com/Jacob-Stokes/sf-deck/internal/sf"
@@ -197,8 +198,15 @@ func Create(store *devproject.Store, in CreateInput) (CreateResult, error) {
 	}); err != nil {
 		return CreateResult{}, fmt.Errorf("write package.xml: %w", err)
 	}
-	if result.IncludedCount == 0 {
+	if result.IncludedCount == 0 && len(result.Records) == 0 {
 		return CreateResult{}, fmt.Errorf("no items mapped to MetadataAPI types (records / unsupported only)")
+	}
+	if len(result.Records) > 0 {
+		if err := securefile.Write(filepath.Join(path, "records.csv"), true, func(w io.Writer) error {
+			return exporters.Write(w, exporters.FormatCSV, dpexport.Headers, dpexport.Rows(result.Records, nil), "records")
+		}); err != nil {
+			return CreateResult{}, fmt.Errorf("write records.csv: %w", err)
+		}
 	}
 
 	if in.FullProject {

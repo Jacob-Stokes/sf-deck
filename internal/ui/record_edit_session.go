@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -149,6 +150,10 @@ func (m *Model) discardAllEdits() {
 }
 
 type recordEditSaveMsg struct {
+	OrgUser  string
+	Target   string
+	Session  *recordEditSession
+	Fields   map[string]any
 	Sobject  string
 	RecordID string
 	Errors   []sf.FieldError
@@ -200,6 +205,7 @@ func (m *Model) triggerRecordEditSave() tea.Cmd {
 			Target: alias, SObject: sobject, ID: id, Fields: fields,
 		})
 		return recordEditSaveMsg{
+			OrgUser: o.Username, Target: alias, Session: session, Fields: fields,
 			Sobject:  sobject,
 			RecordID: id,
 			Errors:   result.FieldErrors,
@@ -209,13 +215,13 @@ func (m *Model) triggerRecordEditSave() tea.Cmd {
 }
 
 func (m *Model) applyRecordEditSave(msg recordEditSaveMsg) tea.Cmd {
-	d, _ := m.activeOrgState()
+	d := m.data[msg.OrgUser]
 	if d == nil || d.EditSessions == nil {
 		return nil
 	}
 	key := editSessionKey(msg.Sobject, msg.RecordID)
 	session := d.EditSessions[key]
-	if session == nil {
+	if session == nil || session != msg.Session {
 		return nil
 	}
 	session.Saving = false
@@ -236,12 +242,17 @@ func (m *Model) applyRecordEditSave(msg recordEditSaveMsg) tea.Cmd {
 		}
 		return nil
 	}
-	delete(d.EditSessions, key)
-	if len(m.orgs) == 0 {
-		return nil
+	for field, saved := range msg.Fields {
+		if current, ok := session.Dirty[field]; ok && reflect.DeepEqual(current, saved) {
+			delete(session.Dirty, field)
+		}
 	}
-	o := m.orgs[m.selected]
-	r := d.EnsureRecordDetail(targetArg(o), msg.Sobject, msg.RecordID)
+	session.Errors = map[string]string{}
+	session.LastError = ""
+	if len(session.Dirty) == 0 && session.Editing == nil {
+		delete(d.EditSessions, key)
+	}
+	r := d.EnsureRecordDetail(msg.Target, msg.Sobject, msg.RecordID)
 	return r.Refresh(m.cache)
 }
 

@@ -78,7 +78,9 @@ func ImportBundle(s *devproject.Store, in ImportBundleInput) (ImportBundleResult
 	}
 	seen := map[string]bool{}
 	for _, it := range existing {
-		seen[itemKey(it.Kind, it.Ref)] = true
+		if it.OrgUser == in.OrgUser {
+			seen[itemKey(it.Kind, it.Ref)] = true
+		}
 	}
 
 	result := ImportBundleResult{

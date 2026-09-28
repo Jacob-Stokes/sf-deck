@@ -32,6 +32,21 @@ func (m *Model) setSelectedOrg(i int) {
 	if i < 0 || i >= len(m.orgs) {
 		return
 	}
+	if m.selectedUsername != m.orgs[i].Username {
+		if m.soqlCancel != nil {
+			m.soqlCancel()
+		}
+		m.soqlRunGen++
+		m.soqlCancel = nil
+		m.soqlRunning = false
+		m.soqlResult = sf.QueryResult{}
+		m.soqlErr = nil
+		m.soqlRowCur = 0
+		if m.soqlModal != nil && m.soqlModal.session.soqlCancel != nil {
+			m.soqlModal.session.soqlCancel()
+		}
+		m.soqlModal = nil
+	}
 	m.selected = i
 	m.selectedUsername = m.orgs[i].Username
 }

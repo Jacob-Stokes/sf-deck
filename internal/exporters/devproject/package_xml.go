@@ -416,7 +416,7 @@ func SuggestedReadme(projectName, orgUser string, result PackageXMLResult, fullP
 		b.WriteString("- `force-app/main/default/` — empty target directory for retrieved source.\n")
 	}
 	if len(result.Records) > 0 {
-		fmt.Fprintf(&b, "- `records.csv` — record-data items (%d). These are data, not metadata; import via Data Loader / Workbench / sf data import.\n", len(result.Records))
+		fmt.Fprintf(&b, "- `records.csv` — references to %d collected records, with IDs, names, orgs and notes. This is not a record-field data export and cannot be imported as record data.\n", len(result.Records))
 	}
 	if len(result.Unsupported) > 0 {
 		fmt.Fprintf(&b, "- %d item(s) skipped because their kind isn't yet mappable to MetadataAPI types.\n", len(result.Unsupported))

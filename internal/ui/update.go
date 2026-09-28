@@ -390,6 +390,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 
 	case soqlResultMsg:
+		if msg.orgUser != "" && (len(m.orgs) == 0 || m.orgs[m.selected].Username != msg.orgUser) {
+			return m, nil
+		}
 		session := (&m).soqlSessionForTarget(msg.session)
 		if session == nil {
 			return m, nil

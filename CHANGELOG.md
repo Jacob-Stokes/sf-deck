@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Apply record-save completion to the originating org and preserve newer unsaved edits.
+- Clear SOQL results and cancel pending queries when switching orgs, rejecting late results.
+- Escape apostrophes and backslashes correctly in copied SOQL `IN` clauses.
+- Do not mark asynchronous deployment submissions as completed deployments.
+- Write the record-reference CSV sidecar during headless bundle creation.
+- Keep identical metadata from different orgs when importing project bundles.
+- Focus trigger code immediately on drill-down so keyboard and mouse scrolling work.
+
 ## [0.1.8] - 2026-09-14
 
 ### Fixed
