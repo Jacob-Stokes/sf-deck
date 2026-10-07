@@ -1,0 +1,209 @@
+// Package headless is the wire contract for sf-deck's CLI / agent
+// surface — the JSON envelope, error codes, and exit-code policy
+// every headless command renders into.
+package headless
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/Jacob-Stokes/sf-deck/internal/redact"
+)
+
+// Response is the standard envelope every headless command renders.
+// Mirrors the shape documented in docs/headless-mode-plan.md.
+type Response struct {
+	OK bool `json:"ok"`
+
+	Command string `json:"command"`
+
+	Org string `json:"org,omitempty"`
+
+	Target string `json:"target,omitempty"`
+
+	// Changed reports whether the command mutated any state.
+	// Useful for idempotent commands that no-op when the target is
+	// already in the desired state — skills can decide whether to
+	// surface a "changed N items" line based on this.
+	Changed bool `json:"changed,omitempty"`
+
+	Warnings []string `json:"warnings,omitempty"`
+
+	Data any `json:"data,omitempty"`
+
+	Error *Error `json:"error,omitempty"`
+}
+
+// Error is the typed failure envelope.
+type Error struct {
+	Code string `json:"code"`
+
+	Message string `json:"message"`
+
+	// Details carries structured context (the required safety
+	// level, the conflicting field name, etc.). Shape varies per
+	// code; documented next to each constant below.
+	Details map[string]any `json:"details,omitempty"`
+}
+
+// Error implements the error interface so command bodies can return
+// *Error directly and have the marshal path use the typed shape.
+func (e *Error) Error() string {
+	if e == nil {
+		return ""
+	}
+	return e.Message
+}
+
+// Standard error codes. Stable strings — adding new codes is
+// allowed, renaming existing ones is a contract break.
+const (
+	// ErrInvalidArgument — caller passed unparseable input. Maps
+	// to exit code 2.
+	ErrInvalidArgument = "invalid_argument"
+
+	// ErrSafetyBlocked — the configured safety policy refuses
+	// this write on this org. Details carry required_write_kind
+	// and effective_safety. Maps to exit code 3.
+	ErrSafetyBlocked = "safety_blocked"
+
+	// ErrNotFound — the referenced record / chip / project /
+	// org doesn't exist. Maps to exit code 4.
+	ErrNotFound = "not_found"
+
+	// ErrAuth — Salesforce auth/session issue (expired token,
+	// disconnected org). Maps to exit code 5.
+	ErrAuth = "auth_required"
+
+	// ErrPartial — multi-item operation that succeeded for some
+	// items + failed for others. Details carry per-item status.
+	// Maps to exit code 6.
+	ErrPartial = "partial_success"
+
+	// ErrInternal — anything else (network failure, programming
+	// bug, unexpected state). Maps to exit code 1.
+	ErrInternal = "internal_error"
+)
+
+// Exit code policy. Headless commands call os.Exit(ExitCodeFor(r))
+// or its equivalent so script callers can branch on $?.
+const (
+	ExitOK             = 0
+	ExitInternal       = 1
+	ExitInvalidArg     = 2
+	ExitSafetyBlocked  = 3
+	ExitNotFound       = 4
+	ExitAuthRequired   = 5
+	ExitPartialSuccess = 6
+)
+
+// ExitCodeFor returns the appropriate process exit code for a
+// completed Response. Success paths return 0; error responses route
+// through their Code.
+func ExitCodeFor(r *Response) int {
+	if r == nil {
+		return ExitInternal
+	}
+	if r.OK {
+		return ExitOK
+	}
+	if r.Error == nil {
+		return ExitInternal
+	}
+	switch r.Error.Code {
+	case ErrInvalidArgument:
+		return ExitInvalidArg
+	case ErrSafetyBlocked:
+		return ExitSafetyBlocked
+	case ErrNotFound:
+		return ExitNotFound
+	case ErrAuth:
+		return ExitAuthRequired
+	case ErrPartial:
+		return ExitPartialSuccess
+	}
+	return ExitInternal
+}
+
+// Write renders the response to w. JSON mode emits a single
+// pretty-printed JSON object followed by a newline; text mode emits
+// a short summary line. Each command decides which mode to use
+// based on the user's --json flag.
+type WriteMode int
+
+const (
+	// JSONMode emits the Response as pretty-printed JSON.
+	// Standard for skill / agent / script consumption.
+	JSONMode WriteMode = iota
+	// TextMode emits a one-line human summary. Default for
+	// interactive shell use.
+	TextMode
+)
+
+// Write renders r to w according to mode. Returns the io.Writer
+// error if any; never modifies r.
+func (r *Response) Write(w io.Writer, mode WriteMode) error {
+	if w == nil {
+		w = os.Stdout
+	}
+	switch mode {
+	case JSONMode:
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(r); err != nil {
+			return err
+		}
+		_, err := w.Write(redact.Bytes(buf.Bytes()))
+		return err
+	case TextMode:
+		var line string
+		if r.OK {
+			if r.Changed {
+				line = fmt.Sprintf("ok · %s · changed\n", r.Command)
+			} else {
+				line = fmt.Sprintf("ok · %s\n", r.Command)
+			}
+			_, err := io.WriteString(w, redact.String(line))
+			return err
+		}
+		if r.Error != nil {
+			line = fmt.Sprintf("error · %s · %s · %s\n",
+				r.Command, r.Error.Code, r.Error.Message)
+		} else {
+			line = fmt.Sprintf("error · %s\n", r.Command)
+		}
+		_, err := io.WriteString(w, redact.String(line))
+		return err
+	}
+	return fmt.Errorf("unknown write mode: %d", mode)
+}
+
+// Success is a convenience constructor for happy-path responses.
+func Success(command, org, target string, changed bool, data any) *Response {
+	return &Response{
+		OK:      true,
+		Command: command,
+		Org:     org,
+		Target:  target,
+		Changed: changed,
+		Data:    data,
+	}
+}
+
+// Fail is the convenience constructor for typed errors.
+func Fail(command, org string, code, message string, details map[string]any) *Response {
+	return &Response{
+		OK:      false,
+		Command: redact.String(command),
+		Org:     redact.String(org),
+		Error: &Error{
+			Code:    redact.String(code),
+			Message: redact.String(message),
+			Details: redact.Map(details),
+		},
+	}
+}

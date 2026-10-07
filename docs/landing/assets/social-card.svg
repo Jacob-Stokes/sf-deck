@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="headline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7aa2f7"/>
+      <stop offset="0.48" stop-color="#7dcfff"/>
+      <stop offset="1" stop-color="#bb9af7"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientTransform="translate(160 40) rotate(44) scale(570 470)">
+      <stop stop-color="#7aa2f7" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#7aa2f7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientTransform="translate(1100 120) rotate(136) scale(500 430)">
+      <stop stop-color="#bb9af7" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#bb9af7" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#0d0f1a" flood-opacity="0.65"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="#222436"/>
+  <rect width="1200" height="630" fill="url(#glowA)"/>
+  <rect width="1200" height="630" fill="url(#glowB)"/>
+
+  <text x="76" y="86" fill="#7aa2f7" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="34" font-weight="700">sf</text>
+  <text x="112" y="86" fill="#c0caf5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="34" font-weight="700">-deck</text>
+
+  <text x="76" y="205" fill="#c0caf5" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="64" font-weight="800">Every Salesforce org,</text>
+  <text x="76" y="282" fill="#7dcfff" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="64" font-weight="800">one keystroke away.</text>
+  <text x="78" y="342" fill="#a0a8cf" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="25">A keyboard-first, safety-gated Salesforce workspace for your terminal.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="76" y="408" width="1048" height="142" rx="20" fill="#292c44" stroke="#727dab" stroke-width="2"/>
+    <rect x="76" y="408" width="1048" height="46" rx="20" fill="#2e3350"/>
+    <rect x="76" y="434" width="1048" height="20" fill="#2e3350"/>
+    <circle cx="105" cy="431" r="7" fill="#f7768e"/>
+    <circle cx="129" cy="431" r="7" fill="#e0af68"/>
+    <circle cx="153" cy="431" r="7" fill="#9ece6a"/>
+    <text x="180" y="439" fill="#929bc5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="17">shell</text>
+    <text x="108" y="511" fill="#929bc5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="25">$</text>
+    <text x="140" y="511" fill="#7dcfff" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="25">brew install --cask Jacob-Stokes/tap/sf-deck</text>
+  </g>
+
+  <text x="76" y="600" fill="#929bc5" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="18">macOS · Linux · Apache-2.0 · no application telemetry</text>
+</svg>

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sfdeck.dev/sitemap.xml
+Sitemap: https://sfdeck.dev/docs/sitemap.xml

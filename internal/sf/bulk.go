@@ -1,0 +1,363 @@
+package sf
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// BulkQueryResult summarises a completed bulk export. The body has
+// already been streamed to the caller's io.Writer; this struct carries
+// the metadata.
+type BulkQueryResult struct {
+	JobID    string
+	RowCount int           // total records written across all chunks
+	Chunks   int           // how many /results pages we walked
+	Polls    int           // how many status polls fired
+	Elapsed  time.Duration // wall-clock from submit to last byte
+}
+
+// BulkQueryProgress reports per-stage progress so the UI can render a
+// "submitting / polling / downloading" affordance instead of a black-box
+// wait. Sent over the progress channel passed to BulkQuery; consumers
+// can ignore it (nil channel = no progress).
+type BulkQueryProgress struct {
+	Stage   string // "submit" | "poll" | "download" | "done"
+	JobID   string
+	State   string // SF-reported state during polling
+	Rows    int    // cumulative rows written during download
+	Chunks  int    // cumulative chunks downloaded
+	Polls   int    // cumulative status polls
+	Elapsed time.Duration
+}
+
+// BulkQuery submits the given SOQL as a Bulk API 2.0 query job, polls
+// it to completion, and streams the CSV result into out. Returns a
+// summary or an error. ctx cancellation aborts the job (best-effort;
+// SF doesn't always honour DELETE quickly).
+//
+// progress, if non-nil, receives Stage updates. The channel is NOT
+// closed by BulkQuery — the caller owns its lifetime. Sends are
+// non-blocking (drop if the consumer can't keep up) so a slow UI
+// thread can't stall the network goroutine.
+func (c *Client) BulkQuery(ctx context.Context, soql string, out io.Writer, progress chan<- BulkQueryProgress) (BulkQueryResult, error) {
+	start := time.Now()
+	res := BulkQueryResult{}
+	sendProgress := func(p BulkQueryProgress) {
+		p.Elapsed = time.Since(start)
+		if progress == nil {
+			return
+		}
+		select {
+		case progress <- p:
+		default:
+		}
+	}
+
+	sendProgress(BulkQueryProgress{Stage: "submit"})
+	jobID, err := c.bulkSubmit(soql)
+	if err != nil {
+		return res, fmt.Errorf("bulk submit: %w", err)
+	}
+	res.JobID = jobID
+
+	for {
+		if err := ctx.Err(); err != nil {
+			_ = c.bulkAbort(jobID)
+			return res, ctx.Err()
+		}
+		state, err := c.bulkStatus(jobID)
+		res.Polls++
+		sendProgress(BulkQueryProgress{Stage: "poll", JobID: jobID, State: state, Polls: res.Polls})
+		if err != nil {
+			return res, fmt.Errorf("bulk status: %w", err)
+		}
+		switch state {
+		case "JobComplete":
+			goto downloadLoop
+		case "Failed", "Aborted":
+			return res, fmt.Errorf("bulk job %s ended in state %s", jobID, state)
+		}
+		wait := pollInterval(res.Polls)
+		select {
+		case <-ctx.Done():
+			_ = c.bulkAbort(jobID)
+			return res, ctx.Err()
+		case <-time.After(wait):
+		}
+	}
+
+downloadLoop:
+	locator := ""
+	for {
+		if err := ctx.Err(); err != nil {
+			return res, ctx.Err()
+		}
+		rows, nextLoc, err := c.bulkDownloadChunk(jobID, locator, out, res.Chunks == 0)
+		res.Chunks++
+		res.RowCount += rows
+		sendProgress(BulkQueryProgress{
+			Stage:  "download",
+			JobID:  jobID,
+			Rows:   res.RowCount,
+			Chunks: res.Chunks,
+			Polls:  res.Polls,
+		})
+		if err != nil {
+			return res, fmt.Errorf("bulk download: %w", err)
+		}
+		if nextLoc == "" || nextLoc == "null" {
+			break
+		}
+		locator = nextLoc
+	}
+	res.Elapsed = time.Since(start)
+	sendProgress(BulkQueryProgress{Stage: "done", JobID: jobID, Rows: res.RowCount, Chunks: res.Chunks, Polls: res.Polls})
+	return res, nil
+}
+
+func pollInterval(pollCount int) time.Duration {
+	steady := cfgBulkPoll()
+	fast := steady / 2
+	if fast < time.Second {
+		fast = time.Second
+	}
+	slow := steady * 2
+	switch {
+	case pollCount < 5:
+		return fast
+	case pollCount < 15:
+		return steady
+	default:
+		return slow
+	}
+}
+
+func (c *Client) bulkSubmit(soql string) (string, error) {
+	path := c.APIPath("jobs/query")
+	body, err := json.Marshal(map[string]any{
+		"operation": "query",
+		"query":     soql,
+	})
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.post(path, body)
+	if err != nil {
+		return "", err
+	}
+	var parsed struct {
+		ID    string `json:"id"`
+		State string `json:"state"`
+	}
+	if err := json.Unmarshal(resp, &parsed); err != nil {
+		return "", fmt.Errorf("decode submit response: %w", err)
+	}
+	if parsed.ID == "" {
+		return "", fmt.Errorf("bulk submit returned empty job ID")
+	}
+	return parsed.ID, nil
+}
+
+func (c *Client) bulkStatus(jobID string) (string, error) {
+	path := c.APIPath("jobs/query/" + jobID)
+	resp, err := c.get(path, nil)
+	if err != nil {
+		return "", err
+	}
+	var parsed struct {
+		State string `json:"state"`
+	}
+	if err := json.Unmarshal(resp, &parsed); err != nil {
+		return "", fmt.Errorf("decode status: %w", err)
+	}
+	return parsed.State, nil
+}
+
+func (c *Client) bulkAbort(jobID string) error {
+	path := c.APIPath("jobs/query/" + jobID)
+	body, _ := json.Marshal(map[string]any{"state": "Aborted"})
+	_, err := c.patch(path, body)
+	return err
+}
+
+func (c *Client) bulkDownloadChunk(jobID, locator string, out io.Writer, includeHeader bool) (int, string, error) {
+	c.mu.Lock()
+	token := c.accessToken
+	base := c.instanceURL
+	httpc := c.http
+	c.mu.Unlock()
+
+	path := c.APIPath("jobs/query/" + jobID + "/results")
+	q := url.Values{}
+	if locator != "" {
+		q.Set("locator", locator)
+	}
+	u := strings.TrimRight(base, "/") + path
+	if len(q) > 0 {
+		u += "?" + q.Encode()
+	}
+	logPath := path
+	if len(q) > 0 {
+		logPath += "?" + q.Encode()
+	}
+
+	startedAt := time.Now()
+	var err error
+	defer func() { fireOnCall(c.alias, []string{"GET", logPath}, err, time.Since(startedAt)) }()
+
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return 0, "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "text/csv")
+	req.Header.Set("User-Agent", "sf-deck/0.1")
+
+	resp, err := httpc.Do(req)
+	if err != nil {
+		return 0, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		err = &sfHTTPError{Status: resp.StatusCode, Body: body}
+		return 0, "", err
+	}
+
+	nextLoc := resp.Header.Get("Sforce-Locator")
+	rowsHeader := resp.Header.Get("Sforce-NumberOfRecords")
+	rowsFromHeader := 0
+	if rowsHeader != "" {
+		if n, err := strconv.Atoi(rowsHeader); err == nil {
+			rowsFromHeader = n
+		}
+	}
+
+	br := bufio.NewReaderSize(resp.Body, 32*1024)
+	rows := 0
+	lineNum := 0
+	for {
+		line, isPrefix, rerr := br.ReadLine()
+		if rerr == io.EOF && len(line) == 0 {
+			break
+		}
+		if rerr != nil && rerr != io.EOF {
+			err = rerr
+			return rows, "", rerr
+		}
+		full := append([]byte(nil), line...)
+		for isPrefix {
+			var more []byte
+			more, isPrefix, rerr = br.ReadLine()
+			if rerr != nil && rerr != io.EOF {
+				err = rerr
+				return rows, "", rerr
+			}
+			full = append(full, more...)
+		}
+		lineNum++
+		if lineNum == 1 && !includeHeader {
+			continue
+		}
+		if _, werr := out.Write(full); werr != nil {
+			err = werr
+			return rows, "", werr
+		}
+		if _, werr := out.Write([]byte("\n")); werr != nil {
+			err = werr
+			return rows, "", werr
+		}
+		if lineNum > 1 || !includeHeader {
+			rows++
+		}
+		if rerr == io.EOF {
+			break
+		}
+	}
+	if rowsFromHeader > 0 {
+		rows = rowsFromHeader
+	}
+	return rows, nextLoc, nil
+}
+
+// BulkQueryAlias is the alias-flavoured entry point that mirrors the
+// rest of this package's "give me the org name, I'll find the client"
+// shape. Most call sites use this; tests that want to inject a fake
+// client construct one directly.
+func BulkQueryAlias(ctx context.Context, orgAlias, soql string, out io.Writer, progress chan<- BulkQueryProgress) (BulkQueryResult, error) {
+	c, err := RESTClient(orgAlias)
+	if err != nil {
+		return BulkQueryResult{}, err
+	}
+	return c.BulkQuery(ctx, soql, out, progress)
+}
+
+// BulkQueryRecords runs the SOQL via Bulk API 2.0 and returns the
+// parsed records as a QueryResult — same shape REST queries return,
+// so the /soql renderer doesn't need a Bulk-specific code path. Used
+// by the editor's Bulk toggle (ctrl+b) to pull large result sets in
+// one API call instead of N/2000.
+//
+// Caveats vs REST:
+//   - All cell values come back as strings (Bulk CSV has no native
+//     types). Numeric/date cells render as their string form; the
+//     SOQL grid's formatCell already handles that gracefully.
+//   - Nested relationships ("Account.Name") flatten as dotted column
+//     headers — same shape SF returns, so Record.Field's dotted-path
+//     traversal still works.
+//   - Done is always true (Bulk always returns the full set).
+//     TotalSize reports the parsed row count, since Bulk doesn't
+//     surface SF's WHERE-clause total separately.
+//
+// Buffers the entire CSV in memory before parsing — fine up to ~1M
+// rows on modern hardware. progress is forwarded to the underlying
+// BulkQuery so the UI can show submit/poll/download stages.
+func BulkQueryRecords(ctx context.Context, orgAlias, soql string, progress chan<- BulkQueryProgress) (QueryResult, error) {
+	var buf bytes.Buffer
+	if _, err := BulkQueryAlias(ctx, orgAlias, soql, &buf, progress); err != nil {
+		return QueryResult{}, err
+	}
+	return parseBulkCSV(buf.Bytes())
+}
+
+func parseBulkCSV(body []byte) (QueryResult, error) {
+	r := csv.NewReader(bytes.NewReader(body))
+	r.ReuseRecord = false
+	r.FieldsPerRecord = -1 // tolerate header/row width mismatches
+	header, err := r.Read()
+	if err == io.EOF {
+		return QueryResult{Records: nil, Done: true}, nil
+	}
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("bulk csv header: %w", err)
+	}
+	records := make([]map[string]any, 0, 1024)
+	for {
+		row, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return QueryResult{}, fmt.Errorf("bulk csv row %d: %w", len(records)+1, err)
+		}
+		rec := make(map[string]any, len(header))
+		for i, name := range header {
+			if i >= len(row) {
+				break
+			}
+			rec[name] = row[i]
+		}
+		records = append(records, rec)
+	}
+	return QueryResult{Records: records, TotalSize: len(records), Done: true}, nil
+}
