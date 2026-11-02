@@ -6,6 +6,19 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- Build with Go 1.26.10 and update the Go networking dependencies to include
+  fixes for HTTP and certificate-handling vulnerabilities.
+- Update Excelize to 2.11.1 to fix malformed-workbook panics, excessive memory
+  allocation, and CPU exhaustion during XLSX report processing.
+
+### Changed
+
+- Update Bubble Tea to 2.1.0, ANSI handling to 0.11.9, and SQLite to 1.60.1.
+- Update the documentation theme, certificate bundle, and pinned build actions.
+- Isolate startup and UI tests from the developer's real settings and databases.
+
 ## [0.1.9] - 2026-09-28
 
 ### Fixed
